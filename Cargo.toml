@@ -11,6 +11,10 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 tokio = { version = "1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.6", default-features = false, features = ["codec"] }
 
+# SIMD
+simdutf8 = { version = "0.1", default-features = false, features = ["std", "public_imp", "aarch64_neon"], optional = true }
+
+# Client
 base64 = { version = "0.13", optional = true }
 hyper = { version = "0.14", default-features = false, optional = true }
 rand = { version = "0.8", optional = true }
@@ -18,6 +22,7 @@ rand = { version = "0.8", optional = true }
 [features]
 default = ["client"]
 client = ["base64", "hyper", "hyper/client", "hyper/http1", "hyper/tcp", "rand"]
+simd = ["simdutf8"]
 
 [dev-dependencies]
 tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread"] }

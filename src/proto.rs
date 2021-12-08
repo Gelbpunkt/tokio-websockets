@@ -2,6 +2,8 @@
 use bytes::{Buf, BufMut, BytesMut};
 use futures_util::{SinkExt, StreamExt};
 use rand::{thread_rng, RngCore};
+#[cfg(feature = "simd")]
+use simdutf8::basic::imp::Utf8Validator;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
@@ -17,6 +19,31 @@ unsafe fn prepend_slice<T: Copy>(vec: &mut Vec<T>, slice: &[T]) {
     ptr::copy(vec.as_ptr(), vec.as_mut_ptr().add(amt), len);
     ptr::copy(slice.as_ptr(), vec.as_mut_ptr(), amt);
     vec.set_len(len + amt);
+}
+
+#[cfg(feature = "simd")]
+#[inline]
+fn parse_utf8(input: Vec<u8>) -> Result<String, ProtocolError> {
+    unsafe {
+        #[cfg(target_feature = "avx2")]
+        let mut validator = simdutf8::basic::imp::x86::avx2::Utf8ValidatorImp::new();
+        #[cfg(all(target_feature = "sse4.2", not(target_feature = "avx2")))]
+        let mut validator = simdutf8::basic::imp::x86::sse42::Utf8ValidatorImp::new();
+
+        validator.update(&input);
+
+        if validator.finalize().is_ok() {
+            Ok(String::from_utf8_unchecked(input))
+        } else {
+            Err(ProtocolError::InvalidUtf8)
+        }
+    }
+}
+
+#[cfg(not(feature = "simd"))]
+#[inline(always)]
+fn parse_utf8(input: Vec<u8>) -> Result<String, ProtocolError> {
+    Ok(String::from_utf8(input)?)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -397,7 +424,7 @@ impl Message {
         match opcode {
             OpCode::Continuation => Err(ProtocolError::DisallowedOpcode),
             OpCode::Text => {
-                let data = String::from_utf8(data)?;
+                let data = parse_utf8(data)?;
 
                 Ok(Self::Text(data))
             }
@@ -416,7 +443,7 @@ impl Message {
                     let reason = if data.is_empty() {
                         None
                     } else {
-                        Some(String::from_utf8(data[2..].to_vec())?)
+                        Some(parse_utf8(data[2..].to_vec())?)
                     };
 
                     Ok(Self::Close(Some(close_code), reason))
@@ -477,7 +504,7 @@ impl Message {
     pub fn into_text(self) -> Result<String, ProtocolError> {
         match self {
             Self::Text(text) => Ok(text),
-            Self::Binary(data) => Ok(String::from_utf8(data)?),
+            Self::Binary(data) => Ok(parse_utf8(data)?),
             _ => Err(ProtocolError::MessageCannotBeText),
         }
     }
