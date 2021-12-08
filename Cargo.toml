@@ -1,0 +1,32 @@
+[package]
+name = "tokio-websockets"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytes = "1"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+tokio = { version = "1", default-features = false, features = ["net"] }
+tokio-util = { version = "0.6", default-features = false, features = ["codec"] }
+
+base64 = { version = "0.13", optional = true }
+hyper = { version = "0.14", default-features = false, optional = true }
+rand = { version = "0.8", optional = true }
+
+[features]
+default = ["client"]
+client = ["base64", "hyper", "hyper/client", "hyper/http1", "hyper/tcp", "rand"]
+
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread"] }
+
+[profile.autobahn]
+inherits = "release"
+codegen-units = 1
+debug = false
+incremental = false
+lto = true
+opt-level = 3
+panic = "abort"
