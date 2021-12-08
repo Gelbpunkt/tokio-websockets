@@ -1,4 +1,4 @@
-/// https://datatracker.ietf.org/doc/html/rfc6455#section-5.2
+/// <https://datatracker.ietf.org/doc/html/rfc6455#section-5.2>
 use bytes::{Buf, BufMut, BytesMut};
 use futures_util::{SinkExt, StreamExt};
 use rand::{thread_rng, RngCore};
@@ -30,7 +30,7 @@ pub enum OpCode {
 }
 
 impl OpCode {
-    fn is_control(&self) -> bool {
+    fn is_control(self) -> bool {
         return matches!(self, Self::Close | Self::Ping | Self::Pong);
     }
 }
@@ -151,6 +151,7 @@ macro_rules! ensure_buffer_has_space {
 }
 
 impl WebsocketProtocol {
+    #[must_use]
     pub fn new(role: Role) -> Self {
         Self { role }
     }
@@ -160,6 +161,7 @@ impl Decoder for WebsocketProtocol {
     type Item = Frame;
     type Error = Error;
 
+    #[allow(clippy::cast_possible_truncation)]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Opcode and payload length must be present
         ensure_buffer_has_space!(src, 2);
@@ -260,6 +262,7 @@ impl Decoder for WebsocketProtocol {
 impl Encoder<Frame> for WebsocketProtocol {
     type Error = Error;
 
+    #[allow(clippy::cast_possible_truncation)]
     fn encode(&mut self, item: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let chunk_size = item.payload.len();
         let masked = self.role == Role::Client;
@@ -360,9 +363,9 @@ impl From<CloseCode> for u16 {
             CloseCode::MandatoryExtension => 1010,
             CloseCode::InternalServerError => 1011,
             CloseCode::TlsHandshake => 1015,
-            CloseCode::ReservedForStandards(value) => value,
-            CloseCode::Libraries(value) => value,
-            CloseCode::Private(value) => value,
+            CloseCode::ReservedForStandards(value)
+            | CloseCode::Libraries(value)
+            | CloseCode::Private(value) => value,
         }
     }
 }
@@ -410,10 +413,10 @@ impl Message {
                         return Err(ProtocolError::DisallowedCloseCode);
                     }
 
-                    let reason = if !data.is_empty() {
-                        Some(String::from_utf8(data[2..].to_vec())?)
-                    } else {
+                    let reason = if data.is_empty() {
                         None
+                    } else {
+                        Some(String::from_utf8(data[2..].to_vec())?)
                     };
 
                     Ok(Self::Close(Some(close_code), reason))
@@ -446,22 +449,27 @@ impl Message {
         }
     }
 
+    #[must_use]
     pub fn is_text(&self) -> bool {
         return matches!(self, Self::Text(_));
     }
 
+    #[must_use]
     pub fn is_binary(&self) -> bool {
         return matches!(self, Self::Binary(_));
     }
 
+    #[must_use]
     pub fn is_close(&self) -> bool {
         return matches!(self, Self::Close(_, _));
     }
 
+    #[must_use]
     pub fn is_ping(&self) -> bool {
         return matches!(self, Self::Ping(_));
     }
 
+    #[must_use]
     pub fn is_pong(&self) -> bool {
         return matches!(self, Self::Pong(_));
     }

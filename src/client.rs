@@ -15,7 +15,7 @@ pub async fn client(uri: Uri) -> WebsocketStream<Upgraded> {
     let mut rng = thread_rng();
     let ws_key_raw = Alphanumeric {}.sample_string(&mut rng, 16);
 
-    let req = Request::builder()
+    let request = Request::builder()
         .uri(uri)
         .header(CONNECTION, "Upgrade")
         .header(UPGRADE, "websocket")
@@ -27,17 +27,19 @@ pub async fn client(uri: Uri) -> WebsocketStream<Upgraded> {
     let mut connector = HttpConnector::new();
     connector.enforce_http(false);
 
-    let res = Client::builder()
+    let response = Client::builder()
         .build(connector)
-        .request(req)
+        .request(request)
         .await
         .unwrap();
 
-    if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-        panic!("Our server didn't upgrade: {}", res.status());
-    }
+    assert!(
+        !(response.status() != StatusCode::SWITCHING_PROTOCOLS),
+        "Our server didn't upgrade: {}",
+        response.status()
+    );
 
-    match hyper::upgrade::on(res).await {
+    match hyper::upgrade::on(response).await {
         Ok(upgraded) => WebsocketStream::new(upgraded, Role::Client),
         Err(e) => panic!("upgrade error: {}", e),
     }
