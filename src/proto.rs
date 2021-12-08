@@ -14,7 +14,7 @@ unsafe fn prepend_slice<T: Copy>(vec: &mut Vec<T>, slice: &[T]) {
     let amt = slice.len();
     vec.reserve(amt);
 
-    ptr::copy(vec.as_ptr(), vec.as_mut_ptr().offset((amt) as isize), len);
+    ptr::copy(vec.as_ptr(), vec.as_mut_ptr().add(amt), len);
     ptr::copy(slice.as_ptr(), vec.as_mut_ptr(), amt);
     vec.set_len(len + amt);
 }
@@ -51,15 +51,15 @@ impl TryFrom<u8> for OpCode {
     }
 }
 
-impl Into<u8> for OpCode {
-    fn into(self) -> u8 {
-        match self {
-            Self::Continuation => 0,
-            Self::Text => 1,
-            Self::Binary => 2,
-            Self::Close => 8,
-            Self::Ping => 9,
-            Self::Pong => 10,
+impl From<OpCode> for u8 {
+    fn from(value: OpCode) -> Self {
+        match value {
+            OpCode::Continuation => 0,
+            OpCode::Text => 1,
+            OpCode::Binary => 2,
+            OpCode::Close => 8,
+            OpCode::Ping => 9,
+            OpCode::Pong => 10,
         }
     }
 }
@@ -235,7 +235,7 @@ impl Decoder for WebsocketProtocol {
 
             if mask {
                 for (i, byte) in payload.iter_mut().enumerate() {
-                    *byte = *byte ^ masking_key[i % 4];
+                    *byte ^= masking_key[i % 4];
                 }
             }
 
@@ -336,7 +336,7 @@ impl TryFrom<u16> for CloseCode {
             1010 => Ok(Self::MandatoryExtension),
             1011 => Ok(Self::InternalServerError),
             1015 => Ok(Self::TlsHandshake),
-            1000..=2999 => Ok(Self::ReservedForStandards(value)),
+            1012..=1014 | 1016..=2999 => Ok(Self::ReservedForStandards(value)),
             3000..=3999 => Ok(Self::Libraries(value)),
             4000..=4999 => Ok(Self::Private(value)),
             _ => Err(ProtocolError::InvalidCloseCode),
@@ -344,25 +344,25 @@ impl TryFrom<u16> for CloseCode {
     }
 }
 
-impl Into<u16> for CloseCode {
-    fn into(self) -> u16 {
-        match self {
-            Self::NormalClosure => 1000,
-            Self::GoingAway => 1001,
-            Self::ProtocolError => 1002,
-            Self::UnsupportedData => 1003,
-            Self::Reserved => 1004,
-            Self::NoStatusReceived => 1005,
-            Self::AbnormalClosure => 1006,
-            Self::InvalidFramePayloadData => 1007,
-            Self::PolicyViolation => 1008,
-            Self::MessageTooBig => 1009,
-            Self::MandatoryExtension => 1010,
-            Self::InternalServerError => 1011,
-            Self::TlsHandshake => 1015,
-            Self::ReservedForStandards(value) => value,
-            Self::Libraries(value) => value,
-            Self::Private(value) => value,
+impl From<CloseCode> for u16 {
+    fn from(value: CloseCode) -> Self {
+        match value {
+            CloseCode::NormalClosure => 1000,
+            CloseCode::GoingAway => 1001,
+            CloseCode::ProtocolError => 1002,
+            CloseCode::UnsupportedData => 1003,
+            CloseCode::Reserved => 1004,
+            CloseCode::NoStatusReceived => 1005,
+            CloseCode::AbnormalClosure => 1006,
+            CloseCode::InvalidFramePayloadData => 1007,
+            CloseCode::PolicyViolation => 1008,
+            CloseCode::MessageTooBig => 1009,
+            CloseCode::MandatoryExtension => 1010,
+            CloseCode::InternalServerError => 1011,
+            CloseCode::TlsHandshake => 1015,
+            CloseCode::ReservedForStandards(value) => value,
+            CloseCode::Libraries(value) => value,
+            CloseCode::Private(value) => value,
         }
     }
 }
