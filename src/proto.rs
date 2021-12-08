@@ -100,14 +100,14 @@ pub enum ProtocolError {
 impl ProtocolError {
     fn to_close(&self) -> Message {
         match self {
-            Self::InvalidUtf8 => Message::Close(Some((
-                CloseCode::InvalidFramePayloadData,
-                String::from("invalid utf8"),
-            ))),
-            _ => Message::Close(Some((
-                CloseCode::ProtocolError,
-                String::from("protocol violation"),
-            ))),
+            Self::InvalidUtf8 => Message::Close(
+                Some(CloseCode::InvalidFramePayloadData),
+                Some(String::from("invalid utf8")),
+            ),
+            _ => Message::Close(
+                Some(CloseCode::ProtocolError),
+                Some(String::from("protocol violation")),
+            ),
         }
     }
 }
@@ -384,7 +384,7 @@ impl CloseCode {
 pub enum Message {
     Text(String),
     Binary(Vec<u8>),
-    Close(Option<(CloseCode, String)>),
+    Close(Option<CloseCode>, Option<String>),
     Ping(Vec<u8>),
     Pong(Vec<u8>),
 }
@@ -401,7 +401,7 @@ impl Message {
             OpCode::Binary => Ok(Self::Binary(data)),
             OpCode::Close => {
                 if data.is_empty() {
-                    Ok(Self::Close(None))
+                    Ok(Self::Close(None, None))
                 } else {
                     let close_code_value = u16::from_be_bytes(data[..2].try_into().unwrap());
                     let close_code = CloseCode::try_from(close_code_value)?;
@@ -410,9 +410,13 @@ impl Message {
                         return Err(ProtocolError::DisallowedCloseCode);
                     }
 
-                    let reason = String::from_utf8(data[2..].to_vec())?;
+                    let reason = if !data.is_empty() {
+                        Some(String::from_utf8(data[2..].to_vec())?)
+                    } else {
+                        None
+                    };
 
-                    Ok(Self::Close(Some((close_code, reason))))
+                    Ok(Self::Close(Some(close_code), reason))
                 }
             }
             OpCode::Ping => Ok(Self::Ping(data)),
@@ -424,11 +428,11 @@ impl Message {
         match self {
             Self::Text(text) => (OpCode::Text, text.into_bytes()),
             Self::Binary(data) => (OpCode::Binary, data),
-            Self::Close(close_data) => {
-                if let Some((close_code, reason)) = close_data {
+            Self::Close(close_code, reason) => {
+                if let Some(close_code) = close_code {
                     let close_code_value: u16 = close_code.into();
                     let close = close_code_value.to_be_bytes();
-                    let mut rest = reason.into_bytes();
+                    let mut rest = reason.unwrap_or_default().into_bytes();
 
                     unsafe { prepend_slice(&mut rest, &close) };
 
@@ -451,7 +455,7 @@ impl Message {
     }
 
     pub fn is_close(&self) -> bool {
-        return matches!(self, Self::Close(_));
+        return matches!(self, Self::Close(_, _));
     }
 
     pub fn is_ping(&self) -> bool {
@@ -588,7 +592,7 @@ where
         };
 
         match &message {
-            Message::Close(_) => match self.state {
+            Message::Close(_, _) => match self.state {
                 StreamState::Active => {
                     self.state = StreamState::ClosedByPeer;
                     if let Err(e) = self.write_message(message.clone()).await {
@@ -649,5 +653,13 @@ where
         } else {
             Ok(())
         }
+    }
+
+    pub async fn close(
+        &mut self,
+        close_code: Option<CloseCode>,
+        reason: Option<String>,
+    ) -> Result<(), Error> {
+        self.write_message(Message::Close(close_code, reason)).await
     }
 }

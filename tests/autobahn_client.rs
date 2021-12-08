@@ -3,7 +3,7 @@ use std::str::FromStr;
 use hyper::Uri;
 use tokio_websockets::{
     client::client,
-    proto::{CloseCode, Error, Message},
+    proto::{CloseCode, Error},
 };
 
 const AGENT: &str = "tokio-websockets";
@@ -14,8 +14,10 @@ async fn get_case_count() -> Result<u32, Error> {
     let msg = stream.read_message().await.unwrap()?;
 
     println!("Called close manually!");
-    let close = Message::Close(Some((CloseCode::NormalClosure, String::from("kthxbye"))));
-    stream.write_message(close).await.unwrap();
+    stream
+        .close(Some(CloseCode::NormalClosure), None)
+        .await
+        .unwrap();
 
     Ok(msg.into_text().unwrap().parse::<u32>().unwrap())
 }
@@ -28,8 +30,7 @@ async fn update_reports() -> Result<(), Error> {
     .unwrap();
     let mut stream = client(uri).await;
 
-    let close = Message::Close(Some((CloseCode::NormalClosure, String::from("kthxbye"))));
-    stream.write_message(close).await?;
+    stream.close(Some(CloseCode::NormalClosure), None).await?;
 
     Ok(())
 }
