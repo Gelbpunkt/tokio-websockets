@@ -6,6 +6,9 @@ use tokio_websockets::{
     proto::{CloseCode, Error},
 };
 
+#[cfg(feature = "simd")]
+const AGENT: &str = "tokio-websockets-avx2";
+#[cfg(not(feature = "simd"))]
 const AGENT: &str = "tokio-websockets";
 
 async fn get_case_count() -> Result<u32, Error> {
@@ -13,7 +16,6 @@ async fn get_case_count() -> Result<u32, Error> {
     let mut stream = client(uri).await;
     let msg = stream.read_message().await.unwrap()?;
 
-    println!("Called close manually!");
     stream
         .close(Some(CloseCode::NormalClosure), None)
         .await
@@ -57,7 +59,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::main]
 async fn main() -> Result<(), Error> {
     let total = get_case_count().await?;
 

@@ -27,8 +27,7 @@ simd = ["simdutf8"]
 [dev-dependencies]
 tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread"] }
 
-[profile.autobahn]
-inherits = "release"
+[profile.release]
 codegen-units = 1
 debug = false
 incremental = false

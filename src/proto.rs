@@ -7,9 +7,29 @@ use simdutf8::basic::imp::Utf8Validator;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
+#[cfg(all(feature = "simd", target_feature = "avx2"))]
+use std::arch::x86_64::{
+    _mm256_load_si256, _mm256_loadu_si256, _mm256_storeu_si256, _mm256_xor_si256,
+};
+#[cfg(all(
+    feature = "simd",
+    not(target_feature = "avx2"),
+    target_feature = "sse2"
+))]
+use std::arch::x86_64::{_mm_load_si128, _mm_loadu_si128, _mm_storeu_si128, _mm_xor_si128};
 use std::{io::Error as IoError, mem::take, ptr, string::FromUtf8Error};
 
 const FRAME_SIZE: usize = 4096;
+
+#[cfg(all(feature = "simd", target_feature = "avx2"))]
+const AVX2_ALIGNMENT: usize = 32;
+
+#[cfg(all(
+    feature = "simd",
+    not(target_feature = "avx2"),
+    target_feature = "sse2"
+))]
+const SSE2_ALIGNMENT: usize = 16;
 
 unsafe fn prepend_slice<T: Copy>(vec: &mut Vec<T>, slice: &[T]) {
     let len = vec.len();
@@ -41,9 +61,115 @@ fn parse_utf8(input: Vec<u8>) -> Result<String, ProtocolError> {
 }
 
 #[cfg(not(feature = "simd"))]
-#[inline(always)]
+#[inline]
 fn parse_utf8(input: Vec<u8>) -> Result<String, ProtocolError> {
     Ok(String::from_utf8(input)?)
+}
+
+#[cfg(all(feature = "simd", target_feature = "avx2"))]
+#[inline]
+fn mask_frame(key: [u8; 4], input: &mut Vec<u8>) {
+    unsafe {
+        let payload_len = input.len();
+
+        // We might be done already
+        if payload_len < AVX2_ALIGNMENT {
+            // Run fallback implementation on small data
+            for (index, byte) in input.iter_mut().enumerate() {
+                *byte ^= key[index % 4];
+            }
+
+            return;
+        }
+
+        let postamble_start = payload_len - payload_len % AVX2_ALIGNMENT;
+
+        // Align the key
+        let mut extended_mask = [0; AVX2_ALIGNMENT];
+
+        for j in (0..AVX2_ALIGNMENT).step_by(4) {
+            ptr::copy_nonoverlapping(key.as_ptr(), extended_mask.as_mut_ptr().add(j), 4);
+        }
+
+        let mask = _mm256_load_si256(extended_mask.as_ptr().cast());
+
+        for index in (0..postamble_start).step_by(AVX2_ALIGNMENT) {
+            let memory_addr = input.as_mut_ptr().add(index).cast();
+            let mut v = _mm256_loadu_si256(memory_addr);
+            v = _mm256_xor_si256(v, mask);
+            _mm256_storeu_si256(memory_addr, v);
+        }
+
+        if postamble_start != payload_len {
+            // Run fallback implementation on postamble data
+            for (index, byte) in input
+                .get_unchecked_mut(postamble_start..)
+                .iter_mut()
+                .enumerate()
+            {
+                *byte ^= key[index % 4];
+            }
+        }
+    }
+}
+
+#[cfg(all(
+    feature = "simd",
+    not(target_feature = "avx2"),
+    target_feature = "sse2"
+))]
+#[inline]
+fn mask_frame(key: [u8; 4], input: &mut Vec<u8>) {
+    unsafe {
+        let payload_len = input.len();
+
+        // We might be done already
+        if payload_len < SSE2_ALIGNMENT {
+            // Run fallback implementation on small data
+            for (index, byte) in input.iter_mut().enumerate() {
+                *byte ^= key[index % 4];
+            }
+
+            return;
+        }
+
+        let postamble_start = payload_len - payload_len % AVX2_ALIGNMENT;
+
+        // Align the key
+        let mut extended_mask = [0; SSE2_ALIGNMENT];
+
+        for j in (0..SSE2_ALIGNMENT).step_by(4) {
+            ptr::copy_nonoverlapping(key.as_ptr(), extended_mask.as_mut_ptr().add(j), 4);
+        }
+
+        let mask = _mm_load_si128(extended_mask.as_ptr().cast());
+
+        for index in (0..postamble_start).step_by(SSE2_ALIGNMENT) {
+            let memory_addr = input.as_mut_ptr().add(index).cast();
+            let mut v = _mm_loadu_si128(memory_addr);
+            v = _mm_xor_si128(v, mask);
+            _mm_storeu_si128(memory_addr, v);
+        }
+
+        if postamble_start != payload_len {
+            // Run fallback implementation on postamble data
+            for (index, byte) in input
+                .get_unchecked_mut(postamble_start..)
+                .iter_mut()
+                .enumerate()
+            {
+                *byte ^= key[index % 4];
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "simd"))]
+#[inline]
+fn mask_frame(key: [u8; 4], input: &mut Vec<u8>) {
+    for (index, byte) in input.iter_mut().enumerate() {
+        *byte ^= key[index % 4];
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -263,9 +389,7 @@ impl Decoder for WebsocketProtocol {
             offset += payload_length;
 
             if mask {
-                for (i, byte) in payload.iter_mut().enumerate() {
-                    *byte ^= masking_key[i % 4];
-                }
+                mask_frame(masking_key, &mut payload);
             }
 
             // Close frames must be at least 2 bytes in length
@@ -290,13 +414,13 @@ impl Encoder<Frame> for WebsocketProtocol {
     type Error = Error;
 
     #[allow(clippy::cast_possible_truncation)]
-    fn encode(&mut self, item: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, mut item: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let chunk_size = item.payload.len();
         let masked = self.role == Role::Client;
-        let mask_bit = 128 * masked as u8;
+        let mask_bit = 128 * u8::from(masked);
         let opcode_value: u8 = item.opcode.into();
 
-        let frame = ((item.is_final as u8) << 7) + opcode_value;
+        let frame = (u8::from(item.is_final) << 7) + opcode_value;
 
         dst.put_u8(frame);
 
@@ -317,12 +441,10 @@ impl Encoder<Frame> for WebsocketProtocol {
 
             dst.extend_from_slice(&mask);
 
-            for (i, byte) in item.payload.iter().enumerate() {
-                dst.put_u8(byte ^ mask[i % 4]);
-            }
-        } else {
-            dst.extend_from_slice(&item.payload);
+            mask_frame(mask, &mut item.payload);
         }
+
+        dst.extend_from_slice(&item.payload);
 
         Ok(())
     }
@@ -546,8 +668,11 @@ where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     pub fn new(stream: T, role: Role) -> Self {
+        let mut framed = WebsocketProtocol::new(role).framed(stream);
+        framed.read_buffer_mut().reserve(4 * 1024);
+
         Self {
-            protocol: WebsocketProtocol::new(role).framed(stream),
+            protocol: framed,
             state: StreamState::Active,
             framing_payload: Vec::new(),
             framing_opcode: OpCode::Continuation,

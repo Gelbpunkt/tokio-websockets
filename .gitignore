@@ -1,3 +1,5 @@
 /target
 Cargo.lock
 /autobahn/reports
+flamegraph.svg
+perf.data*

@@ -34,7 +34,7 @@ pub async fn client(uri: Uri) -> WebsocketStream<Upgraded> {
         .unwrap();
 
     assert!(
-        !(response.status() != StatusCode::SWITCHING_PROTOCOLS),
+        response.status() == StatusCode::SWITCHING_PROTOCOLS,
         "Our server didn't upgrade: {}",
         response.status()
     );
