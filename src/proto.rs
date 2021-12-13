@@ -72,10 +72,10 @@ fn should_fail_fast_on_invalid_utf8(input: &[u8], is_complete: bool) -> bool {
     match simdutf8::compat::from_utf8(input) {
         Ok(_) => false,
         Err(utf8_error) => {
-            if !is_complete {
-                utf8_error.error_len().is_some()
-            } else {
+            if is_complete {
                 true
+            } else {
+                utf8_error.error_len().is_some()
             }
         }
     }
@@ -87,10 +87,10 @@ fn should_fail_fast_on_invalid_utf8(input: &[u8], is_complete: bool) -> bool {
     match std::str::from_utf8(input) {
         Ok(_) => false,
         Err(utf8_error) => {
-            if !is_complete {
-                utf8_error.error_len().is_some()
-            } else {
+            if is_complete {
                 true
+            } else {
+                utf8_error.error_len().is_some()
             }
         }
     }
