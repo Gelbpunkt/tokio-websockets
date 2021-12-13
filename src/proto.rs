@@ -66,6 +66,36 @@ fn parse_utf8(input: Vec<u8>) -> Result<String, ProtocolError> {
     Ok(String::from_utf8(input)?)
 }
 
+#[cfg(feature = "simd")]
+#[inline]
+fn should_fail_fast_on_invalid_utf8(input: &[u8], is_complete: bool) -> bool {
+    match simdutf8::compat::from_utf8(input) {
+        Ok(_) => false,
+        Err(utf8_error) => {
+            if !is_complete {
+                utf8_error.error_len().is_some()
+            } else {
+                true
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "simd"))]
+#[inline]
+fn should_fail_fast_on_invalid_utf8(input: &[u8], is_complete: bool) -> bool {
+    match std::str::from_utf8(input) {
+        Ok(_) => false,
+        Err(utf8_error) => {
+            if !is_complete {
+                utf8_error.error_len().is_some()
+            } else {
+                true
+            }
+        }
+    }
+}
+
 #[cfg(all(feature = "simd", target_feature = "avx2"))]
 #[inline]
 fn mask_frame(key: [u8; 4], input: &mut Vec<u8>) {
@@ -384,7 +414,20 @@ impl Decoder for WebsocketProtocol {
         let mut payload = vec![0; payload_length];
 
         if payload_length > 0 {
-            ensure_buffer_has_space!(src, offset + payload_length);
+            let desired_length = offset + payload_length;
+
+            if src.len() < desired_length {
+                // Even here, we can fast fail on invalid UTF8
+                if opcode == OpCode::Text && should_fail_fast_on_invalid_utf8(&src[offset..], false)
+                {
+                    return Err(Error::Protocol(ProtocolError::InvalidUtf8));
+                }
+
+                src.reserve(desired_length);
+
+                return Ok(None);
+            }
+
             payload.copy_from_slice(&src[offset..offset + payload_length]);
             offset += payload_length;
 
@@ -546,7 +589,7 @@ impl Message {
         match opcode {
             OpCode::Continuation => Err(ProtocolError::DisallowedOpcode),
             OpCode::Text => {
-                let data = parse_utf8(data)?;
+                let data = unsafe { String::from_utf8_unchecked(data) };
 
                 Ok(Self::Text(data))
             }
@@ -704,8 +747,18 @@ where
                     } else if frame.opcode != OpCode::Continuation {
                         return Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage)));
                     }
+
                     self.framing_final = frame.is_final;
                     self.framing_payload.append(&mut frame.payload);
+
+                    if self.framing_opcode == OpCode::Text
+                        && should_fail_fast_on_invalid_utf8(
+                            &self.framing_payload,
+                            self.framing_final,
+                        )
+                    {
+                        return Some(Err(Error::Protocol(ProtocolError::InvalidUtf8)));
+                    }
                 }
                 Err(e) => {
                     return Some(Err(e));
