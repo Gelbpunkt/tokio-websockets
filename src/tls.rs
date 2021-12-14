@@ -18,7 +18,6 @@ use std::{
 use crate::Error;
 
 /// A reusable TLS connector for wrapping streams.
-#[derive(Clone)]
 pub enum Connector {
     /// Plain (non-TLS) connector.
     Plain,

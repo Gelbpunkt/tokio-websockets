@@ -85,13 +85,13 @@ async fn resolve(host: String, port: u16) -> Result<SocketAddr, Error> {
 }
 
 /// Builder for websocket client connections.
-pub struct Builder {
+pub struct Builder<'a> {
     uri: Uri,
-    connector: Option<Connector>,
+    connector: Option<&'a Connector>,
     headers: HeaderMap,
 }
 
-impl Builder {
+impl<'a> Builder<'a> {
     /// Creates a [`Builder`] that connects to a given URI.
     ///
     /// # Errors
@@ -115,13 +115,17 @@ impl Builder {
 
     /// Sets the SSL connector for the client.
     /// By default, the client will create a new one for each connection instead of reusing one.
-    pub fn set_connector(&mut self, connector: Connector) {
+    pub fn set_connector(mut self, connector: &'a Connector) -> Self {
         self.connector = Some(connector);
+
+        self
     }
 
     /// Adds an extra HTTP header to the handshake request.
-    pub fn add_header(&mut self, name: HeaderName, value: HeaderValue) {
+    pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Self {
         self.headers.insert(name, value);
+
+        self
     }
 
     /// Establishes a connection to the websocket server.
@@ -129,22 +133,22 @@ impl Builder {
     /// # Errors
     ///
     /// This method returns an [`Error`] if connecting to the server fails.
-    pub async fn connect(mut self) -> Result<WebsocketStream<MaybeTlsStream<TcpStream>>, Error> {
+    pub async fn connect(&self) -> Result<WebsocketStream<MaybeTlsStream<TcpStream>>, Error> {
         let host = self.uri.host().ok_or(Error::CannotResolveHost)?;
         let port = default_port(&self.uri).unwrap_or(80);
         let addr = resolve(host.to_string(), port).await?;
 
         let stream = TcpStream::connect(&addr).await?;
 
-        let connector = if let Some(connector) = self.connector.take() {
-            connector
+        let stream = if let Some(connector) = self.connector {
+            connector.wrap(host, stream).await?
         } else if self.uri.scheme_str() == Some("wss") {
-            Connector::new()?
-        } else {
-            Connector::Plain
-        };
+            let connector = Connector::new()?;
 
-        let stream = connector.wrap(host, stream).await?;
+            connector.wrap(host, stream).await?
+        } else {
+            Connector::Plain.wrap(host, stream).await?
+        };
 
         self.connect_on(stream).await
     }
@@ -158,7 +162,7 @@ impl Builder {
     ///
     /// This method returns an [`Error`] if writing or reading from the stream fails.
     pub async fn connect_on<S: AsyncRead + AsyncWrite + Unpin>(
-        self,
+        &self,
         mut stream: S,
     ) -> Result<WebsocketStream<S>, Error> {
         let mut key_base64 = [0; 24];

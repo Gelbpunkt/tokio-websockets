@@ -1,10 +1,5 @@
-use bytes::Bytes;
-use http::{StatusCode, Uri};
-use hyper::{
-    client::{Client as HttpClient, HttpConnector},
-    upgrade::Upgraded,
-};
-use tokio_websockets::{upgrade_request, CloseCode, Error, Role, WebsocketStream};
+use http::Uri;
+use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error};
 
 use std::str::FromStr;
 
@@ -13,27 +8,12 @@ const AGENT: &str = "tokio-websockets-avx2";
 #[cfg(not(feature = "simd"))]
 const AGENT: &str = "tokio-websockets";
 
-type Client = HttpClient<HttpConnector, http_body::Empty<Bytes>>;
-
-async fn client(client: &Client, uri: Uri) -> WebsocketStream<Upgraded> {
-    let request = upgrade_request(uri).unwrap();
-    let response = client.request(request).await.unwrap();
-
-    assert!(
-        response.status() == StatusCode::SWITCHING_PROTOCOLS,
-        "Our server didn't upgrade: {}",
-        response.status()
-    );
-
-    match hyper::upgrade::on(response).await {
-        Ok(upgraded) => WebsocketStream::from_raw_stream(upgraded, Role::Client),
-        Err(e) => panic!("upgrade error: {}", e),
-    }
-}
-
-async fn get_case_count(http_client: &Client) -> Result<u32, Error> {
+async fn get_case_count(connector: &Connector) -> Result<u32, Error> {
     let uri = Uri::from_static("ws://localhost:9001/getCaseCount");
-    let mut stream = client(http_client, uri).await;
+    let mut stream = ClientBuilder::from_uri(uri)
+        .set_connector(connector)
+        .connect()
+        .await?;
     let msg = stream.read_message().await.unwrap()?;
 
     stream
@@ -44,20 +24,23 @@ async fn get_case_count(http_client: &Client) -> Result<u32, Error> {
     Ok(msg.into_text().unwrap().parse::<u32>().unwrap())
 }
 
-async fn update_reports(http_client: &Client) -> Result<(), Error> {
+async fn update_reports(connector: &Connector) -> Result<(), Error> {
     let uri = Uri::from_str(&format!(
         "ws://localhost:9001/updateReports?agent={}",
         AGENT
     ))
     .unwrap();
-    let mut stream = client(http_client, uri).await;
+    let mut stream = ClientBuilder::from_uri(uri)
+        .set_connector(connector)
+        .connect()
+        .await?;
 
     stream.close(Some(CloseCode::NormalClosure), None).await?;
 
     Ok(())
 }
 
-async fn run_test(http_client: &Client, case: u32) -> Result<(), Error> {
+async fn run_test(connector: &Connector, case: u32) -> Result<(), Error> {
     println!("Running test case {}", case);
 
     let uri = Uri::from_str(&format!(
@@ -66,7 +49,10 @@ async fn run_test(http_client: &Client, case: u32) -> Result<(), Error> {
     ))
     .unwrap();
 
-    let mut stream = client(http_client, uri).await;
+    let mut stream = ClientBuilder::from_uri(uri)
+        .set_connector(connector)
+        .connect()
+        .await?;
 
     while let Some(msg) = stream.read_message().await {
         let msg = msg?;
@@ -81,16 +67,13 @@ async fn run_test(http_client: &Client, case: u32) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let mut http_connector = HttpConnector::new();
-    http_connector.enforce_http(false);
+    let connector = Connector::Plain;
 
-    let http_client = HttpClient::builder().build(http_connector);
-
-    let total = get_case_count(&http_client).await?;
+    let total = get_case_count(&connector).await?;
     println!("Running {} tests", total);
 
     for case in 1..=total {
-        if let Err(e) = run_test(&http_client, case).await {
+        if let Err(e) = run_test(&connector, case).await {
             match e {
                 Error::Protocol(_) => {}
                 _ => eprintln!("Testcase failed: {:?}", e),
@@ -98,7 +81,7 @@ async fn main() -> Result<(), Error> {
         };
     }
 
-    update_reports(&http_client).await?;
+    update_reports(&connector).await?;
 
     Ok(())
 }
