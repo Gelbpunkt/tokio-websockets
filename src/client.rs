@@ -1,3 +1,4 @@
+#[cfg(feature = "http-integration")]
 use bytes::Bytes;
 #[cfg(feature = "http-integration")]
 use http::{

@@ -20,11 +20,24 @@ base64 = { version = "0.13", optional = true }
 http = { version = "0.2", default-features = false, optional = true }
 http-body = { version = "0.4", default-features = false, optional = true }
 
+# Native TLS
+tokio-native-tls = { version = "0.3", optional = true }
+
+# Rustls
+tokio-rustls = { version = "0.23", optional = true }
+rustls-native-certs = { version = "0.6", optional = true }
+webpki-roots = { version = "0.22", optional = true }
+
 [features]
 default = ["client"]
 client = ["base64"]
 http-integration = ["http", "http-body"]
 simd = ["simdutf8"]
+__tls = []
+native-tls = ["__tls", "tokio-native-tls"]
+__rustls = ["__tls", "tokio-rustls"]
+rustls-webpki-roots = ["__rustls", "webpki-roots"]
+rustls-native-roots = ["__rustls", "rustls-native-certs"]
 
 [dev-dependencies]
 hyper = { version = "0.14", default-features = false, features = ["client", "tcp", "http1"] }

@@ -17,7 +17,9 @@ use std::arch::x86_64::{
     target_feature = "sse2"
 ))]
 use std::arch::x86_64::{_mm_load_si128, _mm_loadu_si128, _mm_storeu_si128, _mm_xor_si128};
-use std::{io::Error as IoError, mem::take, ptr, string::FromUtf8Error};
+use std::{mem::take, ptr, string::FromUtf8Error};
+
+use crate::Error;
 
 const FRAME_SIZE: usize = 4096;
 
@@ -255,14 +257,6 @@ pub struct Frame {
 }
 
 #[derive(Debug)]
-pub enum Error {
-    AlreadyClosed,
-    ConnectionClosed,
-    Protocol(ProtocolError),
-    Io(IoError),
-}
-
-#[derive(Debug)]
 pub enum ProtocolError {
     InvalidCloseCode,
     InvalidCloseSequence,
@@ -298,18 +292,6 @@ impl ProtocolError {
 impl From<FromUtf8Error> for ProtocolError {
     fn from(_: FromUtf8Error) -> Self {
         Self::InvalidUtf8
-    }
-}
-
-impl From<ProtocolError> for Error {
-    fn from(err: ProtocolError) -> Self {
-        Self::Protocol(err)
-    }
-}
-
-impl From<IoError> for Error {
-    fn from(err: IoError) -> Self {
-        Self::Io(err)
     }
 }
 
