@@ -710,7 +710,7 @@ impl<T> WebsocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    pub fn new(stream: T, role: Role) -> Self {
+    pub fn from_raw_stream(stream: T, role: Role) -> Self {
         let mut framed = WebsocketProtocol::new(role).framed(stream);
         framed.read_buffer_mut().reserve(4 * 1024);
 
