@@ -9,8 +9,11 @@ edition = "2021"
 bytes = "1"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
-tokio = { version = "1", default-features = false, features = ["net"] }
+tokio = { version = "1", default-features = false, features = ["net", "io-util", "rt"] }
 tokio-util = { version = "0.6", default-features = false, features = ["codec"] }
+
+# SHA-1 fallback when no TLS is enabled
+sha1 = { version = "0.6", optional = true }
 
 # SIMD
 simdutf8 = { version = "0.1", default-features = false, features = ["std", "public_imp", "aarch64_neon"], optional = true }
@@ -19,23 +22,28 @@ simdutf8 = { version = "0.1", default-features = false, features = ["std", "publ
 base64 = { version = "0.13", optional = true }
 http = { version = "0.2", default-features = false, optional = true }
 http-body = { version = "0.4", default-features = false, optional = true }
+httparse = { version = "1.5", optional = true }
 
 # Native TLS
 tokio-native-tls = { version = "0.3", optional = true }
 
 # Rustls
-tokio-rustls = { version = "0.23", optional = true }
+ring = { version = "0.16", default-features = false, optional = true }
 rustls-native-certs = { version = "0.6", optional = true }
+tokio-rustls = { version = "0.23", optional = true }
 webpki-roots = { version = "0.22", optional = true }
 
+# Users can manually tune into OpenSSL for SHA-1 when native-tls is enabled
+openssl = { version = "0.10", default-features = false, optional = true }
+
 [features]
-default = ["client"]
-client = ["base64"]
-http-integration = ["http", "http-body"]
+default = ["client", "sha1"]
+client = ["base64", "http", "httparse"]
+http-integration = ["http-body"]
 simd = ["simdutf8"]
 __tls = []
 native-tls = ["__tls", "tokio-native-tls"]
-__rustls = ["__tls", "tokio-rustls"]
+__rustls = ["__tls", "tokio-rustls", "ring"]
 rustls-webpki-roots = ["__rustls", "webpki-roots"]
 rustls-native-roots = ["__rustls", "rustls-native-certs"]
 

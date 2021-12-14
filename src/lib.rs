@@ -4,13 +4,21 @@
 #[cfg(feature = "client")]
 pub mod client;
 pub mod error;
+#[cfg(all(feature = "http-integration", feature = "client"))]
+pub mod http;
+mod mask;
 pub mod proto;
-#[cfg(feature = "__tls")]
+#[cfg(feature = "client")]
+mod sha;
 pub mod tls;
+#[cfg(feature = "client")]
+mod upgrade;
+mod utf8;
 
-#[cfg(feature = "http-integration")]
-pub use client::upgrade_request;
+#[cfg(all(feature = "http-integration", feature = "client"))]
+pub use self::http::upgrade_request;
+#[cfg(feature = "client")]
+pub use client::Builder as ClientBuilder;
 pub use error::Error;
 pub use proto::{CloseCode, Message, OpCode, Role, WebsocketStream};
-#[cfg(feature = "__tls")]
 pub use tls::{Connector, MaybeTlsStream};

@@ -17,20 +17,19 @@ use std::{
 
 use crate::Error;
 
-#[cfg(all(feature = "native-tls", feature = "__rustls"))]
-compile_error!("Only one TLS backend may be enabled at once");
-#[cfg(all(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
-compile_error!("Only one of rustls-webpki-roots and rustls-native-roots may be enabled at once");
-
 /// A reusable TLS connector for wrapping streams.
 #[derive(Clone)]
 pub enum Connector {
     /// Plain (non-TLS) connector.
     Plain,
-    /// `native-tls` TLS connector.
+    /// [`native-tls`] TLS connector.
+    ///
+    /// [`native-tls`]: tokio_native_tls::native_tls
     #[cfg(feature = "native-tls")]
     NativeTls(tokio_native_tls::TlsConnector),
-    /// `rustls` async TLS connector.
+    /// [`rustls`] TLS connector.
+    ///
+    /// [`rustls`]: tokio_rustls::rustls
     #[cfg(feature = "__rustls")]
     Rustls(tokio_rustls::TlsConnector),
 }
@@ -53,9 +52,13 @@ pub enum MaybeTlsStream<S> {
     Plain(S),
     #[cfg(feature = "native-tls")]
     /// Encrypted socket stream using [`native-tls`].
+    ///
+    /// [`native-tls`]: tokio_native_tls::native_tls
     NativeTls(tokio_native_tls::TlsStream<S>),
     #[cfg(feature = "__rustls")]
     /// Encrypted socket stream using [`rustls`].
+    ///
+    /// [`rustls`]: tokio_rustls::rustls
     Rustls(tokio_rustls::client::TlsStream<S>),
 }
 
@@ -116,13 +119,13 @@ impl Connector {
     ///
     /// # Errors
     ///
-    /// This method returns an `Err` when creating the underlying TLS connector fails.
+    /// This method returns an [`Error`] when creating the underlying TLS connector fails.
     pub fn new() -> Result<Self, Error> {
         #[cfg(not(feature = "__tls"))]
         {
             Ok(Self::Plain)
         }
-        #[cfg(feature = "native-tls")]
+        #[cfg(all(feature = "native-tls", not(feature = "__rustls")))]
         {
             Ok(Self::NativeTls(
                 tokio_native_tls::native_tls::TlsConnector::new()?.into(),
@@ -137,7 +140,7 @@ impl Connector {
                 let certs = rustls_native_certs::load_native_certs()?;
 
                 for cert in certs {
-                    roots.add(&Certificate(cert.0))?
+                    roots.add(&Certificate(cert.0))?;
                 }
             }
 
@@ -166,7 +169,7 @@ impl Connector {
     ///
     /// # Errors
     ///
-    /// This method returns an `Err` if the TLS handshake fails.
+    /// This method returns an [`Error`] if the TLS handshake fails.
     pub async fn wrap<S: AsyncRead + AsyncWrite + Unpin>(
         &self,
         domain: &str,

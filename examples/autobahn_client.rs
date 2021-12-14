@@ -4,10 +4,7 @@ use hyper::{
     client::{Client as HttpClient, HttpConnector},
     upgrade::Upgraded,
 };
-use tokio_websockets::{
-    client::upgrade_request,
-    proto::{CloseCode, Error, Role, WebsocketStream},
-};
+use tokio_websockets::{upgrade_request, CloseCode, Error, Role, WebsocketStream};
 
 use std::str::FromStr;
 

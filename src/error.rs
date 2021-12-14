@@ -12,15 +12,19 @@ use crate::proto::ProtocolError;
 #[derive(Debug)]
 pub enum Error {
     AlreadyClosed,
+    CannotResolveHost,
     ConnectionClosed,
     Protocol(ProtocolError),
     Io(io::Error),
     #[cfg(feature = "native-tls")]
     NativeTls(native_tls::Error),
+    NoUpgradeResponse,
     #[cfg(feature = "__rustls")]
     InvalidDNSName(InvalidDnsNameError),
     #[cfg(feature = "rustls-native-roots")]
     Webpki(webpki::Error),
+    #[cfg(feature = "client")]
+    Upgrade(String),
 }
 
 #[cfg(feature = "native-tls")]
