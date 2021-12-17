@@ -148,13 +148,13 @@ impl ClientRequest {
     }
 }
 
-/// Tokio decoder for parsing the server's response to the client's HTTP `Connection: Upgrade` request.
+/// Decoder for parsing the server's response to the client's HTTP `Connection: Upgrade` request.
 pub struct Codec {
     ws_accept: [u8; 20],
 }
 
 impl Codec {
-    /// Returns a new `UpgradeCodec` object.
+    /// Returns a new [`Codec`].
     ///
     /// The `key` parameter provides the string passed to the server via the HTTP `Sec-WebSocket-Key` header.
     #[must_use]

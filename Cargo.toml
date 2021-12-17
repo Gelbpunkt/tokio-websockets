@@ -40,6 +40,7 @@ openssl = { version = "0.10", default-features = false, optional = true }
 default = ["client", "sha1"]
 client = ["base64", "http", "httparse"]
 http-integration = ["http-body"]
+server = ["base64", "http", "httparse"]
 simd = ["simdutf8"]
 __tls = []
 native-tls = ["__tls", "tokio-native-tls"]
