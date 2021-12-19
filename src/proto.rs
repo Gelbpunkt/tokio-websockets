@@ -148,8 +148,8 @@ impl Decoder for WebsocketProtocol {
         // Opcode and payload length must be present
         ensure_buffer_has_space!(src, 2);
 
-        let fin_and_rsv = src[0];
-        let payload_len_1 = src[1];
+        let fin_and_rsv = unsafe { src.get_unchecked(0) };
+        let payload_len_1 = unsafe { src.get_unchecked(1) };
 
         // Bit 0
         let fin = fin_and_rsv & 1 << 7 != 0;
@@ -188,13 +188,13 @@ impl Decoder for WebsocketProtocol {
             if payload_length == 126 {
                 ensure_buffer_has_space!(src, 4);
                 let mut payload_length_bytes = [0; 2];
-                payload_length_bytes.copy_from_slice(&src[2..4]);
+                payload_length_bytes.copy_from_slice(unsafe { src.get_unchecked(2..4) });
                 payload_length = u16::from_be_bytes(payload_length_bytes) as usize;
                 offset = 4;
             } else if payload_length == 127 {
                 ensure_buffer_has_space!(src, 10);
                 let mut payload_length_bytes = [0; 8];
-                payload_length_bytes.copy_from_slice(&src[2..10]);
+                payload_length_bytes.copy_from_slice(unsafe { src.get_unchecked(2..10) });
                 payload_length = u64::from_be_bytes(payload_length_bytes) as usize;
                 offset = 10;
             } else {
@@ -205,7 +205,7 @@ impl Decoder for WebsocketProtocol {
         let mut masking_key = [0; 4];
         if mask {
             ensure_buffer_has_space!(src, offset + 4);
-            masking_key.copy_from_slice(&src[offset..offset + 4]);
+            masking_key.copy_from_slice(unsafe { src.get_unchecked(offset..offset + 4) });
             offset += 4;
         }
 
@@ -217,7 +217,9 @@ impl Decoder for WebsocketProtocol {
 
             if src.len() < desired_length {
                 // Even here, we can fast fail on invalid UTF8
-                if opcode == OpCode::Text && utf8::should_fail_fast(&src[offset..], false) {
+                if opcode == OpCode::Text
+                    && utf8::should_fail_fast(unsafe { src.get_unchecked(offset..) }, false)
+                {
                     return Err(Error::Protocol(ProtocolError::InvalidUtf8));
                 }
 
@@ -226,7 +228,7 @@ impl Decoder for WebsocketProtocol {
                 return Ok(None);
             }
 
-            payload.copy_from_slice(&src[offset..offset + payload_length]);
+            payload.copy_from_slice(unsafe { src.get_unchecked(offset..offset + payload_length) });
             offset += payload_length;
 
             if mask {
