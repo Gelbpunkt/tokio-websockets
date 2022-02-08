@@ -8,7 +8,7 @@ use sha1_smol::Sha1;
 const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 #[cfg(all(feature = "sha1_smol", not(feature = "ring"), not(feature = "openssl")))]
-/// Calculate the SHA-1 digest of a websocket key and the GUID using the [`sha1`] crate.
+/// Calculate the SHA-1 digest of a websocket key and the GUID using the [`sha1_smol`] crate.
 pub fn digest(key: &[u8]) -> [u8; 20] {
     let mut s = Sha1::new();
     s.update(key);
