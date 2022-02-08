@@ -1,7 +1,7 @@
 /// <https://datatracker.ietf.org/doc/html/rfc6455#section-5.2>
 use bytes::{Buf, BufMut, BytesMut};
 use futures_util::{SinkExt, StreamExt};
-use rand::{thread_rng, RngCore};
+
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
@@ -108,6 +108,12 @@ impl ProtocolError {
 
 impl From<FromUtf8Error> for ProtocolError {
     fn from(_: FromUtf8Error) -> Self {
+        Self::InvalidUtf8
+    }
+}
+
+impl From<std::str::Utf8Error> for ProtocolError {
+    fn from(_: std::str::Utf8Error) -> Self {
         Self::InvalidUtf8
     }
 }
@@ -278,9 +284,12 @@ impl Encoder<Frame> for WebsocketProtocol {
         }
 
         if masked {
-            let mut mask = [0; 4];
-            let mut rng = thread_rng();
-            rng.fill_bytes(&mut mask);
+            let mask = [
+                fastrand::u8(0..=255),
+                fastrand::u8(0..=255),
+                fastrand::u8(0..=255),
+                fastrand::u8(0..=255),
+            ];
 
             dst.extend_from_slice(&mask);
 

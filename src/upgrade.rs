@@ -136,11 +136,6 @@ impl ClientRequest {
         Ok(Self { ws_accept })
     }
 
-    /// Copies the value that the client expects to see in the server's `Sec-WebSocket-Accept` header into a `String`.
-    pub fn ws_accept_buf(&self, s: &mut String) {
-        base64::encode_config_buf(&self.ws_accept, base64::STANDARD, s);
-    }
-
     /// Returns the value that the client expects to see in the server's `Sec-WebSocket-Accept` header.
     #[must_use]
     pub fn ws_accept(&self) -> String {

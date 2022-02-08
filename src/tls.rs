@@ -169,6 +169,10 @@ impl Connector {
     /// # Errors
     ///
     /// This method returns an [`Error`] if the TLS handshake fails.
+    #[cfg_attr(
+        not(any(feature = "native-tls", feature = "__rustls")),
+        allow(unused_variables)
+    )]
     pub async fn wrap<S: AsyncRead + AsyncWrite + Unpin>(
         &self,
         domain: &str,

@@ -13,7 +13,27 @@ use tokio_util::codec::Decoder;
 use crate::{upgrade, Connector, Error, MaybeTlsStream, Role, WebsocketStream};
 
 pub(crate) fn make_key(key: Option<[u8; 16]>, key_base64: &mut [u8; 24]) {
-    let key_bytes = key.unwrap_or_else(rand::random);
+    // I don't know a better way of writing this, sorry
+    let key_bytes = key.unwrap_or_else(|| {
+        [
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+            fastrand::u8(0..=255),
+        ]
+    });
 
     base64::encode_config_slice(&key_bytes, base64::STANDARD, key_base64);
 }
@@ -115,6 +135,7 @@ impl<'a> Builder<'a> {
 
     /// Sets the SSL connector for the client.
     /// By default, the client will create a new one for each connection instead of reusing one.
+    #[must_use]
     pub fn set_connector(mut self, connector: &'a Connector) -> Self {
         self.connector = Some(connector);
 
@@ -122,6 +143,7 @@ impl<'a> Builder<'a> {
     }
 
     /// Adds an extra HTTP header to the handshake request.
+    #[must_use]
     pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Self {
         self.headers.insert(name, value);
 

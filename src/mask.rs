@@ -8,6 +8,10 @@ use std::arch::x86_64::{
     target_feature = "sse2"
 ))]
 use std::arch::x86_64::{_mm_load_si128, _mm_loadu_si128, _mm_storeu_si128, _mm_xor_si128};
+#[cfg(all(
+    feature = "simd",
+    any(target_feature = "avx2", target_feature = "sse2")
+))]
 use std::ptr;
 
 #[cfg(all(feature = "simd", target_feature = "avx2"))]
@@ -22,7 +26,7 @@ const SSE2_ALIGNMENT: usize = 16;
 
 #[cfg(all(feature = "simd", target_feature = "avx2"))]
 #[inline]
-pub fn frame(key: [u8; 4], input: &mut Vec<u8>) {
+pub fn frame(key: [u8; 4], input: &mut [u8]) {
     unsafe {
         let payload_len = input.len();
 
@@ -73,7 +77,7 @@ pub fn frame(key: [u8; 4], input: &mut Vec<u8>) {
     target_feature = "sse2"
 ))]
 #[inline]
-pub fn frame(key: [u8; 4], input: &mut Vec<u8>) {
+pub fn frame(key: [u8; 4], input: &mut [u8]) {
     unsafe {
         let payload_len = input.len();
 
@@ -120,7 +124,7 @@ pub fn frame(key: [u8; 4], input: &mut Vec<u8>) {
 
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn frame(key: [u8; 4], input: &mut Vec<u8>) {
+pub fn frame(key: [u8; 4], input: &mut [u8]) {
     for (index, byte) in input.iter_mut().enumerate() {
         *byte ^= key[index % 4];
     }
