@@ -1,7 +1,7 @@
-use std::net::SocketAddr;
-
 use tokio::net::{TcpListener, TcpStream};
 use tokio_websockets::{accept, Error};
+
+use std::net::SocketAddr;
 
 #[cfg(feature = "simd")]
 const PORT: u16 = 9003;
