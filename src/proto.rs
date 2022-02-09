@@ -216,16 +216,23 @@ impl Decoder for WebsocketProtocol {
         }
 
         // Get the actual payload, if any
-        let mut payload = vec![0; payload_length];
+        // TODO: Reuse this buffer
+        let desired_length = offset + payload_length;
+        let possible_length = src.len().min(desired_length);
+        let mut payload = vec![0; possible_length - offset];
 
         if payload_length > 0 {
-            let desired_length = offset + payload_length;
+            // Copy what we have to the payload body
+            payload.copy_from_slice(unsafe { src.get_unchecked(offset..possible_length) });
+
+            // Unmask it if needed
+            if mask {
+                mask::frame(masking_key, &mut payload);
+            }
 
             if src.len() < desired_length {
                 // Even here, we can fast fail on invalid UTF8
-                if opcode == OpCode::Text
-                    && utf8::should_fail_fast(unsafe { src.get_unchecked(offset..) }, false)
-                {
+                if opcode == OpCode::Text && utf8::should_fail_fast(&payload, false) {
                     return Err(Error::Protocol(ProtocolError::InvalidUtf8));
                 }
 
@@ -234,12 +241,7 @@ impl Decoder for WebsocketProtocol {
                 return Ok(None);
             }
 
-            payload.copy_from_slice(unsafe { src.get_unchecked(offset..offset + payload_length) });
             offset += payload_length;
-
-            if mask {
-                mask::frame(masking_key, &mut payload);
-            }
 
             // Close frames must be at least 2 bytes in length
             if opcode == OpCode::Close && payload_length == 1 {

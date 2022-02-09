@@ -32,7 +32,7 @@ pub fn parse(input: Vec<u8>) -> Result<String, ProtocolError> {
 #[inline]
 pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
     match simdutf8::basic::from_utf8(input) {
-        Ok(string) => string,
+        Ok(string) => Ok(string),
         Err(_) => Err(ProtocolError::InvalidUtf8),
     }
 }

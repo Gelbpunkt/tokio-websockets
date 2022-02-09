@@ -2,7 +2,7 @@
     "outdir": "./reports/servers",
     "servers": [
         {
-            "agent": "tokio-websockets",
+            "agent": "tokio-websockets-old",
             "url": "ws://127.0.0.1:9002"
         }
     ],
