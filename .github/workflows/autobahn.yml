@@ -30,16 +30,15 @@ jobs:
         run: |
           cargo build --release --examples
           ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
-          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server
+          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server fuzzingclient.json
 
       - name: Run tokio-websockets with SIMD
         env:
           RUSTFLAGS: -C target-cpu=haswell
         run: |
-          sed -i "s:tokio-websockets:tokio-websockets-avx2:g" autobahn/config/fuzzingclient.json
           cargo build --release --examples --features simd
           ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
-          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server
+          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server fuzzingclient-avx2.json
 
       - name: Upload results to GitHub pages
         if: success()

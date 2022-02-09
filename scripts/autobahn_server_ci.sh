@@ -19,4 +19,4 @@ podman run --rm -it \
     --security-opt label=disable \
     --name autobahn \
     crossbario/autobahn-testsuite \
-    wstest -m fuzzingclient -s /config/fuzzingclient.json
+    wstest -m fuzzingclient -s /config/$2
