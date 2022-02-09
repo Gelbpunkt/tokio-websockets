@@ -22,7 +22,7 @@ simdutf8 = { version = "0.1", default-features = false, features = ["std", "publ
 base64 = { version = "0.13", optional = true }
 http = { version = "0.2", default-features = false, optional = true }
 http-body = { version = "0.4", default-features = false, optional = true }
-httparse = { version = "1.5", optional = true }
+httparse = { version = "1.6", optional = true }
 
 # Native TLS
 tokio-native-tls = { version = "0.3", optional = true }

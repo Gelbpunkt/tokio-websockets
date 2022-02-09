@@ -31,19 +31,9 @@ pub fn parse(input: Vec<u8>) -> Result<String, ProtocolError> {
 #[cfg(feature = "simd")]
 #[inline]
 pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
-    unsafe {
-        #[cfg(target_feature = "avx2")]
-        let mut validator = simdutf8::basic::imp::x86::avx2::Utf8ValidatorImp::new();
-        #[cfg(all(target_feature = "sse4.2", not(target_feature = "avx2")))]
-        let mut validator = simdutf8::basic::imp::x86::sse42::Utf8ValidatorImp::new();
-
-        validator.update(&input);
-
-        if validator.finalize().is_ok() {
-            Ok(std::str::from_utf8_unchecked(input))
-        } else {
-            Err(ProtocolError::InvalidUtf8)
-        }
+    match simdutf8::basic::from_utf8(input) {
+        Ok(string) => string,
+        Err(_) => Err(ProtocolError::InvalidUtf8),
     }
 }
 
