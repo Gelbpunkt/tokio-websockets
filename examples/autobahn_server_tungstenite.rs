@@ -9,7 +9,7 @@ const PORT: u16 = 9004;
 async fn accept_connection(stream: TcpStream) {
     if let Err(e) = handle_connection(stream).await {
         match e {
-            Error::ConnectionClosed | Error::Protocol(_) => (),
+            Error::ConnectionClosed | Error::Protocol(_) | Error::Utf8 => (),
             err => eprintln!("Error processing connection: {:?}", err),
         }
     }
@@ -23,8 +23,6 @@ async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
 
         if msg.is_text() || msg.is_binary() {
             ws_stream.send(msg).await?;
-        } else if msg.is_close() {
-            break;
         }
     }
 

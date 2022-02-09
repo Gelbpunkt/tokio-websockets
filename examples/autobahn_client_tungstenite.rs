@@ -49,7 +49,7 @@ async fn main() -> Result<(), Error> {
     for case in 1..=total {
         if let Err(e) = run_test(case).await {
             match e {
-                Error::Protocol(_) => {}
+                Error::ConnectionClosed | Error::Protocol(_) | Error::Utf8 => {}
                 _ => eprintln!("Testcase failed: {:?}", e),
             }
         };
