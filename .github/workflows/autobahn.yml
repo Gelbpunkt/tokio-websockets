@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tokio-websockets without SIMD
         run: |
-          cargo build --release
+          cargo build --release --examples
           ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
           ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server
 
@@ -36,7 +36,8 @@ jobs:
         env:
           RUSTFLAGS: -C target-cpu=haswell
         run: |
-          cargo build --release --features simd
+          sed -i "s:tokio-websockets:tokio-websockets-avx2:g" autobahn/config/fuzzingclient.json
+          cargo build --release --examples --features simd
           ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
           ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server
 
