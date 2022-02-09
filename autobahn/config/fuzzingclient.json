@@ -2,11 +2,11 @@
     "outdir": "./reports/servers",
     "servers": [
         {
-            "agent": "tokio-websockets-old",
+            "agent": "tokio-websockets",
             "url": "ws://127.0.0.1:9002"
         }
     ],
-    "cases": ["1.1.6"],
+    "cases": ["*"],
     "exclude-cases": [],
     "exclude-agent-cases": {}
 }
