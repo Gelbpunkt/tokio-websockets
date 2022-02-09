@@ -1,0 +1,45 @@
+name: Run autobahn testsuite and publish results
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  autobahn:
+    name: Run autobahn testsuite and publish results
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+
+      - name: Run tokio-websockets without SIMD
+        run: |
+          cargo build --release
+          ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
+          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server
+
+      - name: Run tokio-websockets with SIMD
+        env:
+          RUSTFLAGS: -C target-cpu=haswell
+        run: |
+          cargo build --release --features simd
+          ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
+          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server
+
+      - name: Upload results to GitHub pages
+        if: success()
+        uses: crazy-max/ghaction-github-pages@v2
+        with:
+          target_branch: gh-pages
+          build_dir: autobahn/reports
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
