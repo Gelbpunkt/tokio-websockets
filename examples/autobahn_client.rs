@@ -8,10 +8,10 @@ const AGENT: &str = "tokio-websockets-avx2";
 #[cfg(not(feature = "simd"))]
 const AGENT: &str = "tokio-websockets";
 
-async fn get_case_count(connector: &Connector) -> Result<u32, Error> {
+async fn get_case_count() -> Result<u32, Error> {
     let uri = Uri::from_static("ws://localhost:9001/getCaseCount");
     let mut stream = ClientBuilder::from_uri(uri)
-        .set_connector(connector)
+        .set_connector(&Connector::Plain)
         .connect()
         .await?;
     let msg = stream.read_message().await.unwrap()?;
@@ -24,14 +24,14 @@ async fn get_case_count(connector: &Connector) -> Result<u32, Error> {
     Ok(msg.into_text().unwrap().parse::<u32>().unwrap())
 }
 
-async fn update_reports(connector: &Connector) -> Result<(), Error> {
+async fn update_reports() -> Result<(), Error> {
     let uri = Uri::from_str(&format!(
         "ws://localhost:9001/updateReports?agent={}",
         AGENT
     ))
     .unwrap();
     let mut stream = ClientBuilder::from_uri(uri)
-        .set_connector(connector)
+        .set_connector(&Connector::Plain)
         .connect()
         .await?;
 
@@ -40,7 +40,7 @@ async fn update_reports(connector: &Connector) -> Result<(), Error> {
     Ok(())
 }
 
-async fn run_test(connector: &Connector, case: u32) -> Result<(), Error> {
+async fn run_test(case: u32) -> Result<(), Error> {
     println!("Running test case {}", case);
 
     let uri = Uri::from_str(&format!(
@@ -50,7 +50,7 @@ async fn run_test(connector: &Connector, case: u32) -> Result<(), Error> {
     .unwrap();
 
     let mut stream = ClientBuilder::from_uri(uri)
-        .set_connector(connector)
+        .set_connector(&Connector::Plain)
         .connect()
         .await?;
 
@@ -67,13 +67,11 @@ async fn run_test(connector: &Connector, case: u32) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let connector = Connector::Plain;
-
-    let total = get_case_count(&connector).await?;
+    let total = get_case_count().await?;
     println!("Running {} tests", total);
 
     for case in 1..=total {
-        if let Err(e) = run_test(&connector, case).await {
+        if let Err(e) = run_test(case).await {
             match e {
                 Error::Protocol(_) => {}
                 _ => eprintln!("Testcase failed: {:?}", e),
@@ -81,7 +79,7 @@ async fn main() -> Result<(), Error> {
         };
     }
 
-    update_reports(&connector).await?;
+    update_reports().await?;
 
     Ok(())
 }

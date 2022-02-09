@@ -50,6 +50,7 @@ rustls-native-roots = ["__rustls", "rustls-native-certs"]
 
 [dev-dependencies]
 tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread"] }
+tokio-tungstenite = { version = "0.16", default-features = false, features = ["connect"] }
 
 [profile.release]
 codegen-units = 1

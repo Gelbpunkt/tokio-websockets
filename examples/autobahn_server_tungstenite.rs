@@ -1,12 +1,10 @@
 use std::net::SocketAddr;
 
+use futures_util::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_websockets::{accept, Error};
+use tokio_tungstenite::{accept_async, tungstenite::Error};
 
-#[cfg(feature = "simd")]
-const PORT: u16 = 9003;
-#[cfg(not(feature = "simd"))]
-const PORT: u16 = 9002;
+const PORT: u16 = 9004;
 
 async fn accept_connection(stream: TcpStream) {
     if let Err(e) = handle_connection(stream).await {
@@ -18,13 +16,13 @@ async fn accept_connection(stream: TcpStream) {
 }
 
 async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
-    let mut ws_stream = accept(stream).await?;
+    let mut ws_stream = accept_async(stream).await?;
 
-    while let Some(msg) = ws_stream.read_message().await {
+    while let Some(msg) = ws_stream.next().await {
         let msg = msg?;
 
         if msg.is_text() || msg.is_binary() {
-            ws_stream.write_message(msg).await?;
+            ws_stream.send(msg).await?;
         } else if msg.is_close() {
             break;
         }

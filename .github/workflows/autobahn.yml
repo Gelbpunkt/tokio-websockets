@@ -26,19 +26,22 @@ jobs:
           mkdir autobahn/reports
           echo "<!DOCTYPE html><html><head><title>Autobahn test suite results</title></head><body><a href="clients/index.html">Clients</a><br><a href="servers/index.html">Servers</a></body></html>" > autobahn/reports/index.html
 
-      - name: Run tokio-websockets without SIMD
+      - name: Build tokio-websockets (no SIMD) and tokio-tungstenite
         run: |
           cargo build --release --examples
-          ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
-          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server fuzzingclient.json
 
-      - name: Run tokio-websockets with SIMD
+      - name: Build tokio-websockets (SIMD)
         env:
           RUSTFLAGS: -C target-cpu=haswell
         run: |
           cargo build --release --examples --features simd
-          ./scripts/autobahn_client_ci.sh target/release/examples/autobahn_client
-          ./scripts/autobahn_server_ci.sh target/release/examples/autobahn_server fuzzingclient-avx2.json
+          mv target/release/examples/autobahn_client target/release/examples/autobahn_client_simd
+          mv target/release/examples/autobahn_server target/release/examples/autobahn_server_simd
+
+      - name: Run testsuite
+        run: |
+          ./scripts/autobahn_client_ci.sh
+          ./scripts/autobahn_server_ci.sh
 
       - name: Upload results to GitHub pages
         if: success()
