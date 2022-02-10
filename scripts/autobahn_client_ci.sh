@@ -18,6 +18,6 @@ podman run -d --rm \
 
 sleep 3
 
-target/release/examples/autobahn_client
-target/release/examples/autobahn_client_simd
-target/release/examples/autobahn_client_tungstenite
+target/x86_64-unknown-linux-gnu/release/examples/autobahn_client
+target/x86_64-unknown-linux-gnu/release/examples/autobahn_client_simd
+target/x86_64-unknown-linux-gnu/release/examples/autobahn_client_tungstenite
