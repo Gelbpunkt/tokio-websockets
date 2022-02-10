@@ -33,9 +33,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8]) {
         // We might be done already
         if payload_len < AVX2_ALIGNMENT {
             // Run fallback implementation on small data
-            for (index, byte) in input.iter_mut().enumerate() {
-                *byte ^= key[index % 4];
-            }
+            fallback_frame(key, input);
 
             return;
         }
@@ -60,13 +58,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8]) {
 
         if postamble_start != payload_len {
             // Run fallback implementation on postamble data
-            for (index, byte) in input
-                .get_unchecked_mut(postamble_start..)
-                .iter_mut()
-                .enumerate()
-            {
-                *byte ^= key[index % 4];
-            }
+            fallback_frame(key, input.get_unchecked_mut(postamble_start..))
         }
     }
 }
@@ -84,9 +76,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8]) {
         // We might be done already
         if payload_len < SSE2_ALIGNMENT {
             // Run fallback implementation on small data
-            for (index, byte) in input.iter_mut().enumerate() {
-                *byte ^= key[index % 4];
-            }
+            fallback_frame(key, input);
 
             return;
         }
@@ -111,13 +101,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8]) {
 
         if postamble_start != payload_len {
             // Run fallback implementation on postamble data
-            for (index, byte) in input
-                .get_unchecked_mut(postamble_start..)
-                .iter_mut()
-                .enumerate()
-            {
-                *byte ^= key[index % 4];
-            }
+            fallback_frame(key, input.get_unchecked_mut(postamble_start..));
         }
     }
 }
@@ -125,6 +109,10 @@ pub fn frame(key: [u8; 4], input: &mut [u8]) {
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn frame(key: [u8; 4], input: &mut [u8]) {
+    fallback_frame(key, input)
+}
+
+pub fn fallback_frame(key: [u8; 4], input: &mut [u8]) {
     for (index, byte) in input.iter_mut().enumerate() {
         *byte ^= key[index % 4];
     }

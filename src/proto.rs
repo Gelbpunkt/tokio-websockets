@@ -126,6 +126,9 @@ pub enum Role {
 
 pub struct WebsocketProtocol {
     role: Role,
+    payload: Vec<u8>,
+    payload_in: usize,
+    utf8_valid_up_to: usize,
 }
 
 macro_rules! ensure_buffer_has_space {
@@ -141,7 +144,12 @@ macro_rules! ensure_buffer_has_space {
 impl WebsocketProtocol {
     #[must_use]
     pub fn new(role: Role) -> Self {
-        Self { role }
+        Self {
+            role,
+            payload: Vec::new(),
+            payload_in: 0,
+            utf8_valid_up_to: 0,
+        }
     }
 }
 
@@ -215,33 +223,64 @@ impl Decoder for WebsocketProtocol {
             offset += 4;
         }
 
+        // Reserve space for the incoming payload
+        self.payload.resize(payload_length, 0);
+
+        offset += self.payload_in;
+
         // Get the actual payload, if any
-        // TODO: Reuse this buffer
-        let desired_length = offset + payload_length;
-        let possible_length = src.len().min(desired_length);
-        let mut payload = vec![0; possible_length - offset];
+        let data_available = src.len() - offset;
+        let data_missing = payload_length - self.payload_in;
+        let to_read = data_missing.min(data_available);
+        let possible_end_in_payload = self.payload_in + to_read;
 
         if payload_length > 0 {
             // Copy what we have to the payload body
-            payload.copy_from_slice(unsafe { src.get_unchecked(offset..possible_length) });
+            unsafe {
+                self.payload
+                    .get_unchecked_mut(self.payload_in..possible_end_in_payload)
+                    .copy_from_slice(src.get_unchecked(offset..offset + to_read));
+            };
 
             // Unmask it if needed
             if mask {
-                mask::frame(masking_key, &mut payload);
+                masking_key.rotate_left(self.payload_in % 4);
+
+                mask::frame(masking_key, unsafe {
+                    self.payload
+                        .get_unchecked_mut(self.payload_in..possible_end_in_payload)
+                });
             }
 
-            if src.len() < desired_length {
+            self.payload_in = possible_end_in_payload;
+
+            let bytes_missing = payload_length - self.payload_in;
+
+            // If the current payload is incomplete
+            if bytes_missing > 0 {
                 // Even here, we can fast fail on invalid UTF8
-                if opcode == OpCode::Text && utf8::should_fail_fast(&payload, false) {
-                    return Err(Error::Protocol(ProtocolError::InvalidUtf8));
+                if opcode == OpCode::Text {
+                    let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                        unsafe {
+                            self.payload
+                                .get_unchecked(self.utf8_valid_up_to..self.payload_in)
+                        },
+                        false,
+                    );
+
+                    if should_fail {
+                        return Err(Error::Protocol(ProtocolError::InvalidUtf8));
+                    } else {
+                        self.utf8_valid_up_to += valid_up_to;
+                    }
                 }
 
-                src.reserve(desired_length);
+                src.reserve(bytes_missing);
 
                 return Ok(None);
             }
 
-            offset += payload_length;
+            offset += to_read;
 
             // Close frames must be at least 2 bytes in length
             if opcode == OpCode::Close && payload_length == 1 {
@@ -250,6 +289,10 @@ impl Decoder for WebsocketProtocol {
         }
 
         src.advance(offset);
+
+        let payload = take(&mut self.payload);
+        self.payload_in = 0;
+        self.utf8_valid_up_to = 0;
 
         let frame = Frame {
             opcode,
@@ -515,6 +558,8 @@ pub struct WebsocketStream<T> {
     framing_payload: Vec<u8>,
     framing_opcode: OpCode,
     framing_final: bool,
+
+    utf8_valid_up_to: usize,
 }
 
 impl<T> WebsocketStream<T>
@@ -531,6 +576,7 @@ where
             framing_payload: Vec::new(),
             framing_opcode: OpCode::Continuation,
             framing_final: false,
+            utf8_valid_up_to: 0,
         }
     }
 
@@ -550,6 +596,7 @@ where
             framing_payload: Vec::new(),
             framing_opcode: OpCode::Continuation,
             framing_final: false,
+            utf8_valid_up_to: 0,
         }
     }
 
@@ -581,10 +628,17 @@ where
                     self.framing_final = frame.is_final;
                     self.framing_payload.append(&mut frame.payload);
 
-                    if self.framing_opcode == OpCode::Text
-                        && utf8::should_fail_fast(&self.framing_payload, self.framing_final)
-                    {
-                        return Some(Err(Error::Protocol(ProtocolError::InvalidUtf8)));
+                    if self.framing_opcode == OpCode::Text {
+                        let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                            unsafe { self.framing_payload.get_unchecked(self.utf8_valid_up_to..) },
+                            self.framing_final,
+                        );
+
+                        if should_fail {
+                            return Some(Err(Error::Protocol(ProtocolError::InvalidUtf8)));
+                        } else {
+                            self.utf8_valid_up_to += valid_up_to;
+                        }
                     }
                 }
                 Err(e) => {
@@ -598,6 +652,7 @@ where
 
         self.framing_opcode = OpCode::Continuation;
         self.framing_final = false;
+        self.utf8_valid_up_to = 0;
 
         Some(Ok((opcode, payload)))
     }
