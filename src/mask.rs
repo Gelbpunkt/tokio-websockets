@@ -109,7 +109,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8]) {
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn frame(key: [u8; 4], input: &mut [u8]) {
-    fallback_frame(key, input)
+    fallback_frame(key, input);
 }
 
 pub fn fallback_frame(key: [u8; 4], input: &mut [u8]) {

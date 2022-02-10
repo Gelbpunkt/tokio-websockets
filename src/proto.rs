@@ -5,21 +5,11 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
-use std::{mem::take, ptr, string::FromUtf8Error};
+use std::{mem::take, string::FromUtf8Error};
 
 use crate::{mask, utf8, Error};
 
 const FRAME_SIZE: usize = 4096;
-
-unsafe fn prepend_slice<T: Copy>(vec: &mut Vec<T>, slice: &[T]) {
-    let len = vec.len();
-    let amt = slice.len();
-    vec.reserve(amt);
-
-    ptr::copy(vec.as_ptr(), vec.as_mut_ptr().add(amt), len);
-    ptr::copy(slice.as_ptr(), vec.as_mut_ptr(), amt);
-    vec.set_len(len + amt);
-}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OpCode {
@@ -270,9 +260,9 @@ impl Decoder for WebsocketProtocol {
 
                     if should_fail {
                         return Err(Error::Protocol(ProtocolError::InvalidUtf8));
-                    } else {
-                        self.utf8_valid_up_to += valid_up_to;
                     }
+
+                    self.utf8_valid_up_to += valid_up_to;
                 }
 
                 src.reserve(bytes_missing);
@@ -479,13 +469,18 @@ impl Message {
             Self::Binary(data) => (OpCode::Binary, data),
             Self::Close(close_code, reason) => {
                 if let Some(close_code) = close_code {
+                    let reason = reason.unwrap_or_default();
                     let close_code_value: u16 = close_code.into();
-                    let close = close_code_value.to_be_bytes();
-                    let mut rest = reason.unwrap_or_default().into_bytes();
+                    let mut body = vec![0; 2 + reason.len()];
 
-                    unsafe { prepend_slice(&mut rest, &close) };
+                    unsafe {
+                        body.get_unchecked_mut(0..2)
+                            .copy_from_slice(&close_code_value.to_be_bytes());
+                        body.get_unchecked_mut(2..)
+                            .copy_from_slice(reason.as_bytes());
+                    }
 
-                    (OpCode::Close, rest)
+                    (OpCode::Close, body)
                 } else {
                     (OpCode::Close, Vec::new())
                 }
@@ -636,9 +631,9 @@ where
 
                         if should_fail {
                             return Some(Err(Error::Protocol(ProtocolError::InvalidUtf8)));
-                        } else {
-                            self.utf8_valid_up_to += valid_up_to;
                         }
+
+                        self.utf8_valid_up_to += valid_up_to;
                     }
                 }
                 Err(e) => {
