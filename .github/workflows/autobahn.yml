@@ -23,6 +23,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
+          components: rust-src
 
       - name: Prepare directories
         run: |
