@@ -576,14 +576,7 @@ where
     }
 
     pub(crate) fn from_framed<C>(framed: Framed<T, C>, role: Role) -> Self {
-        let old_parts = framed.into_parts();
-        let mut new_parts = WebsocketProtocol::new(role)
-            .framed(old_parts.io)
-            .into_parts();
-        new_parts.write_buf = old_parts.write_buf;
-        new_parts.read_buf = old_parts.read_buf;
-
-        let framed = Framed::from_parts(new_parts);
+        let framed = framed.map_codec(|_| WebsocketProtocol::new(role));
 
         Self {
             protocol: framed,
