@@ -6,9 +6,9 @@ Semi-WIP websockets implementation for Tokio 1.x with a focus on very high perfo
 
 Both the client and server implementations pass the Autobahn test suite entirely, with strict spec conformance, even more strict than tungstenite.
 
+You can find automated benchmark results [here](https://gelbpunkt.github.io/tokio-websockets/index.html).
+
 ## TODO
 
 - Find a way to implement `Stream` and `Sink` for `WebsocketStream`
-- Reuse the payload buffer in the decoder implementation to allocate less
-- Aggregate benchmarks and automate them in CI (use autobahn and publish to GitHub pages)
 - Maybe remove client and/or server implementation in favor of only allowing usage with hyper for security reasons
