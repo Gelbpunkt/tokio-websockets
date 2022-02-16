@@ -3,11 +3,11 @@ set -euo pipefail
 set -x
 
 function cleanup() {
-    kill -9 ${WSSERVER1_PID}
-    kill -9 ${WSSERVER2_PID}
-    kill -9 ${WSSERVER3_PID}
-    kill -9 ${WSSERVER4_PID}
-    kill -9 ${WSSERVER5_PID}
+    kill -9 ${WSSERVER1_PID} || true
+    kill -9 ${WSSERVER2_PID} || true
+    kill -9 ${WSSERVER3_PID} || true
+    kill -9 ${WSSERVER4_PID} || true
+    kill -9 ${WSSERVER5_PID} || true
 }
 
 trap cleanup TERM EXIT
