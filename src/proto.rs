@@ -77,7 +77,7 @@ pub enum ProtocolError {
     InvalidUtf8,
     DisallowedOpcode,
     DisallowedCloseCode,
-    MessageCannotBeText,
+    MessageHasWrongOpcode,
     ServerMaskedData,
     InvalidControlFrameLength,
     FragmentedControlFrame,
@@ -333,7 +333,30 @@ impl Message {
         match self.opcode {
             OpCode::Text => Ok(unsafe { std::str::from_utf8_unchecked(&self.data) }),
             OpCode::Binary => Ok(utf8::parse_str(&self.data)?),
-            _ => Err(ProtocolError::MessageCannotBeText),
+            _ => Err(ProtocolError::MessageHasWrongOpcode),
+        }
+    }
+
+    pub fn as_close(&self) -> Result<(Option<CloseCode>, Option<&str>), ProtocolError> {
+        if self.opcode == OpCode::Close {
+            let close_code = if self.data.len() >= 2 {
+                let close_code_value = u16::from_be_bytes(unsafe {
+                    self.data.get_unchecked(0..2).try_into().unwrap_unchecked()
+                });
+                Some(CloseCode::try_from(close_code_value)?)
+            } else {
+                None
+            };
+
+            let reason = if self.data.len() > 2 {
+                Some(unsafe { std::str::from_utf8_unchecked(self.data.get_unchecked(2..)) })
+            } else {
+                None
+            };
+
+            Ok((close_code, reason))
+        } else {
+            Err(ProtocolError::MessageHasWrongOpcode)
         }
     }
 }
@@ -466,7 +489,7 @@ where
         Some(Ok((opcode, payload)))
     }
 
-    pub async fn read_message(&mut self) -> Option<Result<Message, Error>> {
+    pub async fn next(&mut self) -> Option<Result<Message, Error>> {
         if !self.state.can_read() {
             return None;
         }

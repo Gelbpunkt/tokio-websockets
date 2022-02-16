@@ -15,7 +15,7 @@ async fn get_case_count() -> Result<u32, Error> {
         .set_connector(&Connector::Plain)
         .connect()
         .await?;
-    let msg = stream.read_message().await.unwrap()?;
+    let msg = stream.next().await.unwrap()?;
 
     stream
         .close(Some(CloseCode::NormalClosure), None)
@@ -55,7 +55,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
         .connect()
         .await?;
 
-    while let Some(msg) = stream.read_message().await {
+    while let Some(msg) = stream.next().await {
         let msg = msg?;
 
         if msg.is_text() || msg.is_binary() {

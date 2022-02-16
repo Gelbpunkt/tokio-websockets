@@ -21,7 +21,7 @@ async fn accept_connection(stream: TcpStream) {
 async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
     let mut ws_stream = accept(stream).await?;
 
-    while let Some(msg) = ws_stream.read_message().await {
+    while let Some(msg) = ws_stream.next().await {
         let msg = msg?;
 
         if msg.is_text() || msg.is_binary() {
