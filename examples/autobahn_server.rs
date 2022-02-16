@@ -33,7 +33,7 @@ async fn accept_connection(stream: TcpStream) {
 }
 
 async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
-    let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_ok();
+    let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_err();
     let mut ws_stream = ServerBuilder::new()
         .fail_fast_on_invalid_utf8(fail_fast_on_invalid_utf8)
         .accept(stream)

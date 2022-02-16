@@ -58,7 +58,7 @@ async fn update_reports() -> Result<(), Error> {
 async fn run_test(case: u32) -> Result<(), Error> {
     println!("Running test case {}", case);
 
-    let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_ok();
+    let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_err();
 
     let uri = Uri::from_str(&format!(
         "ws://localhost:9001/runCase?case={}&agent={}",
