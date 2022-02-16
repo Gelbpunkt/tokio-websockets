@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 bytes = "1"
-futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 fastrand = { version = "1.7", default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+pin-project-lite = "0.2"
 tokio = { version = "1", default-features = false, features = ["net", "io-util", "rt"] }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 

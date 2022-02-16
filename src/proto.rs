@@ -1,11 +1,15 @@
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use futures_util::{Sink, SinkExt, StreamExt};
 /// <https://datatracker.ietf.org/doc/html/rfc6455#section-5.2>
-use bytes::{Buf, BufMut, BytesMut};
-use futures_util::{SinkExt, StreamExt};
-
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
-use std::{mem::take, string::FromUtf8Error};
+use std::{
+    mem::take,
+    pin::Pin,
+    string::FromUtf8Error,
+    task::{Context, Poll},
+};
 
 use crate::{mask, utf8, Error};
 
@@ -60,7 +64,7 @@ impl From<OpCode> for u8 {
 pub struct Frame {
     opcode: OpCode,
     is_final: bool,
-    payload: Vec<u8>,
+    payload: Bytes,
 }
 
 #[derive(Debug)]
@@ -81,18 +85,21 @@ pub enum ProtocolError {
     UnfinishedMessage,
 }
 
-impl ProtocolError {
-    fn to_close(&self) -> Message {
-        match self {
-            Self::InvalidUtf8 => Message::Close(
+impl From<&ProtocolError> for Message {
+    fn from(val: &ProtocolError) -> Self {
+        match val {
+            ProtocolError::InvalidUtf8 => Message::close(
                 Some(CloseCode::InvalidFramePayloadData),
-                Some(String::from("invalid utf8")),
+                Some("invalid utf8"),
             ),
-            _ => Message::Close(
-                Some(CloseCode::ProtocolError),
-                Some(String::from("protocol violation")),
-            ),
+            _ => Message::close(Some(CloseCode::ProtocolError), Some("protocol violation")),
         }
+    }
+}
+
+impl From<ProtocolError> for Message {
+    fn from(val: ProtocolError) -> Self {
+        (&val).into()
     }
 }
 
@@ -108,233 +115,10 @@ impl From<std::str::Utf8Error> for ProtocolError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Role {
     Client,
     Server,
-}
-
-pub struct WebsocketProtocol {
-    role: Role,
-    payload: Vec<u8>,
-    payload_in: usize,
-    utf8_valid_up_to: usize,
-}
-
-macro_rules! ensure_buffer_has_space {
-    ($buf:expr, $space:expr) => {
-        if $buf.len() < $space {
-            $buf.reserve($space);
-
-            return Ok(None);
-        }
-    };
-}
-
-impl WebsocketProtocol {
-    #[must_use]
-    pub fn new(role: Role) -> Self {
-        Self {
-            role,
-            payload: Vec::new(),
-            payload_in: 0,
-            utf8_valid_up_to: 0,
-        }
-    }
-}
-
-impl Decoder for WebsocketProtocol {
-    type Item = Frame;
-    type Error = Error;
-
-    #[allow(clippy::cast_possible_truncation)]
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // Opcode and payload length must be present
-        ensure_buffer_has_space!(src, 2);
-
-        let fin_and_rsv = unsafe { src.get_unchecked(0) };
-        let payload_len_1 = unsafe { src.get_unchecked(1) };
-
-        // Bit 0
-        let fin = fin_and_rsv & 1 << 7 != 0;
-
-        // Bits 1-3
-        let rsv = fin_and_rsv & 0x70;
-
-        if rsv != 0 {
-            return Err(Error::Protocol(ProtocolError::InvalidRsv));
-        }
-
-        // Bits 4-7
-        let opcode_value = fin_and_rsv & 31;
-        let opcode = OpCode::try_from(opcode_value)?;
-
-        if !fin && opcode.is_control() {
-            return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
-        }
-
-        let mask = payload_len_1 >> 7 != 0;
-
-        if mask && self.role == Role::Client {
-            return Err(Error::Protocol(ProtocolError::ServerMaskedData));
-        }
-
-        // Bits 1-7
-        let mut payload_length = (payload_len_1 & 127) as usize;
-
-        let mut offset = 2;
-
-        if payload_length > 125 {
-            if opcode.is_control() {
-                return Err(Error::Protocol(ProtocolError::InvalidControlFrameLength));
-            }
-
-            if payload_length == 126 {
-                ensure_buffer_has_space!(src, 4);
-                let mut payload_length_bytes = [0; 2];
-                payload_length_bytes.copy_from_slice(unsafe { src.get_unchecked(2..4) });
-                payload_length = u16::from_be_bytes(payload_length_bytes) as usize;
-                offset = 4;
-            } else if payload_length == 127 {
-                ensure_buffer_has_space!(src, 10);
-                let mut payload_length_bytes = [0; 8];
-                payload_length_bytes.copy_from_slice(unsafe { src.get_unchecked(2..10) });
-                payload_length = u64::from_be_bytes(payload_length_bytes) as usize;
-                offset = 10;
-            } else {
-                return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
-            }
-        }
-
-        let mut masking_key = [0; 4];
-        if mask {
-            ensure_buffer_has_space!(src, offset + 4);
-            masking_key.copy_from_slice(unsafe { src.get_unchecked(offset..offset + 4) });
-            offset += 4;
-        }
-
-        // Reserve space for the incoming payload
-        self.payload.resize(payload_length, 0);
-
-        offset += self.payload_in;
-
-        // Get the actual payload, if any
-        let data_available = src.len() - offset;
-        let data_missing = payload_length - self.payload_in;
-        let to_read = data_missing.min(data_available);
-        let possible_end_in_payload = self.payload_in + to_read;
-
-        if payload_length > 0 {
-            // Copy what we have to the payload body
-            unsafe {
-                self.payload
-                    .get_unchecked_mut(self.payload_in..possible_end_in_payload)
-                    .copy_from_slice(src.get_unchecked(offset..offset + to_read));
-            };
-
-            // Unmask it if needed
-            if mask {
-                masking_key.rotate_left(self.payload_in % 4);
-
-                mask::frame(masking_key, unsafe {
-                    self.payload
-                        .get_unchecked_mut(self.payload_in..possible_end_in_payload)
-                });
-            }
-
-            self.payload_in = possible_end_in_payload;
-
-            let bytes_missing = payload_length - self.payload_in;
-
-            // If the current payload is incomplete
-            if bytes_missing > 0 {
-                // Even here, we can fast fail on invalid UTF8
-                if opcode == OpCode::Text {
-                    let (should_fail, valid_up_to) = utf8::should_fail_fast(
-                        unsafe {
-                            self.payload
-                                .get_unchecked(self.utf8_valid_up_to..self.payload_in)
-                        },
-                        false,
-                    );
-
-                    if should_fail {
-                        return Err(Error::Protocol(ProtocolError::InvalidUtf8));
-                    }
-
-                    self.utf8_valid_up_to += valid_up_to;
-                }
-
-                src.reserve(bytes_missing);
-
-                return Ok(None);
-            }
-
-            offset += to_read;
-
-            // Close frames must be at least 2 bytes in length
-            if opcode == OpCode::Close && payload_length == 1 {
-                return Err(Error::Protocol(ProtocolError::InvalidCloseSequence));
-            }
-        }
-
-        src.advance(offset);
-
-        let payload = take(&mut self.payload);
-        self.payload_in = 0;
-        self.utf8_valid_up_to = 0;
-
-        let frame = Frame {
-            opcode,
-            payload,
-            is_final: fin,
-        };
-
-        Ok(Some(frame))
-    }
-}
-
-impl Encoder<Frame> for WebsocketProtocol {
-    type Error = Error;
-
-    #[allow(clippy::cast_possible_truncation)]
-    fn encode(&mut self, mut item: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let chunk_size = item.payload.len();
-        let masked = self.role == Role::Client;
-        let mask_bit = 128 * u8::from(masked);
-        let opcode_value: u8 = item.opcode.into();
-
-        let frame = (u8::from(item.is_final) << 7) + opcode_value;
-
-        dst.put_u8(frame);
-
-        if chunk_size > u16::MAX as usize {
-            dst.put_u8(127 + mask_bit);
-            dst.put_u64(chunk_size as u64);
-        } else if chunk_size > 125 {
-            dst.put_u8(126 + mask_bit);
-            dst.put_u16(chunk_size as u16);
-        } else {
-            dst.put_u8(chunk_size as u8 + mask_bit);
-        }
-
-        if masked {
-            let mask = [
-                fastrand::u8(0..=255),
-                fastrand::u8(0..=255),
-                fastrand::u8(0..=255),
-                fastrand::u8(0..=255),
-            ];
-
-            dst.extend_from_slice(&mask);
-
-            mask::frame(mask, &mut item.payload);
-        }
-
-        dst.extend_from_slice(&item.payload);
-
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -420,105 +204,135 @@ impl CloseCode {
 }
 
 #[derive(Debug, Clone)]
-pub enum Message {
-    Text(String),
-    Binary(Vec<u8>),
-    Close(Option<CloseCode>, Option<String>),
-    Ping(Vec<u8>),
-    Pong(Vec<u8>),
+pub struct Message {
+    opcode: OpCode,
+    data: Bytes,
 }
 
 impl Message {
-    fn from_raw(opcode: OpCode, data: Vec<u8>) -> Result<Self, ProtocolError> {
+    fn from_raw(opcode: OpCode, data: Bytes) -> Result<Self, ProtocolError> {
         match opcode {
             OpCode::Continuation => Err(ProtocolError::DisallowedOpcode),
-            OpCode::Text => {
-                let data = unsafe { String::from_utf8_unchecked(data) };
-
-                Ok(Self::Text(data))
+            OpCode::Text | OpCode::Binary | OpCode::Ping | OpCode::Pong => {
+                Ok(Self { opcode, data })
             }
-            OpCode::Binary => Ok(Self::Binary(data)),
             OpCode::Close => {
                 if data.is_empty() {
-                    Ok(Self::Close(None, None))
+                    Ok(Self { opcode, data })
                 } else {
-                    let close_code_value = u16::from_be_bytes(data[..2].try_into().unwrap());
+                    let close_code_value = u16::from_be_bytes(unsafe {
+                        data.get_unchecked(0..2).try_into().unwrap_unchecked()
+                    });
                     let close_code = CloseCode::try_from(close_code_value)?;
 
+                    // Verify that the close code is allowed
                     if !close_code.is_allowed() {
                         return Err(ProtocolError::DisallowedCloseCode);
                     }
 
-                    let reason = if data.is_empty() {
-                        None
-                    } else {
-                        Some(utf8::parse(data[2..].to_vec())?)
-                    };
+                    // Verify that the reason is allowed
+                    if data.len() > 2 {
+                        utf8::parse_str(unsafe { data.get_unchecked(2..) })?;
+                    }
 
-                    Ok(Self::Close(Some(close_code), reason))
+                    Ok(Self { opcode, data })
                 }
             }
-            OpCode::Ping => Ok(Self::Ping(data)),
-            OpCode::Pong => Ok(Self::Pong(data)),
         }
     }
 
-    fn into_raw(self) -> (OpCode, Vec<u8>) {
-        match self {
-            Self::Text(text) => (OpCode::Text, text.into_bytes()),
-            Self::Binary(data) => (OpCode::Binary, data),
-            Self::Close(close_code, reason) => {
-                if let Some(close_code) = close_code {
-                    let reason = reason.unwrap_or_default();
-                    let close_code_value: u16 = close_code.into();
-                    let mut body = vec![0; 2 + reason.len()];
+    fn into_raw(self) -> (OpCode, Bytes) {
+        (self.opcode, self.data)
+    }
 
-                    unsafe {
-                        body.get_unchecked_mut(0..2)
-                            .copy_from_slice(&close_code_value.to_be_bytes());
-                        body.get_unchecked_mut(2..)
-                            .copy_from_slice(reason.as_bytes());
-                    }
+    #[must_use]
+    pub fn text(data: String) -> Self {
+        Self {
+            opcode: OpCode::Text,
+            data: data.into(),
+        }
+    }
 
-                    (OpCode::Close, body)
-                } else {
-                    (OpCode::Close, Vec::new())
-                }
-            }
-            Self::Ping(data) => (OpCode::Ping, data),
-            Self::Pong(data) => (OpCode::Pong, data),
+    #[must_use]
+    pub fn binary<D: Into<Bytes>>(data: D) -> Self {
+        Self {
+            opcode: OpCode::Binary,
+            data: data.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn close(code: Option<CloseCode>, reason: Option<&str>) -> Self {
+        let mut data = BytesMut::new();
+
+        if let Some(code) = code {
+            data.put_u16(code.into())
+        }
+
+        if let Some(reason) = reason {
+            data.extend_from_slice(reason.as_bytes());
+        }
+
+        Self {
+            opcode: OpCode::Close,
+            data: data.freeze(),
+        }
+    }
+
+    #[must_use]
+    pub fn ping<D: Into<Bytes>>(data: D) -> Self {
+        Self {
+            opcode: OpCode::Ping,
+            data: data.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn pong<D: Into<Bytes>>(data: D) -> Self {
+        Self {
+            opcode: OpCode::Pong,
+            data: data.into(),
         }
     }
 
     #[must_use]
     pub fn is_text(&self) -> bool {
-        return matches!(self, Self::Text(_));
+        return self.opcode == OpCode::Text;
     }
 
     #[must_use]
     pub fn is_binary(&self) -> bool {
-        return matches!(self, Self::Binary(_));
+        return self.opcode == OpCode::Binary;
     }
 
     #[must_use]
     pub fn is_close(&self) -> bool {
-        return matches!(self, Self::Close(_, _));
+        return self.opcode == OpCode::Close;
     }
 
     #[must_use]
     pub fn is_ping(&self) -> bool {
-        return matches!(self, Self::Ping(_));
+        return self.opcode == OpCode::Ping;
     }
 
     #[must_use]
     pub fn is_pong(&self) -> bool {
-        return matches!(self, Self::Pong(_));
+        return self.opcode == OpCode::Pong;
     }
 
-    pub fn into_text(self) -> Result<String, ProtocolError> {
-        match self {
-            Self::Text(text) => Ok(text),
-            Self::Binary(data) => Ok(utf8::parse(data)?),
+    #[must_use]
+    pub fn into_data(self) -> Bytes {
+        self.data
+    }
+
+    pub fn as_data(&self) -> &Bytes {
+        &self.data
+    }
+
+    pub fn as_text(&self) -> Result<&str, ProtocolError> {
+        match self.opcode {
+            OpCode::Text => Ok(unsafe { std::str::from_utf8_unchecked(&self.data) }),
+            OpCode::Binary => Ok(utf8::parse_str(&self.data)?),
             _ => Err(ProtocolError::MessageCannotBeText),
         }
     }
@@ -547,10 +361,11 @@ impl StreamState {
 }
 
 pub struct WebsocketStream<T> {
-    protocol: Framed<T, WebsocketProtocol>,
+    inner: Framed<T, WebsocketProtocol>,
+
     state: StreamState,
 
-    framing_payload: Vec<u8>,
+    framing_payload: BytesMut,
     framing_opcode: OpCode,
     framing_final: bool,
 
@@ -562,40 +377,46 @@ where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     pub fn from_raw_stream(stream: T, role: Role) -> Self {
-        let mut framed = WebsocketProtocol::new(role).framed(stream);
-        framed.read_buffer_mut().reserve(4 * 1024);
-
         Self {
-            protocol: framed,
+            inner: WebsocketProtocol {
+                role,
+                state: StreamState::Active,
+                payload_in: 0,
+                utf8_valid_up_to: 0,
+            }
+            .framed(stream),
             state: StreamState::Active,
-            framing_payload: Vec::new(),
+            framing_payload: BytesMut::new(),
             framing_opcode: OpCode::Continuation,
             framing_final: false,
             utf8_valid_up_to: 0,
         }
     }
 
-    pub(crate) fn from_framed<C>(framed: Framed<T, C>, role: Role) -> Self {
-        let framed = framed.map_codec(|_| WebsocketProtocol::new(role));
-
+    pub fn from_framed<U>(framed: Framed<T, U>, role: Role) -> Self {
         Self {
-            protocol: framed,
+            inner: framed.map_codec(|_| WebsocketProtocol {
+                role,
+                state: StreamState::Active,
+                payload_in: 0,
+                utf8_valid_up_to: 0,
+            }),
             state: StreamState::Active,
-            framing_payload: Vec::new(),
+            framing_payload: BytesMut::new(),
             framing_opcode: OpCode::Continuation,
             framing_final: false,
             utf8_valid_up_to: 0,
         }
     }
 
-    async fn read_full_message(&mut self) -> Option<Result<(OpCode, Vec<u8>), Error>> {
+    async fn read_full_message(&mut self) -> Option<Result<(OpCode, Bytes), Error>> {
         if let Err(e) = self.state.check_active() {
             return Some(Err(e));
         };
 
         while !self.framing_final {
-            match self.protocol.next().await? {
-                Ok(mut frame) => {
+            match self.inner.next().await? {
+                Ok(frame) => {
                     // Control frames are allowed in between other frames
                     if frame.opcode.is_control() {
                         return Some(Ok((frame.opcode, frame.payload)));
@@ -614,7 +435,7 @@ where
                     }
 
                     self.framing_final = frame.is_final;
-                    self.framing_payload.append(&mut frame.payload);
+                    self.framing_payload.extend_from_slice(&frame.payload);
 
                     if self.framing_opcode == OpCode::Text {
                         let (should_fail, valid_up_to) = utf8::should_fail_fast(
@@ -636,7 +457,7 @@ where
         }
 
         let opcode = self.framing_opcode;
-        let payload = take(&mut self.framing_payload);
+        let payload = take(&mut self.framing_payload).freeze();
 
         self.framing_opcode = OpCode::Continuation;
         self.framing_final = false;
@@ -646,13 +467,17 @@ where
     }
 
     pub async fn read_message(&mut self) -> Option<Result<Message, Error>> {
+        if !self.state.can_read() {
+            return None;
+        }
+
         let (opcode, payload) = match self.read_full_message().await? {
             Ok((opcode, payload)) => (opcode, payload),
             Err(e) => {
                 if let Error::Protocol(protocol) = &e {
-                    let close_msg = protocol.to_close();
+                    let close_msg = protocol.into();
 
-                    if let Err(e) = self.write_message(close_msg).await {
+                    if let Err(e) = self.send(close_msg).await {
                         return Some(Err(e));
                     };
                 }
@@ -664,9 +489,9 @@ where
         let message = match Message::from_raw(opcode, payload) {
             Ok(msg) => msg,
             Err(e) => {
-                let close_msg = e.to_close();
+                let close_msg = (&e).into();
 
-                if let Err(e) = self.write_message(close_msg).await {
+                if let Err(e) = self.send(close_msg).await {
                     return Some(Err(e));
                 };
 
@@ -674,11 +499,11 @@ where
             }
         };
 
-        match &message {
-            Message::Close(_, _) => match self.state {
+        match &message.opcode {
+            OpCode::Close => match self.state {
                 StreamState::Active => {
                     self.state = StreamState::ClosedByPeer;
-                    if let Err(e) = self.write_message(message.clone()).await {
+                    if let Err(e) = self.send(message.clone()).await {
                         return Some(Err(e));
                     };
                 }
@@ -688,8 +513,11 @@ where
                 }
                 StreamState::Terminated => unreachable!(),
             },
-            Message::Ping(data) => {
-                if let Err(e) = self.write_message(Message::Pong(data.clone())).await {
+            OpCode::Ping => {
+                let mut msg = message.clone();
+                msg.opcode = OpCode::Pong;
+
+                if let Err(e) = self.send(msg).await {
                     return Some(Err(e));
                 };
             }
@@ -699,14 +527,61 @@ where
         Some(Ok(message))
     }
 
-    pub async fn write_message(&mut self, message: Message) -> Result<(), Error> {
+    pub async fn close(
+        &mut self,
+        close_code: Option<CloseCode>,
+        reason: Option<&str>,
+    ) -> Result<(), Error> {
+        self.send(Message::close(close_code, reason)).await
+    }
+}
+
+impl<T> Sink<Message> for WebsocketStream<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    type Error = Error;
+
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut self.inner).poll_ready(cx)
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
+        Pin::new(&mut self.inner).start_send(item)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Pin::new(&mut self.inner).poll_close(cx)
+    }
+}
+
+struct WebsocketProtocol {
+    role: Role,
+    state: StreamState,
+    payload_in: usize,
+    utf8_valid_up_to: usize,
+}
+
+impl Encoder<Message> for WebsocketProtocol {
+    type Error = Error;
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
         self.state.check_active()?;
 
-        if message.is_close() {
-            self.state = StreamState::ClosedByUs;
+        if item.is_close() {
+            if matches!(self.state, StreamState::ClosedByPeer) {
+                self.state = StreamState::CloseAcknowledged;
+            } else {
+                self.state = StreamState::ClosedByUs;
+            }
         }
 
-        let (opcode, data) = message.into_raw();
+        let (opcode, data) = item.into_raw();
         let mut chunks = data.chunks(FRAME_SIZE).peekable();
         let mut next_chunk = Some(chunks.next().unwrap_or_default());
         let mut chunk_number = 0;
@@ -718,31 +593,204 @@ where
                 OpCode::Continuation
             };
 
-            let frame = Frame {
-                opcode: frame_opcode,
-                is_final: chunks.peek().is_none(),
-                payload: chunk.to_vec(),
+            let is_final = chunks.peek().is_none();
+            let chunk_size = chunk.len();
+            let mask = if self.role == Role::Client {
+                Some([
+                    fastrand::u8(0..=255),
+                    fastrand::u8(0..=255),
+                    fastrand::u8(0..=255),
+                    fastrand::u8(0..=255),
+                ])
+            } else {
+                None
             };
+            let mask_bit = 128 * u8::from(mask.is_some());
+            let opcode_value: u8 = frame_opcode.into();
 
-            self.protocol.send(frame).await?;
+            let initial_byte = (u8::from(is_final) << 7) + opcode_value;
+
+            dst.put_u8(initial_byte);
+
+            if chunk_size > u16::MAX as usize {
+                dst.put_u8(127 + mask_bit);
+                dst.put_u64(chunk_size as u64);
+            } else if chunk_size > 125 {
+                dst.put_u8(126 + mask_bit);
+                dst.put_u16(chunk_size as u16);
+            } else {
+                dst.put_u8(chunk_size as u8 + mask_bit);
+            }
+
+            if let Some(mask) = &mask {
+                dst.extend_from_slice(mask);
+            }
+
+            dst.extend_from_slice(chunk);
+
+            if let Some(mask) = mask {
+                let start_of_data = dst.len() - chunk.len();
+                mask::frame(&mask, unsafe { dst.get_unchecked_mut(start_of_data..) });
+            }
 
             next_chunk = chunks.next();
             chunk_number += 1;
         }
 
-        if self.protocol.codec().role == Role::Server && !self.state.can_read() {
+        if self.role == Role::Server && !self.state.can_read() {
             self.state = StreamState::Terminated;
             Err(Error::ConnectionClosed)
         } else {
             Ok(())
         }
     }
+}
 
-    pub async fn close(
-        &mut self,
-        close_code: Option<CloseCode>,
-        reason: Option<String>,
-    ) -> Result<(), Error> {
-        self.write_message(Message::Close(close_code, reason)).await
+macro_rules! ensure_buffer_has_space {
+    ($buf:expr, $space:expr) => {
+        if $buf.len() < $space {
+            $buf.reserve($space);
+
+            return Ok(None);
+        }
+    };
+}
+
+impl Decoder for WebsocketProtocol {
+    type Item = Frame;
+
+    type Error = Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        // Opcode and payload length must be present
+        ensure_buffer_has_space!(src, 2);
+
+        let fin_and_rsv = unsafe { src.get_unchecked(0) };
+        let payload_len_1 = unsafe { src.get_unchecked(1) };
+
+        // Bit 0
+        let fin = fin_and_rsv & 1 << 7 != 0;
+
+        // Bits 1-3
+        let rsv = fin_and_rsv & 0x70;
+
+        if rsv != 0 {
+            return Err(Error::Protocol(ProtocolError::InvalidRsv));
+        }
+
+        // Bits 4-7
+        let opcode_value = fin_and_rsv & 31;
+        let opcode = OpCode::try_from(opcode_value)?;
+
+        if !fin && opcode.is_control() {
+            return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
+        }
+
+        let mask = payload_len_1 >> 7 != 0;
+
+        if mask && self.role == Role::Client {
+            return Err(Error::Protocol(ProtocolError::ServerMaskedData));
+        }
+
+        // Bits 1-7
+        let mut payload_length = (payload_len_1 & 127) as usize;
+
+        let mut offset = 2;
+
+        if payload_length > 125 {
+            if opcode.is_control() {
+                return Err(Error::Protocol(ProtocolError::InvalidControlFrameLength));
+            }
+
+            if payload_length == 126 {
+                ensure_buffer_has_space!(src, 4);
+                payload_length = u16::from_be_bytes(unsafe {
+                    src.get_unchecked(2..4).try_into().unwrap_unchecked()
+                }) as usize;
+                offset = 4;
+            } else if payload_length == 127 {
+                ensure_buffer_has_space!(src, 10);
+                payload_length = u64::from_be_bytes(unsafe {
+                    src.get_unchecked(2..10).try_into().unwrap_unchecked()
+                }) as usize;
+                offset = 10;
+            } else {
+                return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
+            }
+        }
+
+        let mut masking_key = [0; 4];
+        if mask {
+            ensure_buffer_has_space!(src, offset + 4);
+            masking_key.copy_from_slice(unsafe { src.get_unchecked(offset..offset + 4) });
+            offset += 4;
+        }
+
+        // Get the actual payload, if any
+        let data_available = (src.len() - offset).min(payload_length);
+        let to_read = data_available - self.payload_in;
+
+        if payload_length > 0 {
+            // Unmask it if needed (in-place since this is reusable)
+            if mask {
+                masking_key.rotate_left(self.payload_in % 4);
+
+                let unmasked_until = offset + self.payload_in;
+
+                mask::frame(&masking_key, unsafe {
+                    src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
+                });
+            }
+
+            self.payload_in = data_available;
+
+            let bytes_missing = payload_length - self.payload_in;
+
+            // If the current payload is incomplete
+            if bytes_missing > 0 {
+                // Even here, we can fast fail on invalid UTF8
+                if opcode == OpCode::Text {
+                    let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                        unsafe {
+                            src.get_unchecked(
+                                offset + self.utf8_valid_up_to..offset + self.payload_in,
+                            )
+                        },
+                        false,
+                    );
+
+                    if should_fail {
+                        return Err(Error::Protocol(ProtocolError::InvalidUtf8));
+                    }
+
+                    self.utf8_valid_up_to += valid_up_to;
+                }
+
+                src.reserve(bytes_missing);
+
+                return Ok(None);
+            }
+
+            // Close frames must be at least 2 bytes in length
+            if opcode == OpCode::Close && payload_length == 1 {
+                return Err(Error::Protocol(ProtocolError::InvalidCloseSequence));
+            }
+        }
+
+        // Advance the offset into the payload body
+        src.advance(offset);
+        // Take the payload
+        let payload = src.split_to(payload_length).freeze();
+
+        self.payload_in = 0;
+        self.utf8_valid_up_to = 0;
+
+        let frame = Frame {
+            opcode,
+            payload,
+            is_final: fin,
+        };
+
+        Ok(Some(frame))
     }
 }

@@ -1,3 +1,4 @@
+use futures_util::SinkExt;
 use http::Uri;
 use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error};
 
@@ -21,7 +22,7 @@ async fn get_case_count() -> Result<u32, Error> {
         .await
         .unwrap();
 
-    Ok(msg.into_text().unwrap().parse::<u32>().unwrap())
+    Ok(msg.as_text().unwrap().parse::<u32>().unwrap())
 }
 
 async fn update_reports() -> Result<(), Error> {
@@ -58,7 +59,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
         let msg = msg?;
 
         if msg.is_text() || msg.is_binary() {
-            stream.write_message(msg).await?;
+            stream.send(msg).await?;
         }
     }
 

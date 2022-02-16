@@ -1,3 +1,4 @@
+use futures_util::SinkExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_websockets::{accept, Error};
 
@@ -24,9 +25,7 @@ async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
         let msg = msg?;
 
         if msg.is_text() || msg.is_binary() {
-            ws_stream.write_message(msg).await?;
-        } else if msg.is_close() {
-            break;
+            ws_stream.send(msg).await?;
         }
     }
 

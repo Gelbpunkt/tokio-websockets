@@ -1,32 +1,4 @@
-#[cfg(feature = "simd")]
-use simdutf8::basic::imp::Utf8Validator;
-
 use crate::proto::ProtocolError;
-
-#[cfg(feature = "simd")]
-#[inline]
-pub fn parse(input: Vec<u8>) -> Result<String, ProtocolError> {
-    unsafe {
-        #[cfg(target_feature = "avx2")]
-        let mut validator = simdutf8::basic::imp::x86::avx2::Utf8ValidatorImp::new();
-        #[cfg(all(target_feature = "sse4.2", not(target_feature = "avx2")))]
-        let mut validator = simdutf8::basic::imp::x86::sse42::Utf8ValidatorImp::new();
-
-        validator.update(&input);
-
-        if validator.finalize().is_ok() {
-            Ok(String::from_utf8_unchecked(input))
-        } else {
-            Err(ProtocolError::InvalidUtf8)
-        }
-    }
-}
-
-#[cfg(not(feature = "simd"))]
-#[inline]
-pub fn parse(input: Vec<u8>) -> Result<String, ProtocolError> {
-    Ok(String::from_utf8(input)?)
-}
 
 #[cfg(feature = "simd")]
 #[inline]

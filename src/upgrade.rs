@@ -1,9 +1,11 @@
+use std::hint::unreachable_unchecked;
+
 use base64::display::Base64Display;
 use bytes::{Buf, BytesMut};
-use httparse::{self, Header, Response};
+use httparse::{self, Header, Request, Response};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::{sha::digest, Error};
+use crate::{sha::digest, utf8::parse_str, Error};
 
 const SWITCHING_PROTOCOLS: u16 = 101;
 
@@ -22,46 +24,6 @@ fn header<'a, 'header: 'a>(
         })?;
 
     Ok(header.value)
-}
-
-fn validate_server_response(
-    expected_ws_accept: &[u8],
-    data: &[u8],
-) -> Result<Option<usize>, Error> {
-    let mut headers = [httparse::EMPTY_HEADER; 25];
-    let mut response = Response::new(&mut headers);
-    let status = response
-        .parse(data)
-        .map_err(|e| Error::Upgrade(e.to_string()))?;
-
-    if !status.is_complete() {
-        return Ok(None);
-    }
-
-    let response_len = status.unwrap();
-    let code = response.code.unwrap();
-
-    if code != SWITCHING_PROTOCOLS {
-        return Err(Error::Upgrade(format!(
-            "server responded with HTTP error {code}",
-            code = code
-        )));
-    }
-
-    let ws_accept_header = header(response.headers, "Sec-WebSocket-Accept")?;
-    let mut ws_accept = [0; 20];
-    base64::decode_config_slice(&ws_accept_header, base64::STANDARD, &mut ws_accept)
-        .map_err(|e| Error::Upgrade(e.to_string()))?;
-
-    if expected_ws_accept != ws_accept {
-        return Err(Error::Upgrade(format!(
-            "server responded with incorrect Sec-WebSocket-Accept header: expected {expected}, got {actual}",
-            expected = Base64Display::with_config(expected_ws_accept, base64::STANDARD),
-            actual = Base64Display::with_config(&ws_accept, base64::STANDARD),
-        )));
-    }
-
-    Ok(Some(response_len))
 }
 
 fn contains_ignore_ascii_case(mut haystack: &[u8], needle: &[u8]) -> bool {
@@ -144,38 +106,106 @@ impl ClientRequest {
 }
 
 /// Decoder for parsing the server's response to the client's HTTP `Connection: Upgrade` request.
-pub struct Codec {
+pub struct ServerResponseCodec {
     ws_accept: [u8; 20],
 }
 
-impl Codec {
+impl ServerResponseCodec {
     /// Returns a new [`Codec`].
     ///
     /// The `key` parameter provides the string passed to the server via the HTTP `Sec-WebSocket-Key` header.
     #[must_use]
     pub fn new(key: &[u8]) -> Self {
-        Codec {
+        Self {
             ws_accept: digest(key),
         }
     }
 }
 
-impl Decoder for Codec {
+impl Decoder for ServerResponseCodec {
     type Item = ();
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        (validate_server_response(&self.ws_accept, src)?).map_or(Ok(None), |response_len| {
-            src.advance(response_len);
-            Ok(Some(()))
-        })
+        let mut headers = [httparse::EMPTY_HEADER; 25];
+        let mut response = Response::new(&mut headers);
+        let status = response
+            .parse(src)
+            .map_err(|e| Error::Upgrade(e.to_string()))?;
+
+        if !status.is_complete() {
+            return Ok(None);
+        }
+
+        let response_len = status.unwrap();
+        let code = response.code.unwrap();
+
+        if code != SWITCHING_PROTOCOLS {
+            return Err(Error::Upgrade(format!(
+                "server responded with HTTP error {code}",
+                code = code
+            )));
+        }
+
+        let ws_accept_header = header(response.headers, "Sec-WebSocket-Accept")?;
+        let mut ws_accept = [0; 20];
+        base64::decode_config_slice(&ws_accept_header, base64::STANDARD, &mut ws_accept)
+            .map_err(|e| Error::Upgrade(e.to_string()))?;
+
+        if self.ws_accept != ws_accept {
+            return Err(Error::Upgrade(format!(
+                "server responded with incorrect Sec-WebSocket-Accept header: expected {expected}, got {actual}",
+                expected = Base64Display::with_config(&self.ws_accept, base64::STANDARD),
+                actual = Base64Display::with_config(&ws_accept, base64::STANDARD),
+            )));
+        }
+
+        src.advance(response_len);
+
+        Ok(Some(()))
     }
 }
 
-impl Encoder<()> for Codec {
+impl Encoder<()> for ServerResponseCodec {
     type Error = Error;
 
     fn encode(&mut self, _item: (), _dst: &mut BytesMut) -> Result<(), Self::Error> {
-        unimplemented!()
+        unsafe { unreachable_unchecked() }
+    }
+}
+
+pub struct ClientRequestCodec {}
+
+impl Decoder for ClientRequestCodec {
+    type Item = String;
+    type Error = Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let mut headers = [httparse::EMPTY_HEADER; 25];
+        let mut request = Request::new(&mut headers);
+        let status = request
+            .parse(src)
+            .map_err(|e| Error::Upgrade(e.to_string()))?;
+
+        if !status.is_complete() {
+            return Ok(None);
+        }
+
+        let request_len = status.unwrap();
+
+        let ws_accept = if let Ok(req) = ClientRequest::parse(|name| {
+            let h = headers.iter().find(|h| h.name == name)?;
+            parse_str(h.value).ok()
+        }) {
+            req.ws_accept()
+        } else {
+            return Err(Error::Upgrade(String::from(
+                "Invalid client upgrade request",
+            )));
+        };
+
+        src.advance(request_len);
+
+        Ok(Some(format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-Websocket-Accept: {}\r\n\r\n", ws_accept)))
     }
 }

@@ -190,9 +190,9 @@ impl<'a> Builder<'a> {
         let mut key_base64 = [0; 24];
         make_key(None, &mut key_base64);
 
-        let upgrade_codec = upgrade::Codec::new(&key_base64);
+        let upgrade_codec = upgrade::ServerResponseCodec::new(&key_base64);
         let request = build_request(&self.uri, &key_base64, &self.headers);
-        AsyncWriteExt::write_all(&mut stream, &request).await?;
+        stream.write_all(&request).await?;
 
         let (opt, framed) = upgrade_codec.framed(stream).into_future().await;
         opt.ok_or(Error::NoUpgradeResponse)??;
