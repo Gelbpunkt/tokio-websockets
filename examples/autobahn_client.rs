@@ -4,10 +4,24 @@ use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error};
 
 use std::str::FromStr;
 
-#[cfg(feature = "simd")]
-const AGENT: &str = "tokio-websockets-avx2";
-#[cfg(not(feature = "simd"))]
-const AGENT: &str = "tokio-websockets";
+fn get_agent() -> &'static str {
+    #[cfg(feature = "simd")]
+    {
+        if std::env::var("SKIP_FAIL_FAST").is_ok() {
+            "tokio-websockets-avx2-skip-fail-fast"
+        } else {
+            "tokio-websockets-avx2"
+        }
+    }
+    #[cfg(not(feature = "simd"))]
+    {
+        if std::env::var("SKIP_FAIL_FAST").is_ok() {
+            "tokio-websockets-skip-fail-fast"
+        } else {
+            "tokio-websockets"
+        }
+    }
+}
 
 async fn get_case_count() -> Result<u32, Error> {
     let uri = Uri::from_static("ws://localhost:9001/getCaseCount");
@@ -28,7 +42,7 @@ async fn get_case_count() -> Result<u32, Error> {
 async fn update_reports() -> Result<(), Error> {
     let uri = Uri::from_str(&format!(
         "ws://localhost:9001/updateReports?agent={}",
-        AGENT
+        get_agent()
     ))
     .unwrap();
     let mut stream = ClientBuilder::from_uri(uri)
@@ -44,13 +58,17 @@ async fn update_reports() -> Result<(), Error> {
 async fn run_test(case: u32) -> Result<(), Error> {
     println!("Running test case {}", case);
 
+    let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_ok();
+
     let uri = Uri::from_str(&format!(
         "ws://localhost:9001/runCase?case={}&agent={}",
-        case, AGENT
+        case,
+        get_agent()
     ))
     .unwrap();
 
     let mut stream = ClientBuilder::from_uri(uri)
+        .fail_fast_on_invalid_utf8(fail_fast_on_invalid_utf8)
         .set_connector(&Connector::Plain)
         .connect()
         .await?;

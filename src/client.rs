@@ -109,6 +109,7 @@ pub struct Builder<'a> {
     uri: Uri,
     connector: Option<&'a Connector>,
     headers: HeaderMap,
+    fail_fast_on_invalid_utf8: bool,
 }
 
 impl<'a> Builder<'a> {
@@ -130,6 +131,7 @@ impl<'a> Builder<'a> {
             uri,
             connector: None,
             headers: HeaderMap::new(),
+            fail_fast_on_invalid_utf8: true,
         }
     }
 
@@ -146,6 +148,18 @@ impl<'a> Builder<'a> {
     #[must_use]
     pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Self {
         self.headers.insert(name, value);
+
+        self
+    }
+
+    /// Toggle whether to perform UTF8 checks on incomplete frame parts.
+    /// This is not technically required by the websocket specification and adds a decent
+    /// amount of overhead, especially when messages are sent in small chops.
+    ///
+    /// Because this is SHOULD behaviour, it is enabled by default.
+    #[must_use]
+    pub fn fail_fast_on_invalid_utf8(mut self, value: bool) -> Self {
+        self.fail_fast_on_invalid_utf8 = value;
 
         self
     }
@@ -197,6 +211,10 @@ impl<'a> Builder<'a> {
         let (opt, framed) = upgrade_codec.framed(stream).into_future().await;
         opt.ok_or(Error::NoUpgradeResponse)??;
 
-        Ok(WebsocketStream::from_framed(framed, Role::Client))
+        Ok(WebsocketStream::from_framed(
+            framed,
+            Role::Client,
+            self.fail_fast_on_invalid_utf8,
+        ))
     }
 }

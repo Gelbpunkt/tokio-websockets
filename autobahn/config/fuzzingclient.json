@@ -6,12 +6,20 @@
             "url": "ws://127.0.0.1:9002"
         },
         {
-            "agent": "tokio-websockets-avx2",
+            "agent": "tokio-websockets-skip-fail-fast",
             "url": "ws://127.0.0.1:9003"
         },
         {
-            "agent": "tokio-tungstenite",
+            "agent": "tokio-websockets-avx2",
             "url": "ws://127.0.0.1:9004"
+        },
+        {
+            "agent": "tokio-websockets-avx2-skip-fail-fast",
+            "url": "ws://127.0.0.1:9005"
+        },
+        {
+            "agent": "tokio-tungstenite",
+            "url": "ws://127.0.0.1:9006"
         }
     ],
     "cases": ["*"],

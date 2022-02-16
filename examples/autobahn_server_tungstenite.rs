@@ -4,7 +4,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{accept_async, tungstenite::Error};
 
-const PORT: u16 = 9004;
+const PORT: u16 = 9006;
 
 async fn accept_connection(stream: TcpStream) {
     if let Err(e) = handle_connection(stream).await {

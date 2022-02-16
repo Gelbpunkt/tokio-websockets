@@ -1,13 +1,27 @@
 use futures_util::SinkExt;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_websockets::{accept, Error};
+use tokio_websockets::{Error, ServerBuilder};
 
 use std::net::SocketAddr;
 
-#[cfg(feature = "simd")]
-const PORT: u16 = 9003;
-#[cfg(not(feature = "simd"))]
-const PORT: u16 = 9002;
+fn get_port() -> u16 {
+    #[cfg(feature = "simd")]
+    {
+        if std::env::var("SKIP_FAIL_FAST").is_ok() {
+            9005
+        } else {
+            9004
+        }
+    }
+    #[cfg(not(feature = "simd"))]
+    {
+        if std::env::var("SKIP_FAIL_FAST").is_ok() {
+            9003
+        } else {
+            9002
+        }
+    }
+}
 
 async fn accept_connection(stream: TcpStream) {
     if let Err(e) = handle_connection(stream).await {
@@ -19,7 +33,11 @@ async fn accept_connection(stream: TcpStream) {
 }
 
 async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
-    let mut ws_stream = accept(stream).await?;
+    let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_ok();
+    let mut ws_stream = ServerBuilder::new()
+        .fail_fast_on_invalid_utf8(fail_fast_on_invalid_utf8)
+        .accept(stream)
+        .await?;
 
     while let Some(msg) = ws_stream.next().await {
         let msg = msg?;
@@ -34,7 +52,7 @@ async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() {
-    let addr: SocketAddr = ([127, 0, 0, 1], PORT).into();
+    let addr: SocketAddr = ([127, 0, 0, 1], get_port()).into();
     let listener = TcpListener::bind(&addr).await.expect("Can't listen");
 
     println!("Listening on: {}", addr);

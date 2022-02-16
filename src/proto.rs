@@ -399,13 +399,17 @@ impl<T> WebsocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    pub fn from_raw_stream(stream: T, role: Role) -> Self {
+    pub fn from_raw_stream(stream: T, role: Role, fail_fast_on_invalid_utf8: bool) -> Self {
         Self {
             inner: WebsocketProtocol {
                 role,
                 state: StreamState::Active,
                 payload_in: 0,
-                utf8_valid_up_to: 0,
+                utf8_valid_up_to: if fail_fast_on_invalid_utf8 {
+                    Some(0)
+                } else {
+                    None
+                },
             }
             .framed(stream),
             state: StreamState::Active,
@@ -416,13 +420,21 @@ where
         }
     }
 
-    pub fn from_framed<U>(framed: Framed<T, U>, role: Role) -> Self {
+    pub fn from_framed<U>(
+        framed: Framed<T, U>,
+        role: Role,
+        fail_fast_on_invalid_utf8: bool,
+    ) -> Self {
         Self {
             inner: framed.map_codec(|_| WebsocketProtocol {
                 role,
                 state: StreamState::Active,
                 payload_in: 0,
-                utf8_valid_up_to: 0,
+                utf8_valid_up_to: if fail_fast_on_invalid_utf8 {
+                    Some(0)
+                } else {
+                    None
+                },
             }),
             state: StreamState::Active,
             framing_payload: BytesMut::new(),
@@ -586,7 +598,7 @@ struct WebsocketProtocol {
     role: Role,
     state: StreamState,
     payload_in: usize,
-    utf8_valid_up_to: usize,
+    utf8_valid_up_to: Option<usize>,
 }
 
 impl Encoder<Message> for WebsocketProtocol {
@@ -772,21 +784,23 @@ impl Decoder for WebsocketProtocol {
             // If the current payload is incomplete
             if bytes_missing > 0 {
                 // Even here, we can fast fail on invalid UTF8
-                if opcode == OpCode::Text {
-                    let (should_fail, valid_up_to) = utf8::should_fail_fast(
-                        unsafe {
-                            src.get_unchecked(
-                                offset + self.utf8_valid_up_to..offset + self.payload_in,
-                            )
-                        },
-                        false,
-                    );
+                if let Some(utf8_valid_up_to) = &mut self.utf8_valid_up_to {
+                    if opcode == OpCode::Text {
+                        let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                            unsafe {
+                                src.get_unchecked(
+                                    offset + *utf8_valid_up_to..offset + self.payload_in,
+                                )
+                            },
+                            false,
+                        );
 
-                    if should_fail {
-                        return Err(Error::Protocol(ProtocolError::InvalidUtf8));
+                        if should_fail {
+                            return Err(Error::Protocol(ProtocolError::InvalidUtf8));
+                        }
+
+                        *utf8_valid_up_to += valid_up_to;
                     }
-
-                    self.utf8_valid_up_to += valid_up_to;
                 }
 
                 src.reserve(bytes_missing);
@@ -806,7 +820,8 @@ impl Decoder for WebsocketProtocol {
         let payload = src.split_to(payload_length).freeze();
 
         self.payload_in = 0;
-        self.utf8_valid_up_to = 0;
+
+        self.utf8_valid_up_to.map(|_| 0);
 
         let frame = Frame {
             opcode,

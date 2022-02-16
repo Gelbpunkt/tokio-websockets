@@ -24,5 +24,5 @@ pub use client::Builder as ClientBuilder;
 pub use error::Error;
 pub use proto::{CloseCode, Message, OpCode, Role, WebsocketStream};
 #[cfg(feature = "server")]
-pub use server::accept;
+pub use server::Builder as ServerBuilder;
 pub use tls::{Connector, MaybeTlsStream};
