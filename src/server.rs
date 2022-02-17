@@ -11,9 +11,16 @@ pub struct Builder {
     fail_fast_on_invalid_utf8: bool,
 }
 
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Builder {
     /// Creates a [`Builder`] that will perform a HTTP upgrade handshake
     /// and then receive messages as the server end.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fail_fast_on_invalid_utf8: true,

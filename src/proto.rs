@@ -97,12 +97,6 @@ impl From<&ProtocolError> for Message {
     }
 }
 
-impl From<ProtocolError> for Message {
-    fn from(val: ProtocolError) -> Self {
-        (&val).into()
-    }
-}
-
 impl From<FromUtf8Error> for ProtocolError {
     fn from(_: FromUtf8Error) -> Self {
         Self::InvalidUtf8
@@ -266,7 +260,7 @@ impl Message {
         let mut data = BytesMut::new();
 
         if let Some(code) = code {
-            data.put_u16(code.into())
+            data.put_u16(code.into());
         }
 
         if let Some(reason) = reason {
@@ -297,27 +291,27 @@ impl Message {
 
     #[must_use]
     pub fn is_text(&self) -> bool {
-        return self.opcode == OpCode::Text;
+        self.opcode == OpCode::Text
     }
 
     #[must_use]
     pub fn is_binary(&self) -> bool {
-        return self.opcode == OpCode::Binary;
+        self.opcode == OpCode::Binary
     }
 
     #[must_use]
     pub fn is_close(&self) -> bool {
-        return self.opcode == OpCode::Close;
+        self.opcode == OpCode::Close
     }
 
     #[must_use]
     pub fn is_ping(&self) -> bool {
-        return self.opcode == OpCode::Ping;
+        self.opcode == OpCode::Ping
     }
 
     #[must_use]
     pub fn is_pong(&self) -> bool {
-        return self.opcode == OpCode::Pong;
+        self.opcode == OpCode::Pong
     }
 
     #[must_use]
@@ -524,7 +518,7 @@ where
         let message = match Message::from_raw(opcode, payload) {
             Ok(msg) => msg,
             Err(e) => {
-                let close_msg = (&e).into();
+                let close_msg = Message::from(&e);
 
                 if let Err(e) = self.send(close_msg).await {
                     return Some(Err(e));
@@ -696,6 +690,7 @@ impl Decoder for WebsocketProtocol {
 
     type Error = Error;
 
+    #[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Opcode and payload length must be present
         ensure_buffer_has_space!(src, 2);
@@ -754,10 +749,10 @@ impl Decoder for WebsocketProtocol {
             }
         }
 
-        let mut masking_key = [0; 4];
+        // There could be a mask here, but we only load it later,
+        // so just increase the offset to calculate the available data
         if mask {
             ensure_buffer_has_space!(src, offset + 4);
-            masking_key.copy_from_slice(unsafe { src.get_unchecked(offset..offset + 4) });
             offset += 4;
         }
 
@@ -766,26 +761,29 @@ impl Decoder for WebsocketProtocol {
         let to_read = data_available - self.payload_in;
 
         if payload_length > 0 {
-            // Unmask it if needed (in-place since this is reusable)
-            if mask {
-                masking_key.rotate_left(self.payload_in % 4);
+            let bytes_missing = payload_length - data_available;
 
-                let unmasked_until = offset + self.payload_in;
-
-                mask::frame(&masking_key, unsafe {
-                    src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
-                });
-            }
-
-            self.payload_in = data_available;
-
-            let bytes_missing = payload_length - self.payload_in;
-
-            // If the current payload is incomplete
             if bytes_missing > 0 {
-                // Even here, we can fast fail on invalid UTF8
+                // If data is missing, we might have to fail fast on invalid UTF8
                 if let Some(utf8_valid_up_to) = &mut self.utf8_valid_up_to {
                     if opcode == OpCode::Text {
+                        // Data might be masked, so unmask it here
+                        if mask {
+                            let mut masking_key = [0; 4];
+                            masking_key
+                                .copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
+
+                            masking_key.rotate_left(self.payload_in % 4);
+
+                            let unmasked_until = offset + self.payload_in;
+
+                            mask::frame(&masking_key, unsafe {
+                                src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
+                            });
+                        }
+
+                        self.payload_in = data_available;
+
                         let (should_fail, valid_up_to) = utf8::should_fail_fast(
                             unsafe {
                                 src.get_unchecked(
@@ -814,6 +812,20 @@ impl Decoder for WebsocketProtocol {
             }
         }
 
+        // Since we only unmasked if data was previously incomplete, unmask the entire rest
+        if mask {
+            let mut masking_key = [0; 4];
+            masking_key.copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
+
+            masking_key.rotate_left(self.payload_in % 4);
+
+            let unmasked_until = offset + self.payload_in;
+
+            mask::frame(&masking_key, unsafe {
+                src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
+            });
+        }
+
         // Advance the offset into the payload body
         src.advance(offset);
         // Take the payload
@@ -821,7 +833,9 @@ impl Decoder for WebsocketProtocol {
 
         self.payload_in = 0;
 
-        self.utf8_valid_up_to.map(|_| 0);
+        if let Some(valid_up_to) = &mut self.utf8_valid_up_to {
+            *valid_up_to = 0;
+        };
 
         let frame = Frame {
             opcode,

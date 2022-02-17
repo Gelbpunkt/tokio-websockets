@@ -114,6 +114,6 @@ pub fn frame(key: &[u8], input: &mut [u8]) {
 
 pub fn fallback_frame(key: &[u8], input: &mut [u8]) {
     for (index, byte) in input.iter_mut().enumerate() {
-        *byte ^= key[index % 4];
+        *byte ^= key[index & 3];
     }
 }
