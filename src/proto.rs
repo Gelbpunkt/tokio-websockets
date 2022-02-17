@@ -772,7 +772,7 @@ impl Decoder for WebsocketProtocol {
                             masking_key
                                 .copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
 
-                            masking_key.rotate_left(self.payload_in % 4);
+                            masking_key.rotate_left(self.payload_in & 3);
 
                             let unmasked_until = offset + self.payload_in;
 
@@ -815,7 +815,7 @@ impl Decoder for WebsocketProtocol {
                 let mut masking_key = [0; 4];
                 masking_key.copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
 
-                masking_key.rotate_left(self.payload_in % 4);
+                masking_key.rotate_left(self.payload_in & 3);
 
                 let unmasked_until = offset + self.payload_in;
 
