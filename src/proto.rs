@@ -756,11 +756,10 @@ impl Decoder for WebsocketProtocol {
             offset += 4;
         }
 
-        // Get the actual payload, if any
-        let data_available = (src.len() - offset).min(payload_length);
-        let to_read = data_available - self.payload_in;
-
         if payload_length > 0 {
+            // Get the actual payload, if any
+            let data_available = (src.len() - offset).min(payload_length);
+            let to_read = data_available - self.payload_in;
             let bytes_missing = payload_length - data_available;
 
             if bytes_missing > 0 {
@@ -810,20 +809,20 @@ impl Decoder for WebsocketProtocol {
             if opcode == OpCode::Close && payload_length == 1 {
                 return Err(Error::Protocol(ProtocolError::InvalidCloseSequence));
             }
-        }
 
-        // Since we only unmasked if data was previously incomplete, unmask the entire rest
-        if mask {
-            let mut masking_key = [0; 4];
-            masking_key.copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
+            // Since we only unmasked if data was previously incomplete, unmask the entire rest
+            if mask {
+                let mut masking_key = [0; 4];
+                masking_key.copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
 
-            masking_key.rotate_left(self.payload_in % 4);
+                masking_key.rotate_left(self.payload_in % 4);
 
-            let unmasked_until = offset + self.payload_in;
+                let unmasked_until = offset + self.payload_in;
 
-            mask::frame(&masking_key, unsafe {
-                src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
-            });
+                mask::frame(&masking_key, unsafe {
+                    src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
+                });
+            }
         }
 
         // Advance the offset into the payload body
