@@ -1,6 +1,6 @@
+/// <https://datatracker.ietf.org/doc/html/rfc6455#section-5.2>
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures_util::{Sink, SinkExt, StreamExt};
-/// <https://datatracker.ietf.org/doc/html/rfc6455#section-5.2>
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
@@ -659,7 +659,7 @@ impl Encoder<Message> for WebsocketProtocol {
 
             if let Some(mask) = mask {
                 let start_of_data = dst.len() - chunk.len();
-                mask::frame(&mask, unsafe { dst.get_unchecked_mut(start_of_data..) });
+                mask::frame(&mask, unsafe { dst.get_unchecked_mut(start_of_data..) }, 0);
             }
 
             next_chunk = chunks.next();
@@ -759,26 +759,31 @@ impl Decoder for WebsocketProtocol {
         if payload_length > 0 {
             // Get the actual payload, if any
             let data_available = (src.len() - offset).min(payload_length);
-            let to_read = data_available - self.payload_in;
             let bytes_missing = payload_length - data_available;
 
             if bytes_missing > 0 {
                 // If data is missing, we might have to fail fast on invalid UTF8
                 if let Some(utf8_valid_up_to) = &mut self.utf8_valid_up_to {
                     if opcode == OpCode::Text {
+                        let to_read = data_available - self.payload_in;
+
                         // Data might be masked, so unmask it here
                         if mask {
-                            let mut masking_key = [0; 4];
-                            masking_key
-                                .copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
-
-                            masking_key.rotate_left(self.payload_in & 3);
-
                             let unmasked_until = offset + self.payload_in;
 
-                            mask::frame(&masking_key, unsafe {
-                                src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
-                            });
+                            // This is very unsafe, but sound because the masking key
+                            // and the payload do not overlap in src
+                            let (masking_key, to_unmask) = unsafe {
+                                let masking_key_ptr =
+                                    src.get_unchecked(offset - 4..offset) as *const [u8];
+                                let to_unmask_ptr = src
+                                    .get_unchecked_mut(unmasked_until..unmasked_until + to_read)
+                                    as *mut [u8];
+
+                                (&*masking_key_ptr, &mut *to_unmask_ptr)
+                            };
+
+                            mask::frame(masking_key, to_unmask, self.payload_in & 3);
                         }
 
                         self.payload_in = data_available;
@@ -812,16 +817,20 @@ impl Decoder for WebsocketProtocol {
 
             // Since we only unmasked if data was previously incomplete, unmask the entire rest
             if mask {
-                let mut masking_key = [0; 4];
-                masking_key.copy_from_slice(unsafe { src.get_unchecked(offset - 4..offset) });
-
-                masking_key.rotate_left(self.payload_in & 3);
-
                 let unmasked_until = offset + self.payload_in;
 
-                mask::frame(&masking_key, unsafe {
-                    src.get_unchecked_mut(unmasked_until..unmasked_until + to_read)
-                });
+                // This is very unsafe, but sound because the masking key
+                // and the payload do not overlap in src
+                let (masking_key, to_unmask) = unsafe {
+                    let masking_key_ptr = src.get_unchecked(offset - 4..offset) as *const [u8];
+                    let to_unmask_ptr = src
+                        .get_unchecked_mut(unmasked_until..offset + payload_length)
+                        as *mut [u8];
+
+                    (&*masking_key_ptr, &mut *to_unmask_ptr)
+                };
+
+                mask::frame(masking_key, to_unmask, self.payload_in & 3);
             }
         }
 
