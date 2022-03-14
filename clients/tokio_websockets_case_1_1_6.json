@@ -1,0 +1,366 @@
+{
+   "agent": "tokio-websockets",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 6,
+   "closedByMe": true,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send text message message with payload of length 65535.",
+   "droppedByMe": true,
+   "duration": 9,
+   "expectation": "Receive echo'ed text message (with payload as sent). Clean close with normal code.",
+   "expected": {
+      "OK": [
+         [
+            "message",
+            "**************************************************************** ...",
+            false
+         ]
+      ]
+   },
+   "expectedClose": {
+      "closeCode": [
+         1000
+      ],
+      "closedByMe": true,
+      "requireClean": true
+   },
+   "failedByMe": false,
+   "httpRequest": "GET /runCase?case=6&agent=tokio-websockets HTTP/1.1\r\nHost: localhost:9001\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: g9yCX7RJp6kxc0gKUlWLSQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nServer: AutobahnTestSuite/0.8.2-0.10.9\r\nX-Powered-By: AutobahnPython/0.10.9\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: YpBKOlZbwXzpYeGz+/mm2/IHzhI=\r\n\r\n",
+   "id": "1.1.6",
+   "isServer": true,
+   "localCloseCode": 1000,
+   "localCloseReason": null,
+   "received": [
+      [
+         "message",
+         "**************************************************************** ...",
+         false
+      ]
+   ],
+   "remoteCloseCode": 1000,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": false,
+   "result": "Actual events match at least one expected.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {
+      "0": 15,
+      "1": 1,
+      "8": 1
+   },
+   "rxOctetStats": {
+      "8": 1,
+      "127": 1,
+      "190": 1,
+      "65536": 1
+   },
+   "started": "2022-03-14T16:22:20.996Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "1": 1,
+      "8": 1
+   },
+   "txOctetStats": {
+      "4": 1,
+      "206": 1,
+      "65539": 1
+   },
+   "wasClean": true,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": null,
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "RO",
+         [
+            190,
+            "474554202f72756e436173653f636173653d36266167656e743d746f6b696f2d776562736f636b65747320485454502f312e310d0a486f73743a206c6f63616c ..."
+         ]
+      ],
+      [
+         "TO",
+         [
+            206,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a5365727665723a204175746f6261686e5465737453756974652f302e382e ..."
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            65535,
+            "**************************************************************** ..."
+         ],
+         1,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            65539,
+            "817effff2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a ..."
+         ],
+         false
+      ],
+      [
+         "KL",
+         10
+      ],
+      [
+         "RO",
+         [
+            65536,
+            "01fe100015bcd2e93f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c33f96f8c3 ..."
+         ]
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         1,
+         false,
+         0,
+         true,
+         "15bcd2e9"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "5dda5ce2"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "f939b665"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "bf5f5eb2"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "d514ff9c"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "6004a754"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "83f4fb67"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "ba9bb3af"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "1fe145f2"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "f90ad35f"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "21d2a0b0"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "496657ab"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "094b4d00"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "86b8df3e"
+      ],
+      [
+         "RF",
+         [
+            4096,
+            "**************************************************************** ..."
+         ],
+         0,
+         false,
+         0,
+         true,
+         "04a6655d"
+      ],
+      [
+         "RO",
+         [
+            127,
+            "42f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c842f614c8 ..."
+         ]
+      ],
+      [
+         "RF",
+         [
+            4095,
+            "**************************************************************** ..."
+         ],
+         0,
+         true,
+         0,
+         true,
+         "68dc3ee2"
+      ],
+      [
+         "TF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            4,
+            "880203e8"
+         ],
+         false
+      ],
+      [
+         "RO",
+         [
+            8,
+            "8882d59a15acd672"
+         ]
+      ],
+      [
+         "RF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         true,
+         "d59a15ac"
+      ]
+   ]
+}
