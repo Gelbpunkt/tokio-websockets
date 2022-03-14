@@ -19,7 +19,7 @@ target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_tungstenite & W
 export SKIP_FAIL_FAST=1
 
 target/x86_64-unknown-linux-gnu/release/examples/autobahn_server & WSSERVER4_PID=$!
-target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_tungstenite & WSSERVER5_PID=$!
+target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_simd & WSSERVER5_PID=$!
 
 sleep 3
 
