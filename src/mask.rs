@@ -96,25 +96,18 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
         let postamble_start = payload_len - payload_len % SSE2_ALIGNMENT;
 
         // Align the key
-        let aligned_to = Layout::from_size_align_unchecked(SSE2_ALIGNMENT, SSE2_ALIGNMENT);
-        let mem_ptr = alloc(aligned_to);
-        let mut extended_mask: [u8; SSE2_ALIGNMENT] = *(mem_ptr as *const [u8; SSE2_ALIGNMENT]);
+        let layout = Layout::from_size_align_unchecked(SSE2_ALIGNMENT, SSE2_ALIGNMENT);
+        let mem_ptr = alloc(layout);
 
-        ptr::copy_nonoverlapping(
-            key.as_ptr().add(offset),
-            extended_mask.as_mut_ptr(),
-            4 - offset,
-        );
+        ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
 
         for j in (4 - offset..SSE2_ALIGNMENT).step_by(4) {
-            ptr::copy_nonoverlapping(key.as_ptr(), extended_mask.as_mut_ptr().add(j), 4);
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
         }
 
-        ptr::copy_nonoverlapping(
-            key.as_ptr(),
-            extended_mask.as_mut_ptr().add(SSE2_ALIGNMENT - offset),
-            offset,
-        );
+        if offset > 0 {
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(SSE2_ALIGNMENT - offset), offset);
+        }
 
         let mask = _mm_load_si128(mem_ptr.cast());
 
@@ -125,7 +118,7 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
             _mm_storeu_si128(memory_addr, v);
         }
 
-        dealloc(mem_ptr, aligned_to);
+        dealloc(mem_ptr, layout);
 
         if postamble_start != payload_len {
             // Run fallback implementation on postamble data
