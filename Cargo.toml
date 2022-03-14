@@ -42,14 +42,14 @@ client = ["base64", "http", "httparse"]
 http-integration = ["http-body"]
 server = ["base64", "http", "httparse"]
 simd = ["simdutf8"]
-__tls = []
+__tls = [] # Private, do not enable this manually
 native-tls = ["__tls", "tokio-native-tls"]
-__rustls = ["__tls", "tokio-rustls", "ring"]
+__rustls = ["__tls", "tokio-rustls", "ring"] # Private, do not enable this manually
 rustls-webpki-roots = ["__rustls", "webpki-roots"]
 rustls-native-roots = ["__rustls", "rustls-native-certs"]
 
 [dev-dependencies]
-tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread"] }
+tokio = { version = "1", default-features = false, features = ["net", "macros", "parking_lot", "rt-multi-thread"] }
 tokio-tungstenite = { version = "0.17", default-features = false, features = ["connect"] }
 
 [profile.release]

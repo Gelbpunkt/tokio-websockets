@@ -44,27 +44,20 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
         let postamble_start = payload_len - payload_len % AVX2_ALIGNMENT;
 
         // Align the key
-        let aligned_to = Layout::from_size_align_unchecked(AVX2_ALIGNMENT, AVX2_ALIGNMENT);
-        let mem_ptr = alloc(aligned_to);
-        let mut extended_mask: [u8; AVX2_ALIGNMENT] = *(mem_ptr as *const [u8; AVX2_ALIGNMENT]);
+        let layout = Layout::from_size_align_unchecked(AVX2_ALIGNMENT, AVX2_ALIGNMENT);
+        let mem_ptr = alloc(layout);
 
-        ptr::copy_nonoverlapping(
-            key.as_ptr().add(offset),
-            extended_mask.as_mut_ptr(),
-            4 - offset,
-        );
+        ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
 
         for j in (4 - offset..AVX2_ALIGNMENT).step_by(4) {
-            ptr::copy_nonoverlapping(key.as_ptr(), extended_mask.as_mut_ptr().add(j), 4);
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
         }
 
-        ptr::copy_nonoverlapping(
-            key.as_ptr(),
-            extended_mask.as_mut_ptr().add(AVX2_ALIGNMENT - offset),
-            offset,
-        );
+        if offset > 0 {
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(AVX2_ALIGNMENT - offset), offset);
+        }
 
-        let mask = _mm256_load_si256(extended_mask.as_ptr().cast());
+        let mask = _mm256_load_si256(mem_ptr.cast());
 
         for index in (0..postamble_start).step_by(AVX2_ALIGNMENT) {
             let memory_addr = input.as_mut_ptr().add(index).cast();
@@ -73,7 +66,7 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
             _mm256_storeu_si256(memory_addr, v);
         }
 
-        dealloc(mem_ptr, aligned_to);
+        dealloc(mem_ptr, layout);
 
         if postamble_start != payload_len {
             // Run fallback implementation on postamble data
@@ -123,7 +116,7 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
             offset,
         );
 
-        let mask = _mm_load_si128(extended_mask.as_ptr().cast());
+        let mask = _mm_load_si128(mem_ptr.cast());
 
         for index in (0..postamble_start).step_by(SSE2_ALIGNMENT) {
             let memory_addr = input.as_mut_ptr().add(index).cast();
@@ -149,6 +142,6 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
 
 pub fn fallback_frame(key: &[u8], input: &mut [u8], offset: usize) {
     for (index, byte) in input.iter_mut().enumerate() {
-        *byte ^= key[(offset + index) & 3];
+        *byte ^= key[(index + offset) & 3];
     }
 }
