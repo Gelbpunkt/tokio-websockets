@@ -8,7 +8,7 @@ Both the client and server implementations pass the Autobahn test suite entirely
 
 You can find automated benchmark results [here](https://gelbpunkt.github.io/tokio-websockets/index.html).
 
-I will not release this to crates.io until I deem the implementation good enough, which currently is not the case. I am also waiting for GATs in the `Stream` trait.
+This crate is released on crates.io as a pre-1.0 release to gather feedback on API and general features.
 
 ## TODO
 
