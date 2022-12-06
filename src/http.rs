@@ -17,7 +17,7 @@ use crate::client::make_key;
 ///
 /// ```rust
 /// use hyper::{self, client::HttpConnector, Client, StatusCode, Uri};
-/// use tokio_websockets::{upgrade_request, ClientBuilder, Role};
+/// use tokio_websockets::{upgrade_request, ClientBuilder};
 ///
 /// # use futures_util::SinkExt;
 /// # use tokio_websockets::ServerBuilder;
