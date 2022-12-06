@@ -4,7 +4,7 @@
 //! [`native-tls`]: tokio_native_tls::native_tls
 //! [`rustls`]: tokio_rustls::rustls
 
-#[cfg(feature = "__rustls")]
+#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
 use std::sync::Arc;
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -18,7 +18,7 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_rustls::rustls::Certificate;
 #[cfg(feature = "rustls-webpki-roots")]
 use tokio_rustls::rustls::OwnedTrustAnchor;
-#[cfg(feature = "__rustls")]
+#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
 use tokio_rustls::rustls::{ClientConfig, RootCertStore, ServerName};
 
 use crate::Error;
@@ -35,7 +35,7 @@ pub enum Connector {
     /// [`rustls`] TLS connector.
     ///
     /// [`rustls`]: tokio_rustls::rustls
-    #[cfg(feature = "__rustls")]
+    #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
     Rustls(tokio_rustls::TlsConnector),
 }
 
@@ -45,7 +45,7 @@ impl Debug for Connector {
             Self::Plain => f.write_str("Connector::Plain"),
             #[cfg(feature = "native-tls")]
             Self::NativeTls(connector) => connector.fmt(f),
-            #[cfg(feature = "__rustls")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Self::Rustls(_) => f.write_str("Connector::RustlsAsync"),
         }
     }
@@ -56,15 +56,15 @@ impl Debug for Connector {
 pub enum MaybeTlsStream<S> {
     /// Unencrypted socket stream.
     Plain(S),
-    #[cfg(feature = "native-tls")]
     /// Encrypted socket stream using [`native-tls`].
     ///
     /// [`native-tls`]: tokio_native_tls::native_tls
+    #[cfg(feature = "native-tls")]
     NativeTls(tokio_native_tls::TlsStream<S>),
-    #[cfg(feature = "__rustls")]
     /// Encrypted socket stream using [`rustls`].
     ///
     /// [`rustls`]: tokio_rustls::rustls
+    #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
     Rustls(tokio_rustls::client::TlsStream<S>),
 }
 
@@ -78,7 +78,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncRead for MaybeTlsStream<S> {
             Self::Plain(ref mut s) => Pin::new(s).poll_read(cx, buf),
             #[cfg(feature = "native-tls")]
             Self::NativeTls(s) => Pin::new(s).poll_read(cx, buf),
-            #[cfg(feature = "__rustls")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Self::Rustls(s) => Pin::new(s).poll_read(cx, buf),
         }
     }
@@ -94,7 +94,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             Self::Plain(ref mut s) => Pin::new(s).poll_write(cx, buf),
             #[cfg(feature = "native-tls")]
             Self::NativeTls(s) => Pin::new(s).poll_write(cx, buf),
-            #[cfg(feature = "__rustls")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Self::Rustls(s) => Pin::new(s).poll_write(cx, buf),
         }
     }
@@ -104,7 +104,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             Self::Plain(ref mut s) => Pin::new(s).poll_flush(cx),
             #[cfg(feature = "native-tls")]
             Self::NativeTls(s) => Pin::new(s).poll_flush(cx),
-            #[cfg(feature = "__rustls")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Self::Rustls(s) => Pin::new(s).poll_flush(cx),
         }
     }
@@ -114,7 +114,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             Self::Plain(ref mut s) => Pin::new(s).poll_shutdown(cx),
             #[cfg(feature = "native-tls")]
             Self::NativeTls(s) => Pin::new(s).poll_shutdown(cx),
-            #[cfg(feature = "__rustls")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Self::Rustls(s) => Pin::new(s).poll_shutdown(cx),
         }
     }
@@ -129,17 +129,24 @@ impl Connector {
     /// This method returns an [`Error`] when creating the underlying TLS
     /// connector fails.
     pub fn new() -> Result<Self, Error> {
-        #[cfg(not(feature = "__tls"))]
+        #[cfg(not(any(
+            feature = "native-tls",
+            feature = "rustls-webpki-roots",
+            feature = "rustls-native-roots"
+        )))]
         {
             Ok(Self::Plain)
         }
-        #[cfg(all(feature = "native-tls", not(feature = "__rustls")))]
+        #[cfg(all(
+            feature = "native-tls",
+            not(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))
+        ))]
         {
             Ok(Self::NativeTls(
                 tokio_native_tls::native_tls::TlsConnector::new()?.into(),
             ))
         }
-        #[cfg(feature = "__rustls")]
+        #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
         {
             let mut roots = RootCertStore::empty();
 
@@ -179,7 +186,11 @@ impl Connector {
     ///
     /// This method returns an [`Error`] if the TLS handshake fails.
     #[cfg_attr(
-        not(any(feature = "native-tls", feature = "__rustls")),
+        not(any(
+            feature = "native-tls",
+            feature = "rustls-webpki-roots",
+            feature = "rustls-native-roots"
+        )),
         allow(unused_variables, clippy::unused_async)
     )]
     pub async fn wrap<S: AsyncRead + AsyncWrite + Unpin>(
@@ -193,7 +204,7 @@ impl Connector {
             Self::NativeTls(connector) => Ok(MaybeTlsStream::NativeTls(
                 connector.connect(domain, stream).await?,
             )),
-            #[cfg(feature = "__rustls")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Self::Rustls(connector) => Ok(MaybeTlsStream::Rustls(
                 connector
                     .connect(ServerName::try_from(domain)?, stream)

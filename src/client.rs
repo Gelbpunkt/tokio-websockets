@@ -5,8 +5,8 @@
 //!     Upgrade handshake, via [`Builder::connect`]
 //!   - By letting the library perform a HTTP/1.1 Upgrade handshake on an
 //!     established stream, via [`Builder::connect_on`]
-//!   - By performing the handshake yourself and then using [`Builder::take_over`]
-//!     to let it take over a websocket stream
+//!   - By performing the handshake yourself and then using
+//!     [`Builder::take_over`] to let it take over a websocket stream
 use std::{
     net::{SocketAddr, ToSocketAddrs},
     str::FromStr,

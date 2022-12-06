@@ -3,7 +3,7 @@ use std::io;
 
 #[cfg(feature = "native-tls")]
 use tokio_native_tls::native_tls;
-#[cfg(feature = "__rustls")]
+#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
 use tokio_rustls::rustls::client::InvalidDnsNameError;
 #[cfg(feature = "rustls-native-roots")]
 use tokio_rustls::webpki;
@@ -32,7 +32,7 @@ pub enum Error {
     /// No response to the HTTP/1.1 Upgrade was received.
     NoUpgradeResponse,
     /// Attempted to connect to an invalid DNS name.
-    #[cfg(feature = "__rustls")]
+    #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
     InvalidDNSName(InvalidDnsNameError),
     /// Adding a native certificate to the storage for the TLS connector failed.
     #[cfg(feature = "rustls-native-roots")]
@@ -61,7 +61,7 @@ impl From<io::Error> for Error {
     }
 }
 
-#[cfg(feature = "__rustls")]
+#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
 impl From<InvalidDnsNameError> for Error {
     fn from(err: InvalidDnsNameError) -> Self {
         Self::InvalidDNSName(err)
