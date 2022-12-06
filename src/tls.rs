@@ -171,7 +171,7 @@ impl Connector {
     /// This method returns an [`Error`] if the TLS handshake fails.
     #[cfg_attr(
         not(any(feature = "native-tls", feature = "__rustls")),
-        allow(unused_variables)
+        allow(unused_variables, clippy::unused_async)
     )]
     pub async fn wrap<S: AsyncRead + AsyncWrite + Unpin>(
         &self,

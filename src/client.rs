@@ -35,7 +35,7 @@ pub(crate) fn make_key(key: Option<[u8; 16]>, key_base64: &mut [u8; 24]) {
         ]
     });
 
-    base64::encode_config_slice(&key_bytes, base64::STANDARD, key_base64);
+    base64::encode_config_slice(key_bytes, base64::STANDARD, key_base64);
 }
 
 fn default_port(uri: &Uri) -> Option<u16> {

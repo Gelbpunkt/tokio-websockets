@@ -57,9 +57,8 @@ impl ClientRequest {
     where
         F: Fn(&'static str) -> Option<&'a str> + 'a,
     {
-        let find_header = |name| {
-            header(name).ok_or_else(|| format!("client didn't provide {name} header", name = name))
-        };
+        let find_header =
+            |name| header(name).ok_or_else(|| format!("client didn't provide {name} header"));
 
         let check_header = |name, expected| {
             let actual = find_header(name)?;
@@ -101,7 +100,7 @@ impl ClientRequest {
     /// Returns the value that the client expects to see in the server's `Sec-WebSocket-Accept` header.
     #[must_use]
     pub fn ws_accept(&self) -> String {
-        base64::encode_config(&self.ws_accept, base64::STANDARD)
+        base64::encode_config(self.ws_accept, base64::STANDARD)
     }
 }
 
@@ -149,7 +148,7 @@ impl Decoder for ServerResponseCodec {
 
         let ws_accept_header = header(response.headers, "Sec-WebSocket-Accept")?;
         let mut ws_accept = [0; 20];
-        base64::decode_config_slice(&ws_accept_header, base64::STANDARD, &mut ws_accept)
+        base64::decode_config_slice(ws_accept_header, base64::STANDARD, &mut ws_accept)
             .map_err(|e| Error::Upgrade(e.to_string()))?;
 
         if self.ws_accept != ws_accept {
@@ -206,6 +205,6 @@ impl Decoder for ClientRequestCodec {
 
         src.advance(request_len);
 
-        Ok(Some(format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-Websocket-Accept: {}\r\n\r\n", ws_accept)))
+        Ok(Some(format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-Websocket-Accept: {ws_accept}\r\n\r\n")))
     }
 }

@@ -27,7 +27,7 @@ pub enum OpCode {
 
 impl OpCode {
     fn is_control(self) -> bool {
-        return matches!(self, Self::Close | Self::Ping | Self::Pong);
+        matches!(self, Self::Close | Self::Ping | Self::Pong)
     }
 }
 
@@ -366,7 +366,7 @@ enum StreamState {
 
 impl StreamState {
     fn can_read(&self) -> bool {
-        return matches!(self, Self::Active | Self::ClosedByUs);
+        matches!(self, Self::Active | Self::ClosedByUs)
     }
 
     fn check_active(&self) -> Result<(), Error> {
