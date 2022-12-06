@@ -1,8 +1,8 @@
+use std::net::SocketAddr;
+
 use futures_util::SinkExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_websockets::{Error, ServerBuilder};
-
-use std::net::SocketAddr;
 
 fn get_port() -> u16 {
     #[cfg(feature = "simd")]

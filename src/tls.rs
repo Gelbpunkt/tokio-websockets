@@ -1,10 +1,8 @@
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-#[cfg(feature = "rustls-native-roots")]
-use tokio_rustls::rustls::Certificate;
-#[cfg(feature = "rustls-webpki-roots")]
-use tokio_rustls::rustls::OwnedTrustAnchor;
-#[cfg(feature = "__rustls")]
-use tokio_rustls::rustls::{ClientConfig, RootCertStore, ServerName};
+//! Wrapper types for TLS functionality, abstracting over [`rustls`] and
+//! [`native-tls`] connector and stream types.
+//!
+//! [`native-tls`]: tokio_native_tls::native_tls
+//! [`rustls`]: tokio_rustls::rustls
 
 #[cfg(feature = "__rustls")]
 use std::sync::Arc;
@@ -14,6 +12,14 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+#[cfg(feature = "rustls-native-roots")]
+use tokio_rustls::rustls::Certificate;
+#[cfg(feature = "rustls-webpki-roots")]
+use tokio_rustls::rustls::OwnedTrustAnchor;
+#[cfg(feature = "__rustls")]
+use tokio_rustls::rustls::{ClientConfig, RootCertStore, ServerName};
 
 use crate::Error;
 
@@ -46,6 +52,7 @@ impl Debug for Connector {
 }
 
 /// A stream that might be protected with TLS.
+#[allow(clippy::large_enum_variant)] // Only one or two of these will be used
 pub enum MaybeTlsStream<S> {
     /// Unencrypted socket stream.
     Plain(S),
@@ -114,11 +121,13 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
 }
 
 impl Connector {
-    /// Creates a new `Connector` with the underlying TLS library specified in the feature flags.
+    /// Creates a new `Connector` with the underlying TLS library specified in
+    /// the feature flags.
     ///
     /// # Errors
     ///
-    /// This method returns an [`Error`] when creating the underlying TLS connector fails.
+    /// This method returns an [`Error`] when creating the underlying TLS
+    /// connector fails.
     pub fn new() -> Result<Self, Error> {
         #[cfg(not(feature = "__tls"))]
         {

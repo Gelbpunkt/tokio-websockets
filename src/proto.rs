@@ -1,9 +1,6 @@
-/// <https://datatracker.ietf.org/doc/html/rfc6455#section-5.2>
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures_util::{Sink, SinkExt, StreamExt};
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::codec::{Decoder, Encoder, Framed};
-
+//! This module contains a correct and complete implementation of [RFC6455](https://datatracker.ietf.org/doc/html/rfc6455).
+//!
+//! Any extensions are currently not implemented.
 use std::{
     mem::take,
     pin::Pin,
@@ -11,21 +8,39 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use futures_util::{Sink, SinkExt, StreamExt};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::{Decoder, Encoder, Framed};
+
 use crate::{mask, utf8, Error};
 
+/// Outgoing messages are split into frames of this size.
 const FRAME_SIZE: usize = 4096;
 
+/// The opcode of a websocket frame. It denotes the type of the frame or an
+/// assembled message.
+///
+/// A fully assembled [`Message`] will never have a continuation opcode.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OpCode {
+    /// A continuation opcode. This will never be encountered in a full
+    /// [`Message`].
     Continuation,
+    /// A text opcode.
     Text,
+    /// A binary opcode.
     Binary,
+    /// A close opcode.
     Close,
+    /// A ping opcode.
     Ping,
+    /// A pong opcode.
     Pong,
 }
 
 impl OpCode {
+    /// Whether this is a control opcode (i.e. close, ping or pong).
     fn is_control(self) -> bool {
         matches!(self, Self::Close | Self::Ping | Self::Pong)
     }
@@ -60,28 +75,57 @@ impl From<OpCode> for u8 {
     }
 }
 
+/// A frame of a websocket [`Message`].
 #[derive(Debug)]
-pub struct Frame {
+struct Frame {
+    /// The [`OpCode`] of the frame.
     opcode: OpCode,
+    /// Whether this is the last frame of a message.
     is_final: bool,
+    /// The payload bytes of the frame.
     payload: Bytes,
 }
 
+/// Error encountered on protocol violations by the other end of the connection.
 #[derive(Debug)]
 pub enum ProtocolError {
+    /// An invalid close code (smaller than 1000 or greater or equal than 5000)
+    /// has been received.
     InvalidCloseCode,
+    /// A close frame with payload length of one byte has been received.
     InvalidCloseSequence,
+    /// An invalid opcode was received.
     InvalidOpcode,
+    /// An invalid RSV (not equal to 0) was received. This is used for
+    /// extensions, which are currently not supported.
     InvalidRsv,
+    /// An invalid payload length byte was received, i.e. payload length is not
+    /// in 8-, 16- or 64-bit range.
     InvalidPayloadLength,
+    /// Invalid UTF-8 was received when valid UTF-8 was expected, for example in
+    /// text messages.
     InvalidUtf8,
+    /// A message was received with a continuation opcode. This error should
+    /// never be encountered due to the nature of the library.
     DisallowedOpcode,
+    /// A close message with reserved close code was received.
     DisallowedCloseCode,
+    /// A message has an opcode that did not match the attempted interpretation
+    /// of the data. Encountered for example when attempting to use
+    /// [`Message::as_close`] on a text message.
     MessageHasWrongOpcode,
+    /// The server on the other end masked the payload.
     ServerMaskedData,
+    /// A control frame with a payload length greater than 255 bytes was
+    /// received.
     InvalidControlFrameLength,
+    /// A fragemented control frame was received.
     FragmentedControlFrame,
+    /// A continuation frame was received when a message start frame with
+    /// non-continuation opcode was expected.
     UnexpectedContinuation,
+    /// A non-continuation and non-control frame was received when the previous
+    /// message was not fully received yet.
     UnfinishedMessage,
 }
 
@@ -109,29 +153,96 @@ impl From<std::str::Utf8Error> for ProtocolError {
     }
 }
 
+/// Role assumed by the [`WebsocketStream`] in a connection.
 #[derive(PartialEq, Eq, Clone, Copy)]
-pub enum Role {
+pub(crate) enum Role {
+    /// The client end.
     Client,
+    /// The server end.
     Server,
 }
 
+/// A close status code as defined by section [7.4 of the RFC](https://datatracker.ietf.org/doc/html/rfc6455#section-7.4).
+///
+/// Enum variants are provided for codes and ranges defined in the
+/// RFC and commonly used ones. All others are invalid.
+///
+/// This is intended to be used via the `TryFrom<u16>` and `Into<u16>` trait
+/// implementations.
+///
+/// Enum variant descriptions are taken from the RFC.
 #[derive(Debug, Clone)]
 pub enum CloseCode {
+    /// 1000 indicates a normal closure, meaning that the purpose for which the
+    /// connection was established has been fulfilled.
     NormalClosure,
+    /// 1001 indicates that an endpoint is "going away", such as a server going
+    /// down or a browser having navigated away from a page.
     GoingAway,
+    /// 1002 indicates that an endpoint is terminating the connection due to a
+    /// protocol error.
     ProtocolError,
+    /// 1003 indicates that an endpoint is terminating the connection because it
+    /// has received a type of data it cannot accept (e.g., an endpoint that
+    /// understands only text data MAY send this if it receives a binary
+    /// message).
     UnsupportedData,
+    /// Reserved. The specific meaning might be defined in the future.
     Reserved,
+    /// 1005 is a reserved value and MUST NOT be set as a status code in a Close
+    /// control frame by an endpoint. It is designated for use in applications
+    /// expecting a status code to indicate that no status code was actually
+    /// present.
     NoStatusReceived,
+    /// 1006 is a reserved value and MUST NOT be set as a status code in a Close
+    /// control frame by an endpoint. It is designated for use in applications
+    /// expecting a status code to indicate that the connection was closed
+    /// abnormally, e.g., without sending or receiving a Close control frame.
     AbnormalClosure,
+    /// 1007 indicates that an endpoint is terminating the connection because it
+    /// has received data within a message that was not consistent with the type
+    /// of the message (e.g., non-UTF-8 data within a text message).
     InvalidFramePayloadData,
+    /// 1008 indicates that an endpoint is terminating the connection because it
+    /// has received a message that violates its policy. This is a generic
+    /// status code that can be returned when there is no other more suitable
+    /// status code (e.g., 1003 or 1009) or if there is a need to hide specific
+    /// details about the policy.
     PolicyViolation,
+    /// 1009 indicates that an endpoint is terminating the connection because it
+    /// has received a message that is too big for it to process.
     MessageTooBig,
+    /// 1010 indicates that an endpoint (client) is terminating the connection
+    /// because it has expected the server to negotiate one or more extension,
+    /// but the server didn't return them in the response message of the
+    /// WebSocket handshake. The list of extensions that are needed SHOULD
+    /// appear in the /reason/ part of the Close frame. Note that this status
+    /// code is not used by the server, because it can fail the WebSocket
+    /// handshake instead.
     MandatoryExtension,
+    /// 1011 indicates that a server is terminating the connection because it
+    /// encountered an unexpected condition that prevented it from fulfilling
+    /// the request.
     InternalServerError,
+    /// 1015 is a reserved value and MUST NOT be set as a status code in a Close
+    /// control frame by an endpoint. It is designated for use in applications
+    /// expecting a status code to indicate that the connection was closed due
+    /// to a failure to perform a TLS handshake (e.g., the server certificate
+    /// can't be verified).
     TlsHandshake,
+    /// Status codes in the range 1000-2999 are reserved for definition by this
+    /// protocol, its future revisions, and extensions specified in a permanent
+    /// and readily available public specification.
     ReservedForStandards(u16),
+    /// Status codes in the range 3000-3999 are reserved for use by libraries,
+    /// frameworks, and applications. These status codes are registered
+    /// directly with IANA. The interpretation of these codes is undefined by
+    /// this protocol.
     Libraries(u16),
+    /// Status codes in the range 4000-4999 are reserved for private use and
+    /// thus can't be registered. Such codes can be used by prior agreements
+    /// between WebSocket applications. The interpretation of these codes is
+    /// undefined by this protocol.
     Private(u16),
 }
 
@@ -185,6 +296,8 @@ impl From<CloseCode> for u16 {
 }
 
 impl CloseCode {
+    /// Whether the close code is allowed to be used, i.e. not in the reserved
+    /// ranges specified [by the RFC](https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.2).
     fn is_allowed(&self) -> bool {
         !matches!(
             self,
@@ -197,13 +310,27 @@ impl CloseCode {
     }
 }
 
+/// A websocket message. This is cheaply clonable and uses [`Bytes`] as the
+/// payload storage underneath.
+///
+/// Received messages are always validated prior to dealing with them, so all
+/// the type casting methods are either almost or fully zero cost.
 #[derive(Debug, Clone)]
 pub struct Message {
+    /// The [`OpCode`] of the message.
     opcode: OpCode,
+    /// The payload of the message.
     data: Bytes,
 }
 
 impl Message {
+    /// Assembles and verifies a message from raw message payload and
+    /// [`OpCode`].
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if the message has a continuation
+    /// opcode or a disallowed close code.
     fn from_raw(opcode: OpCode, data: Bytes) -> Result<Self, ProtocolError> {
         match opcode {
             OpCode::Continuation => Err(ProtocolError::DisallowedOpcode),
@@ -235,10 +362,12 @@ impl Message {
         }
     }
 
+    /// Returns the raw [`OpCode`] and payload of the message and consumes it.
     fn into_raw(self) -> (OpCode, Bytes) {
         (self.opcode, self.data)
     }
 
+    /// Create a new text message.
     #[must_use]
     pub fn text(data: String) -> Self {
         Self {
@@ -247,6 +376,7 @@ impl Message {
         }
     }
 
+    /// Create a new binary message.
     #[must_use]
     pub fn binary<D: Into<Bytes>>(data: D) -> Self {
         Self {
@@ -255,16 +385,18 @@ impl Message {
         }
     }
 
+    /// Create a new close message. If a reason is specified, a [`CloseCode`]
+    /// must be specified for it to be included in the payload.
     #[must_use]
     pub fn close(code: Option<CloseCode>, reason: Option<&str>) -> Self {
         let mut data = BytesMut::new();
 
         if let Some(code) = code {
             data.put_u16(code.into());
-        }
 
-        if let Some(reason) = reason {
-            data.extend_from_slice(reason.as_bytes());
+            if let Some(reason) = reason {
+                data.extend_from_slice(reason.as_bytes());
+            }
         }
 
         Self {
@@ -273,6 +405,7 @@ impl Message {
         }
     }
 
+    /// Create a new ping message.
     #[must_use]
     pub fn ping<D: Into<Bytes>>(data: D) -> Self {
         Self {
@@ -281,6 +414,7 @@ impl Message {
         }
     }
 
+    /// Create a new pong message.
     #[must_use]
     pub fn pong<D: Into<Bytes>>(data: D) -> Self {
         Self {
@@ -289,40 +423,58 @@ impl Message {
         }
     }
 
+    /// Whether the message is a text message.
     #[must_use]
     pub fn is_text(&self) -> bool {
         self.opcode == OpCode::Text
     }
 
+    /// Whether the message is a binary message.
     #[must_use]
     pub fn is_binary(&self) -> bool {
         self.opcode == OpCode::Binary
     }
 
+    /// Whether the message is a close message.
     #[must_use]
     pub fn is_close(&self) -> bool {
         self.opcode == OpCode::Close
     }
 
+    /// Whether the message is a ping message.
     #[must_use]
     pub fn is_ping(&self) -> bool {
         self.opcode == OpCode::Ping
     }
 
+    /// Whether the message is a pong message.
     #[must_use]
     pub fn is_pong(&self) -> bool {
         self.opcode == OpCode::Pong
     }
 
+    /// Returns the message payload and consumes the message, regardless of
+    /// type.
     #[must_use]
     pub fn into_data(self) -> Bytes {
         self.data
     }
 
+    /// Returns a reference to the message payload, regardless of message type.
     pub fn as_data(&self) -> &Bytes {
         &self.data
     }
 
+    /// Returns a reference to the message payload as a string if it is a text
+    /// message or a binary message and valid UTF-8.
+    ///
+    /// For text messages, this is just a free transmutation because UTF-8 is
+    /// already validated previously.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if the message is neither text or
+    /// binary or binary and invalid UTF-8.
     pub fn as_text(&self) -> Result<&str, ProtocolError> {
         match self.opcode {
             OpCode::Text => Ok(unsafe { std::str::from_utf8_unchecked(&self.data) }),
@@ -331,6 +483,12 @@ impl Message {
         }
     }
 
+    /// Returns the [`CloseCode`] and close reason if the message is a close
+    /// message.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if the message is not a close message.
     pub fn as_close(&self) -> Result<(Option<CloseCode>, Option<&str>), ProtocolError> {
         if self.opcode == OpCode::Close {
             let close_code = if self.data.len() >= 2 {
@@ -355,20 +513,35 @@ impl Message {
     }
 }
 
+/// The connection state of the stream.
 #[derive(Debug)]
 enum StreamState {
+    /// The connection is fully active and no close has been initiated.
     Active,
+    /// The connection has been closed by the peer, but not yet acknowledged by
+    /// us.
     ClosedByPeer,
+    /// The connection has been closed by us, but not yet acknowledged.
     ClosedByUs,
+    /// The close has been acknowledged by the end that did not initiate the
+    /// close.
     CloseAcknowledged,
+    /// The connection has been terminated by both ends.
     Terminated,
 }
 
 impl StreamState {
+    /// Returns whether the connection can still be read from, i.e. if it is
+    /// still active or we are waiting for a close acknowledge.
     fn can_read(&self) -> bool {
         matches!(self, Self::Active | Self::ClosedByUs)
     }
 
+    /// Returns whether the connection is still active.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if the stream is terminated already.
     fn check_active(&self) -> Result<(), Error> {
         match self {
             Self::Terminated => Err(Error::AlreadyClosed),
@@ -377,15 +550,37 @@ impl StreamState {
     }
 }
 
+/// A websocket stream that full messages can be read from and written to.
+///
+/// The stream implements [`futures_util::Sink`], but due to language
+/// limitations it currently does not implement [`futures_util::Stream`]. A
+/// [`WebsocketStream::next`] method serves as a replacement.
+///
+/// You must use a [`ClientBuilder`] or [`ServerBuilder`] to
+/// obtain a websocket stream.
+///
+/// For usage examples, see the top level crate documentation, which showcases a
+/// simple echo server and client.
+///
+/// [`ClientBuilder`]: crate::ClientBuilder
+/// [`ServerBuilder`]: crate::ServerBuilder
 pub struct WebsocketStream<T> {
+    /// The underlying stream using the [`WebsocketProtocol`] to read and write
+    /// full frames.
     inner: Framed<T, WebsocketProtocol>,
 
+    /// State of the websocket connection.
     state: StreamState,
 
+    /// Payload of the full message that is being assembled.
     framing_payload: BytesMut,
+    /// Opcode of the full message that is being assembled.
     framing_opcode: OpCode,
+    /// Whether the full message has been assembled.
     framing_final: bool,
 
+    /// Index up to which the full message payload was validated to be valid
+    /// UTF-8.
     utf8_valid_up_to: usize,
 }
 
@@ -393,7 +588,8 @@ impl<T> WebsocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    pub fn from_raw_stream(stream: T, role: Role, fail_fast_on_invalid_utf8: bool) -> Self {
+    /// Create a new [`WebsocketStream`] from a raw stream.
+    pub(crate) fn from_raw_stream(stream: T, role: Role, fail_fast_on_invalid_utf8: bool) -> Self {
         Self {
             inner: WebsocketProtocol {
                 role,
@@ -414,7 +610,9 @@ where
         }
     }
 
-    pub fn from_framed<U>(
+    /// Create a new [`WebsocketStream`] from an existing [`Framed`]. This
+    /// allows for reusing the internal buffer of the [`Framed`] object.
+    pub(crate) fn from_framed<U>(
         framed: Framed<T, U>,
         role: Role,
         fail_fast_on_invalid_utf8: bool,
@@ -438,6 +636,13 @@ where
         }
     }
 
+    /// Assemble the next raw [`Message`] parts from the websocket stream from
+    /// intermediate frames from the codec.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if reading from the stream fails or a
+    /// protocol violation is encountered.
     async fn read_full_message(&mut self) -> Option<Result<(OpCode, Bytes), Error>> {
         if let Err(e) = self.state.check_active() {
             return Some(Err(e));
@@ -495,6 +700,15 @@ where
         Some(Ok((opcode, payload)))
     }
 
+    /// Receive the next full [`Message`] from the websocket stream, assembling
+    /// intermediate frames from the underlying codec together.
+    ///
+    /// This method has the same semantics as [`futures_util::StreamExt::next`].
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if reading from the stream fails or a
+    /// protocol violation is encountered.
     pub async fn next(&mut self) -> Option<Result<Message, Error>> {
         if !self.state.can_read() {
             return None;
@@ -540,6 +754,7 @@ where
                 StreamState::ClosedByUs => {
                     self.state = StreamState::CloseAcknowledged;
                 }
+                // SAFETY: can_read at the beginning of the method ensures that this is not the case
                 StreamState::Terminated => unreachable!(),
             },
             OpCode::Ping => {
@@ -556,6 +771,15 @@ where
         Some(Ok(message))
     }
 
+    /// Send a close [`Message`] with an optional [`CloseCode`] and reason for
+    /// closure.
+    ///
+    /// The reason will only be included in the sent payload if a close code was
+    /// specified.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if sending the close frame fails.
     pub async fn close(
         &mut self,
         close_code: Option<CloseCode>,
@@ -588,10 +812,19 @@ where
     }
 }
 
+/// The actual implementation of the websocket byte-level protocol.
+/// It provides an [`Encoder`] for entire [`Message`]s and a [`Decoder`] for
+/// single frames that must be assembled by a client such as the
+/// [`WebsocketStream`] later.
 struct WebsocketProtocol {
+    /// The [`Role`] this implementation should assume for the stream.
     role: Role,
+    /// The [`StreamState`] of the current stream.
     state: StreamState,
+    /// Length of the processed (unmasked) part of the payload.
     payload_in: usize,
+    /// Index up to which the payload was validated to be valid UTF-8.
+    /// `None` if the UTF-8 validation on partial frames is disabled.
     utf8_valid_up_to: Option<usize>,
 }
 
@@ -675,6 +908,8 @@ impl Encoder<Message> for WebsocketProtocol {
     }
 }
 
+/// Macro that returns with `Ok(None)` early and reserves missing space if not
+/// enough bytes are in a specified buffer.
 macro_rules! ensure_buffer_has_space {
     ($buf:expr, $space:expr) => {
         if $buf.len() < $space {
@@ -686,9 +921,8 @@ macro_rules! ensure_buffer_has_space {
 }
 
 impl Decoder for WebsocketProtocol {
-    type Item = Frame;
-
     type Error = Error;
+    type Item = Frame;
 
     #[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -815,7 +1049,8 @@ impl Decoder for WebsocketProtocol {
                 return Err(Error::Protocol(ProtocolError::InvalidCloseSequence));
             }
 
-            // Since we only unmasked if data was previously incomplete, unmask the entire rest
+            // Since we only unmasked if data was previously incomplete, unmask the entire
+            // rest
             if mask {
                 let unmasked_until = offset + self.payload_in;
 

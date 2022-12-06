@@ -1,3 +1,5 @@
+//! Helper for creating [`http::Request`] objects for HTTP/1.1 Upgrade requests
+//! with websocket servers.
 use bytes::Bytes;
 use http::{
     header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE},
@@ -11,23 +13,42 @@ use crate::client::make_key;
 ///
 /// This can be sent with a client and then waiting for the upgrade to complete.
 ///
+/// For example, using [hyper](https://docs.rs/hyper/latest/hyper/):
+///
 /// ```rust
-/// # use hyper::{self, Client, client::HttpConnector, Uri, StatusCode};
-/// # use tokio_websockets::{
-/// #     client::upgrade_request,
-/// #     proto::{Role, WebsocketStream},
-/// # };
-/// #
+/// use hyper::{self, client::HttpConnector, Client, StatusCode, Uri};
+/// use tokio_websockets::{upgrade_request, ClientBuilder, Role};
+///
+/// # use futures_util::SinkExt;
+/// # use tokio_websockets::ServerBuilder;
+/// # use tokio::net::TcpListener;
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// /// Create a new hyper client, ideally you'd reuse an existing one
-/// /// The HTTP Connector does not allow ws:// per default
+/// # let listener = TcpListener::bind("127.0.0.1:3333").await?;
+/// # tokio::spawn(async move {
+/// #     let (stream, _) = listener.accept().await?;
+/// #     let mut ws_stream = ServerBuilder::new()
+/// #         .accept(stream)
+/// #         .await.unwrap();
+/// #
+/// #     while let Some(msg) = ws_stream.next().await {
+/// #         let msg = msg?;
+/// #
+/// #         if msg.is_text() || msg.is_binary() {
+/// #             ws_stream.send(msg).await?;
+/// #         }
+/// #     }
+/// #
+/// #     Ok::<_, tokio_websockets::Error>(())
+/// # });
+/// #
+/// // Create a new hyper client, ideally you'd reuse an existing one
+/// // The HTTP Connector does not allow ws:// per default
 /// let mut connector = HttpConnector::new();
 /// connector.enforce_http(false);
-///
 /// let client = Client::builder().build(connector);
 ///
-/// let uri = Uri::from_static("ws://localhost:9001/getCaseCount");
+/// let uri = Uri::from_static("ws://localhost:3333");
 /// let response = client.request(upgrade_request(uri)?).await?;
 ///
 /// assert!(
@@ -37,14 +58,19 @@ use crate::client::make_key;
 /// );
 ///
 /// let stream = match hyper::upgrade::on(response).await {
-///     Ok(upgraded) => WebsocketStream::from_raw_stream(upgraded, Role::Client),
+///     Ok(upgraded) => ClientBuilder::new().take_over(upgraded),
 ///     Err(e) => panic!("upgrade error: {}", e),
 /// };
 ///
-/// /// Do magic with stream
+/// // stream is a websocket stream like any other one
 ///
 /// # Ok(()) }
 /// ```
+///
+/// # Errors
+///
+/// This method returns a [`http::Error`] if assembling the request failed,
+/// which should never happen.
 pub fn upgrade_request<T>(uri: T) -> Result<Request<Empty<Bytes>>, http::Error>
 where
     Uri: TryFrom<T>,
@@ -58,9 +84,6 @@ where
         .header(CONNECTION, "Upgrade")
         .header(UPGRADE, "websocket")
         .header(SEC_WEBSOCKET_VERSION, "13")
-        .header(
-            SEC_WEBSOCKET_KEY,
-            HeaderValue::from_bytes(key_bytes).unwrap(),
-        )
+        .header(SEC_WEBSOCKET_KEY, HeaderValue::from_bytes(key_bytes)?)
         .body(Empty::new())
 }

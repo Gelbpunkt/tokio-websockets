@@ -1,5 +1,13 @@
+//! UTF-8 validation and parsing helpers that abstract over [`simdutf8`] if the
+//! `simd` feature is enabled, otherwise fall back to [`std`] equivalents.
 use crate::proto::ProtocolError;
 
+/// Attempts to parse an input of bytes as a UTF-8 string with SIMD
+/// acceleration.
+///
+/// # Errors
+///
+/// This method returns a [`ProtocolError`] if the input is invalid UTF-8.
 #[cfg(feature = "simd")]
 #[inline]
 pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
@@ -9,12 +17,23 @@ pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
     }
 }
 
+/// Attempts to parse an input of bytes as a UTF-8 string.
+///
+/// # Errors
+///
+/// This method returns a [`ProtocolError`] if the input is invalid UTF-8.
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
     Ok(std::str::from_utf8(input)?)
 }
 
+/// Attempts to parse an input of bytes as a partial UTF-8 string with SIMD
+/// acceleration.
+///
+/// The return type is a tuple with a boolean indicating whether the input is
+/// invalid UTF-8 up to this point and the index of the last valid UTF-8
+/// codepoint byte.
 #[cfg(feature = "simd")]
 #[inline]
 pub fn should_fail_fast(input: &[u8], is_complete: bool) -> (bool, usize) {
@@ -30,6 +49,11 @@ pub fn should_fail_fast(input: &[u8], is_complete: bool) -> (bool, usize) {
     }
 }
 
+/// Attempts to parse an input of bytes as a partial UTF-8 string.
+///
+/// The return type is a tuple with a boolean indicating whether the input is
+/// invalid UTF-8 up to this point and the index of the last valid UTF-8
+/// codepoint byte.
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn should_fail_fast(input: &[u8], is_complete: bool) -> (bool, usize) {

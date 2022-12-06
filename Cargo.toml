@@ -52,10 +52,16 @@ rustls-webpki-roots = ["__rustls", "webpki-roots"]
 rustls-native-roots = ["__rustls", "rustls-native-certs"]
 
 [dev-dependencies]
+# For tests
+hyper = { version = "0.14", default-features = false, features = ["client", "http1", "tcp"] }
 # This is just a little bit of performance tuning
 parking_lot = { version = "0.12", default-features = false, features = ["nightly", "hardware-lock-elision"] }
 tokio = { version = "1", default-features = false, features = ["net", "macros", "parking_lot", "rt-multi-thread"] }
 tokio-tungstenite = { version = "0.18", default-features = false, features = ["connect"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.release]
 codegen-units = 1

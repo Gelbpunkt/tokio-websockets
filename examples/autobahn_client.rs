@@ -1,8 +1,8 @@
+use std::str::FromStr;
+
 use futures_util::SinkExt;
 use http::Uri;
 use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error};
-
-use std::str::FromStr;
 
 fn get_agent() -> &'static str {
     #[cfg(feature = "simd")]
@@ -26,7 +26,7 @@ fn get_agent() -> &'static str {
 async fn get_case_count() -> Result<u32, Error> {
     let uri = Uri::from_static("ws://localhost:9001/getCaseCount");
     let mut stream = ClientBuilder::from_uri(uri)
-        .set_connector(&Connector::Plain)
+        .connector(&Connector::Plain)
         .connect()
         .await?;
     let msg = stream.next().await.unwrap()?;
@@ -46,7 +46,7 @@ async fn update_reports() -> Result<(), Error> {
     ))
     .unwrap();
     let mut stream = ClientBuilder::from_uri(uri)
-        .set_connector(&Connector::Plain)
+        .connector(&Connector::Plain)
         .connect()
         .await?;
 
@@ -69,7 +69,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
 
     let mut stream = ClientBuilder::from_uri(uri)
         .fail_fast_on_invalid_utf8(fail_fast_on_invalid_utf8)
-        .set_connector(&Connector::Plain)
+        .connector(&Connector::Plain)
         .connect()
         .await?;
 

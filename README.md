@@ -1,16 +1,115 @@
 # tokio-websockets
 
-Semi-WIP websockets implementation for Tokio 1.x with a focus on very high performance and tiny dependencies.
+High performance, strict, tokio-util based websockets implementation.
 
-## Status
+## Notice
 
-Both the client and server implementations pass the Autobahn test suite entirely, with strict spec conformance, even more strict than tungstenite.
+This crate has not been tested enough to an extent that I would deem it ready for usage in production enviroments of big projects. Try it before deploying and please give feedback!
 
-You can find automated benchmark results [here](https://gelbpunkt.github.io/tokio-websockets/index.html).
+## Why use tokio-websockets?
 
-This crate is released on crates.io as a pre-1.0 release to gather feedback on API and general features.
+- Built with tokio-util, intended to be used with tokio from the ground up
+- Minimal dependencies: The base only requires:
+  - tokio, tokio-util, bytes, futures-util (which almost all tokio projects depend on)
+  - fastrand
+  - SHA1 backend, e.g. sha1_smol (see [Feature flags](#feature-flags))
+- Big selection of features to tailor dependencies to any project (see [Feature flags](#feature-flags))
+- SIMD support: AVX2 or SSE2 for frame (un)masking and accelerated UTF-8 validation
+- Strict conformance with the websocket specification, passes the [Autobahn test suite](https://github.com/crossbario/autobahn-testsuite) without relaxations [by default](https://gelbpunkt.github.io/tokio-websockets/index.html) (some can be enabled for performance)
+- TLS support
+- Reusable TLS connectors
+- Uses widely known crates from the ecosystem for types, for example `Uri` from `http` in the client
+- Cheaply clonable messages due to `Bytes` as payload storage
+- Tuned for performance: no unnecessary duplicate UTF-8 validation, no duplicate bounds checking (this however heavily uses unsafe code, which is sound to my knowledge, if not, open an issue!)
 
-## TODO
+## Feature flags
 
-- Find a way to implement `Stream` for `WebsocketStream`
-- Maybe remove client and/or server implementation in favor of only allowing usage with hyper for security reasons
+Feature flags in tokio-websockets are added to allow tailoring it to your needs.
+
+- `simd` will enable AVX2 and SSE2 accelerated masking and UTF-8 validation
+- `client` enables a tiny client implementation
+- `server` enables a tiny server implementation
+- `http-integration` enables a method for [`http::Request`](https://docs.rs/http/latest/http/request/struct.Request.html) upgrade generation
+
+TLS support is supported via any of the following feature flags:
+
+- `native-tls` for a [`tokio-native-tls`](https://docs.rs/tokio-native-tls/latest/tokio_native_tls/) backed implementation
+- `rustls-webpki-roots` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`webpki-roots`](https://docs.rs/webpki-roots/latest/webpki_roots/)
+- `rustls-native-roots` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`rustls-native-certs`](https://docs.rs/rustls-native-certs/latest/rustls_native_certs/)
+
+One SHA1 implementation is required, usually provided by the TLS implementation:
+
+- [`ring`](https://docs.rs/ring/latest/ring/) is used if `rustls` is the TLS library
+- The `openssl` feature will use [`openssl`](https://docs.rs/openssl/latest/openssl/), usually prefered on most Linux/BSD systems with `native-tls`
+- The [`sha1_smol`](https://docs.rs/sha1_smol/latest/sha1_smol/) feature can be used as a fallback if no TLS is needed
+
+For these reasons, I recommend disabling default features and using a configuration that makes sense for you, for example:
+
+```toml
+# Tiny client
+tokio-websockets = { version = "*", default-features = false, features = ["client", "sha1_smol"] }
+# Client with SIMD and rustls
+tokio-websockets = { version = "*", default-features = false, features = ["client", "simd", "rustls-webpki-roots"] }
+```
+
+## Example
+
+This is a simple websocket echo server without any proper error handling.
+
+More examples can be found in the [examples folder](https://github.com/Gelbpunkt/tokio-websockets/tree/main/examples).
+
+```rust
+use futures_util::SinkExt;
+use http::Uri;
+use tokio::net::TcpListener;
+use tokio_websockets::{ClientBuilder, Error, Message, ServerBuilder};
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+  let listener = TcpListener::bind("127.0.0.1:3000").await?;
+
+  tokio::spawn(async move {
+    while let Ok((stream, _)) = listener.accept().await {
+      let mut ws_stream = ServerBuilder::new()
+        .accept(stream)
+        .await?;
+
+      tokio::spawn(async move {
+        // Just an echo server, really
+        while let Some(Ok(msg)) = ws_stream.next().await {
+          if msg.is_text() || msg.is_binary() {
+            ws_stream.send(msg).await?;
+          }
+        }
+
+        Ok::<_, Error>(())
+      });
+    }
+
+    Ok::<_, Error>(())
+  });
+
+  let uri = Uri::from_static("ws://127.0.0.1:3000");
+  let mut client = ClientBuilder::from_uri(uri).connect().await?;
+
+  client.send(Message::text(String::from("Hello world!"))).await?;
+
+  while let Some(Ok(msg)) = client.next().await {
+    if let Ok(text) = msg.as_text() {
+      assert_eq!(text, "Hello world!");
+      // We got one message, just stop now
+      client.close(None, None).await?;
+    }
+  }
+
+  Ok(())
+}
+```
+
+## Caveats / Limitations / ToDo
+
+Currently, `WebsocketStream` does not implement `Stream` due to the `poll_next` nature of the trait, which makes implementing it with actual async code near impossible.
+
+I am waiting for async traits and will implement it once possible. Until then, a method called `next` already exists and serves as a replacement for [futures-util's `next`](https://docs.rs/futures-util/latest/futures_util/stream/trait.StreamExt.html#method.next), which most users were probably looking for.
+
+Further, websocket compression is currently unsupported.

@@ -1,5 +1,10 @@
-#![deny(clippy::pedantic)]
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#![deny(
+    clippy::pedantic,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc
+)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![doc = include_str!("../README.md")]
 
 #[cfg(feature = "client")]
 pub mod client;
@@ -17,12 +22,13 @@ pub mod tls;
 mod upgrade;
 mod utf8;
 
-#[cfg(all(feature = "http-integration", feature = "client"))]
-pub use self::http::upgrade_request;
 #[cfg(feature = "client")]
 pub use client::Builder as ClientBuilder;
 pub use error::Error;
-pub use proto::{CloseCode, Message, OpCode, Role, WebsocketStream};
+pub use proto::{CloseCode, Message, OpCode, WebsocketStream};
 #[cfg(feature = "server")]
 pub use server::Builder as ServerBuilder;
 pub use tls::{Connector, MaybeTlsStream};
+
+#[cfg(all(feature = "http-integration", feature = "client"))]
+pub use self::http::upgrade_request;
