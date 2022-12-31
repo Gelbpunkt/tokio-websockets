@@ -38,7 +38,7 @@ pub enum Error {
     #[cfg(feature = "rustls-native-roots")]
     Webpki(webpki::Error),
     /// The HTTP/1.1 Upgrade failed.
-    #[cfg(feature = "client")]
+    #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(String),
 }
 
