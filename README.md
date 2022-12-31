@@ -29,7 +29,7 @@ Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 - `simd` will enable AVX2 and SSE2 accelerated masking and UTF-8 validation
 - `client` enables a tiny client implementation
 - `server` enables a tiny server implementation
-- `http-integration` enables a method for websocket upgrade[`http::Request`](https://docs.rs/http/latest/http/request/struct.Request.html) generation
+- `http-integration` enables a method for websocket upgrade [`http::Request`](https://docs.rs/http/latest/http/request/struct.Request.html) generation
 
 TLS support is supported via any of the following feature flags:
 

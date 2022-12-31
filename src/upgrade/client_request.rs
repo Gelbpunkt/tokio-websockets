@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
-use bytes::{BytesMut, Buf};
+use bytes::{Buf, BytesMut};
 use httparse::Request;
 use tokio_util::codec::Decoder;
 

@@ -6,8 +6,12 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
 
-// If the client or server implementation is enabled, at least one SHA1 backend is required.
-#[cfg(all(any(feature = "client", feature = "server"), not(any(feature = "ring", feature = "openssl", feature = "sha1_smol"))))]
+// If the client or server implementation is enabled, at least one SHA1 backend
+// is required.
+#[cfg(all(
+    any(feature = "client", feature = "server"),
+    not(any(feature = "ring", feature = "openssl", feature = "sha1_smol"))
+))]
 compile_error!("client and server implementation require at least one SHA1 backend");
 
 #[cfg(feature = "client")]
