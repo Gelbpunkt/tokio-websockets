@@ -9,7 +9,7 @@ use futures_util::StreamExt;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Framed};
 
-use crate::{proto::Role, upgrade::ClientRequestCodec, Error, WebsocketStream};
+use crate::{proto::Role, upgrade::client_request, Error, WebsocketStream};
 
 /// HTTP/1.1 400 Bad Request response payload.
 const BAD_REQUEST: &[u8] = b"HTTP/1.1 400 Bad Request\r\n\r\n";
@@ -64,7 +64,7 @@ impl Builder {
         &self,
         stream: S,
     ) -> Result<WebsocketStream<S>, Error> {
-        let (reply, framed) = ClientRequestCodec {}.framed(stream).into_future().await;
+        let (reply, framed) = client_request::Codec {}.framed(stream).into_future().await;
         let mut parts = framed.into_parts();
 
         match reply {

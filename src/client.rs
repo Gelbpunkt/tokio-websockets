@@ -21,7 +21,9 @@ use tokio::{
 };
 use tokio_util::codec::Decoder;
 
-use crate::{proto::Role, upgrade, Connector, Error, MaybeTlsStream, WebsocketStream};
+use crate::{
+    proto::Role, upgrade::server_response, Connector, Error, MaybeTlsStream, WebsocketStream,
+};
 
 /// Generates a new, random 16-byte websocket key and encodes it as base64.
 pub(crate) fn make_key(key: Option<[u8; 16]>, key_base64: &mut [u8; 24]) {
@@ -266,7 +268,7 @@ impl<'a> Builder<'a> {
         let mut key_base64 = [0; 24];
         make_key(None, &mut key_base64);
 
-        let upgrade_codec = upgrade::ServerResponseCodec::new(&key_base64);
+        let upgrade_codec = server_response::Codec::new(&key_base64);
         let request = build_request(uri, &key_base64, &self.headers);
         stream.write_all(&request).await?;
 

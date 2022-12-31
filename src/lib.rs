@@ -1,7 +1,8 @@
 #![deny(
     clippy::pedantic,
     clippy::missing_docs_in_private_items,
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc,
+    rustdoc::broken_intra_doc_links
 )]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]

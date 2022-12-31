@@ -1,13 +1,14 @@
+//! A [`Codec`] to parse client HTTP Upgrade handshakes and validate them.
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
 use httparse::Request;
 use tokio_util::codec::Decoder;
 
-use crate::{sha::digest, utf8::parse_str, Error};
+use crate::{sha::digest, upgrade::Error, utf8::parse_str};
 
 /// A static HTTP/1.1 101 Switching Protocols response up until the
 /// `Sec-WebSocket-Accept` header value.
-const SWITCHING_PROTOCOLS_BODY: &str = "HTTP/1.1 101Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-Websocket-Accept: ";
+const SWITCHING_PROTOCOLS_BODY: &str = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-Websocket-Accept: ";
 
 /// Returns whether an ASCII byte slice is contained in another one, ignoring
 /// captalization.
@@ -40,38 +41,37 @@ impl ClientRequest {
     ///
     /// This method fails when a header required for the websocket protocol is
     /// missing in the handshake.
-    pub fn parse<'a, F>(header: F) -> Result<Self, String>
+    pub fn parse<'a, F>(header: F) -> Result<Self, Error>
     where
         F: Fn(&'static str) -> Option<&'a str> + 'a,
     {
-        let find_header =
-            |name| header(name).ok_or_else(|| format!("client didn't provide {name} header"));
+        let find_header = |name| header(name).ok_or(super::Error::MissingHeader(name));
 
-        let check_header = |name, expected| {
+        let check_header = |name, expected, err| {
             let actual = find_header(name)?;
             if actual.eq_ignore_ascii_case(expected) {
                 Ok(())
             } else {
-                Err(format!(
-                    "client provided incorrect {name} header: expected {expected}, got {actual}"
-                ))
+                Err(err)
             }
         };
 
-        let check_header_contains = |name, expected: &str| {
+        let check_header_contains = |name, expected: &str, err| {
             let actual = find_header(name)?;
             if contains_ignore_ascii_case(actual.as_bytes(), expected.as_bytes()) {
                 Ok(())
             } else {
-                Err(format!(
-                    "client provided incorrect {name} header: expected string containing {expected}, got {actual}"
-                ))
+                Err(err)
             }
         };
 
-        check_header("Upgrade", "websocket")?;
-        check_header_contains("Connection", "Upgrade")?;
-        check_header("Sec-WebSocket-Version", "13")?;
+        check_header("Upgrade", "websocket", Error::UpgradeNotWebsocket)?;
+        check_header_contains("Connection", "Upgrade", Error::ConnectionNotUpgrade)?;
+        check_header(
+            "Sec-WebSocket-Version",
+            "13",
+            Error::UnsupportedWebsocketVersion,
+        )?;
 
         let key = find_header("Sec-WebSocket-Key")?;
         let ws_accept = digest(key.as_bytes());
@@ -92,18 +92,16 @@ impl ClientRequest {
 /// It does not implement an [`Encoder`].
 ///
 /// [`Encoder`]: tokio_util::codec::Encoder
-pub struct ClientRequestCodec {}
+pub struct Codec {}
 
-impl Decoder for ClientRequestCodec {
-    type Error = Error;
+impl Decoder for Codec {
+    type Error = crate::Error;
     type Item = String;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let mut headers = [httparse::EMPTY_HEADER; 25];
         let mut request = Request::new(&mut headers);
-        let status = request
-            .parse(src)
-            .map_err(|e| Error::Upgrade(e.to_string()))?;
+        let status = request.parse(src).map_err(Error::Parsing)?;
 
         if !status.is_complete() {
             return Ok(None);
@@ -111,17 +109,12 @@ impl Decoder for ClientRequestCodec {
 
         let request_len = status.unwrap();
 
-        let ws_accept = match ClientRequest::parse(|name| {
+        let ws_accept = ClientRequest::parse(|name| {
             let h = headers.iter().find(|h| h.name.eq_ignore_ascii_case(name))?;
             parse_str(h.value).ok()
-        }) {
-            Ok(req) => req.ws_accept(),
-            Err(e) => {
-                let mut error_msg = String::from("Invalid client upgrade request: ");
-                error_msg.push_str(&e);
-                return Err(Error::Upgrade(error_msg));
-            }
-        };
+        })?
+        .ws_accept();
+        println!("Sending {}", ws_accept.len());
 
         src.advance(request_len);
 

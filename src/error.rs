@@ -39,7 +39,7 @@ pub enum Error {
     Webpki(webpki::Error),
     /// The HTTP/1.1 Upgrade failed.
     #[cfg(any(feature = "client", feature = "server"))]
-    Upgrade(String),
+    Upgrade(crate::upgrade::Error),
 }
 
 #[cfg(feature = "native-tls")]
@@ -72,5 +72,12 @@ impl From<InvalidDnsNameError> for Error {
 impl From<webpki::Error> for Error {
     fn from(err: webpki::Error) -> Self {
         Self::Webpki(err)
+    }
+}
+
+#[cfg(any(feature = "client", feature = "server"))]
+impl From<crate::upgrade::Error> for Error {
+    fn from(err: crate::upgrade::Error) -> Self {
+        Self::Upgrade(err)
     }
 }
