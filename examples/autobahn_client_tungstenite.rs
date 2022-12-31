@@ -14,7 +14,7 @@ async fn get_case_count() -> Result<u32, Error> {
 
 async fn update_reports() -> Result<(), Error> {
     let (mut stream, _) =
-        connect_async(format!("ws://localhost:9001/updateReports?agent={}", AGENT)).await?;
+        connect_async(format!("ws://localhost:9001/updateReports?agent={AGENT}")).await?;
 
     stream.close(None).await?;
 
@@ -22,11 +22,10 @@ async fn update_reports() -> Result<(), Error> {
 }
 
 async fn run_test(case: u32) -> Result<(), Error> {
-    println!("Running test case {}", case);
+    println!("Running test case {case}");
 
     let (mut stream, _) = connect_async(format!(
-        "ws://localhost:9001/runCase?case={}&agent={}",
-        case, AGENT
+        "ws://localhost:9001/runCase?case={case}&agent={AGENT}"
     ))
     .await?;
 
@@ -44,13 +43,13 @@ async fn run_test(case: u32) -> Result<(), Error> {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let total = get_case_count().await?;
-    println!("Running {} tests", total);
+    println!("Running {total} tests");
 
     for case in 1..=total {
         if let Err(e) = run_test(case).await {
             match e {
                 Error::ConnectionClosed | Error::Protocol(_) | Error::Utf8 => {}
-                _ => eprintln!("Testcase failed: {:?}", e),
+                _ => eprintln!("Testcase failed: {e:?}"),
             }
         };
     }

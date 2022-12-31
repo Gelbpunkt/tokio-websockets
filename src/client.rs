@@ -12,6 +12,7 @@ use std::{
     str::FromStr,
 };
 
+use base64::{engine::general_purpose, Engine};
 use futures_util::StreamExt;
 use http::{header::HeaderName, HeaderMap, HeaderValue, Uri};
 use tokio::{
@@ -46,7 +47,12 @@ pub(crate) fn make_key(key: Option<[u8; 16]>, key_base64: &mut [u8; 24]) {
         ]
     });
 
-    base64::encode_config_slice(key_bytes, base64::STANDARD, key_base64);
+    // SAFETY: We know that 16 bytes will be 24 bytes base64-encoded
+    unsafe {
+        general_purpose::STANDARD
+            .encode_slice(key_bytes, key_base64)
+            .unwrap_unchecked()
+    };
 }
 
 /// Guesses the port to connect on for a URI. If none is specified, port 443
@@ -154,11 +160,12 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Creates a [`Builder`] that connects to a given URI.
+    /// Sets the [`Uri`] to connect to.
     ///
     /// # Errors
     ///
-    /// This method returns an [`Err`] result if URL parsing fails.
+    /// This method returns a [`http::uri::InvalidUri`] error if URI parsing
+    /// fails.
     pub fn uri(mut self, uri: &str) -> Result<Self, http::uri::InvalidUri> {
         self.uri = Some(Uri::from_str(uri)?);
 
@@ -178,7 +185,8 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Sets the SSL connector for the client.
+    /// Sets the TLS connector for the client.
+    ///
     /// By default, the client will create a new one for each connection instead
     /// of reusing one.
     #[must_use]
@@ -209,11 +217,13 @@ impl<'a> Builder<'a> {
         self
     }
 
-    /// Establishes a connection to the websocket server.
+    /// Establishes a connection to the websocket server. This requires a URI to
+    /// be configured via [`Builder::uri`].
     ///
     /// # Errors
     ///
-    /// This method returns an [`Error`] if connecting to the server fails.
+    /// This method returns an [`Error`] if connecting to the server fails or no
+    /// URI has been configured.
     pub async fn connect(&self) -> Result<WebsocketStream<MaybeTlsStream<TcpStream>>, Error> {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
         let host = uri.host().ok_or(Error::CannotResolveHost)?;
@@ -236,7 +246,8 @@ impl<'a> Builder<'a> {
     }
 
     /// Takes over an already established stream and uses it to send and receive
-    /// websocket messages.
+    /// websocket messages. This requires a URI to be configured via
+    /// [`Builder::uri`].
     ///
     /// This method assumes that the TLS connection has already been
     /// established, if needed. It sends an HTTP upgrade request and waits
@@ -245,7 +256,7 @@ impl<'a> Builder<'a> {
     /// # Errors
     ///
     /// This method returns an [`Error`] if writing or reading from the stream
-    /// fails.
+    /// fails or no URI has been configured.
     pub async fn connect_on<S: AsyncRead + AsyncWrite + Unpin>(
         &self,
         mut stream: S,

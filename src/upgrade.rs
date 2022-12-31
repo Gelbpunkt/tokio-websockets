@@ -1,7 +1,7 @@
 //! Helpers for a minimal HTTP/1.1 upgrade client and server implementation.
 use std::hint::unreachable_unchecked;
 
-use base64::display::Base64Display;
+use base64::{display::Base64Display, engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
 use httparse::{self, Header, Request, Response};
 use tokio_util::codec::{Decoder, Encoder};
@@ -71,10 +71,7 @@ impl ClientRequest {
                 Ok(())
             } else {
                 Err(format!(
-                    "client provided incorrect {name} header: expected {expected}, got {actual}",
-                    name = name,
-                    expected = expected,
-                    actual = actual
+                    "client provided incorrect {name} header: expected {expected}, got {actual}"
                 ))
             }
         };
@@ -85,10 +82,7 @@ impl ClientRequest {
                 Ok(())
             } else {
                 Err(format!(
-                    "client provided incorrect {name} header: expected string containing {expected}, got {actual}",
-                    name = name,
-                    expected = expected,
-                    actual = actual
+                    "client provided incorrect {name} header: expected string containing {expected}, got {actual}"
                 ))
             }
         };
@@ -106,7 +100,7 @@ impl ClientRequest {
     /// `Sec-WebSocket-Accept` header.
     #[must_use]
     pub fn ws_accept(&self) -> String {
-        base64::encode_config(self.ws_accept, base64::STANDARD)
+        STANDARD.encode(self.ws_accept)
     }
 }
 
@@ -156,14 +150,15 @@ impl Decoder for ServerResponseCodec {
 
         let ws_accept_header = header(response.headers, "Sec-WebSocket-Accept")?;
         let mut ws_accept = [0; 20];
-        base64::decode_config_slice(ws_accept_header, base64::STANDARD, &mut ws_accept)
+        STANDARD
+            .decode_slice(ws_accept_header, &mut ws_accept)
             .map_err(|e| Error::Upgrade(e.to_string()))?;
 
         if self.ws_accept != ws_accept {
             return Err(Error::Upgrade(format!(
                 "server responded with incorrect Sec-WebSocket-Accept header: expected {expected}, got {actual}",
-                expected = Base64Display::with_config(&self.ws_accept, base64::STANDARD),
-                actual = Base64Display::with_config(&ws_accept, base64::STANDARD),
+                expected = Base64Display::new(&self.ws_accept, &STANDARD),
+                actual = Base64Display::new(&ws_accept, &STANDARD),
             )));
         }
 

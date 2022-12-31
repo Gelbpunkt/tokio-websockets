@@ -15,7 +15,7 @@ mod mask;
 pub mod proto;
 #[cfg(feature = "server")]
 pub mod server;
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", feature = "server"))]
 mod sha;
 pub mod tls;
 #[cfg(any(feature = "client", feature = "server"))]

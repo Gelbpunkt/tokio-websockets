@@ -10,7 +10,7 @@ async fn accept_connection(stream: TcpStream) {
     if let Err(e) = handle_connection(stream).await {
         match e {
             Error::ConnectionClosed | Error::Protocol(_) | Error::Utf8 => (),
-            err => eprintln!("Error processing connection: {:?}", err),
+            err => eprintln!("Error processing connection: {err:?}"),
         }
     }
 }
@@ -34,7 +34,7 @@ async fn main() {
     let addr: SocketAddr = ([127, 0, 0, 1], PORT).into();
     let listener = TcpListener::bind(&addr).await.expect("Can't listen");
 
-    println!("Listening on: {}", addr);
+    println!("Listening on: {addr}");
 
     while let Ok((stream, _)) = listener.accept().await {
         tokio::spawn(accept_connection(stream));

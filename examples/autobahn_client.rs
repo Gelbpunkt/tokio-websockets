@@ -56,7 +56,7 @@ async fn update_reports() -> Result<(), Error> {
 }
 
 async fn run_test(case: u32) -> Result<(), Error> {
-    println!("Running test case {}", case);
+    println!("Running test case {case}");
 
     let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_err();
 
@@ -87,13 +87,13 @@ async fn run_test(case: u32) -> Result<(), Error> {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let total = get_case_count().await?;
-    println!("Running {} tests", total);
+    println!("Running {total} tests");
 
     for case in 1..=total {
         if let Err(e) = run_test(case).await {
             match e {
                 Error::Protocol(_) => {}
-                _ => eprintln!("Testcase failed: {:?}", e),
+                _ => eprintln!("Testcase failed: {e:?}"),
             }
         };
     }

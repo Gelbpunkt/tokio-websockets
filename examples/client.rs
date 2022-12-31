@@ -7,7 +7,7 @@ async fn main() -> Result<(), Error> {
     let mut client = ClientBuilder::from_uri(uri).connect().await?;
 
     while let Some(item) = client.next().await {
-        println!("{:?}", item);
+        println!("{item:?}");
     }
 
     Ok(())
