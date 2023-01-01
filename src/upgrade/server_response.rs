@@ -67,16 +67,8 @@ impl Decoder for Codec {
 
         let ws_accept_header = header(response.headers, "Sec-WebSocket-Accept")?;
         let mut ws_accept = [0; 20];
-        // base64 0.21 calculates wrong size estimates of 21 bytes here, even though it
-        // should be 20. Make the check pass by pretending that the output slice is
-        // bigger than it is. This will not be present in a release build.
-        // See https://github.com/marshallpierce/rust-base64/pull/207#issuecomment-1368294711
-        let ws_accept_fake_length = unsafe {
-            let ptr = ws_accept.as_mut_ptr();
-            std::slice::from_raw_parts_mut(ptr, 21)
-        };
         STANDARD
-            .decode_slice(ws_accept_header, ws_accept_fake_length)
+            .decode_slice_unchecked(ws_accept_header, &mut ws_accept)
             .map_err(|_| Error::WrongWebsocketAccept)?;
 
         if self.ws_accept != ws_accept {
