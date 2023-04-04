@@ -33,8 +33,8 @@ tokio-native-tls = { version = "0.3", optional = true }
 # Rustls
 ring = { version = "0.16", default-features = false, optional = true }
 rustls-native-certs = { version = "0.6", optional = true }
-tokio-rustls = { version = "0.23", optional = true }
-webpki-roots = { version = "0.22", optional = true }
+tokio-rustls = { version = "0.24", optional = true }
+webpki-roots = { version = "0.23", optional = true }
 
 # Users can manually tune into OpenSSL for SHA-1 when native-tls is enabled
 openssl = { version = "0.10", default-features = false, optional = true }
