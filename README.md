@@ -2,10 +2,6 @@
 
 High performance, strict, tokio-util based websockets implementation.
 
-## Notice
-
-This crate has not been tested enough to an extent that I would deem it ready for usage in production enviroments of big projects. Try it before deploying and please give feedback!
-
 ## Why use tokio-websockets?
 
 - Built with tokio-util, intended to be used with tokio from the ground up
