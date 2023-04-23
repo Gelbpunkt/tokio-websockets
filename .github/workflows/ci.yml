@@ -18,6 +18,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+          components: rust-src
 
       - name: Add problem matchers
         run: echo "::add-matcher::.github/rust.json"
@@ -40,6 +41,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+          components: rust-src
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
@@ -81,7 +83,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
-          profile: minimal
+          components: rust-src
 
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v2
@@ -114,6 +116,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+          components: rust-src
 
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v2
