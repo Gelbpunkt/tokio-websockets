@@ -26,28 +26,8 @@ use crate::{
 };
 
 /// Generates a new, random 16-byte websocket key and encodes it as base64.
-pub(crate) fn make_key(key: Option<[u8; 16]>, key_base64: &mut [u8; 24]) {
-    // I don't know a better way of writing this, sorry
-    let key_bytes = key.unwrap_or_else(|| {
-        [
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-        ]
-    });
+pub(crate) fn make_key(key_base64: &mut [u8; 24]) {
+    let key_bytes = crate::rand::get_key();
 
     // SAFETY: We know that 16 bytes will be 24 bytes base64-encoded
     unsafe {
@@ -266,7 +246,7 @@ impl<'a> Builder<'a> {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
 
         let mut key_base64 = [0; 24];
-        make_key(None, &mut key_base64);
+        make_key(&mut key_base64);
 
         let upgrade_codec = server_response::Codec::new(&key_base64);
         let request = build_request(uri, &key_base64, &self.headers);

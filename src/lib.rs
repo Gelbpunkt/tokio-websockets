@@ -22,6 +22,8 @@ pub mod error;
 pub mod http;
 mod mask;
 pub mod proto;
+#[cfg(feature = "client")]
+mod rand;
 #[cfg(feature = "server")]
 pub mod server;
 #[cfg(any(feature = "client", feature = "server"))]

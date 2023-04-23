@@ -5,8 +5,6 @@ use std::io;
 use tokio_native_tls::native_tls;
 #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
 use tokio_rustls::rustls::client::InvalidDnsNameError;
-#[cfg(feature = "rustls-native-roots")]
-use tokio_rustls::webpki;
 
 use crate::proto::ProtocolError;
 
@@ -36,7 +34,7 @@ pub enum Error {
     InvalidDNSName(InvalidDnsNameError),
     /// Adding a native certificate to the storage for the TLS connector failed.
     #[cfg(feature = "rustls-native-roots")]
-    Webpki(webpki::Error),
+    Rustls(tokio_rustls::rustls::Error),
     /// The HTTP/1.1 Upgrade failed.
     #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(crate::upgrade::Error),
@@ -69,9 +67,9 @@ impl From<InvalidDnsNameError> for Error {
 }
 
 #[cfg(feature = "rustls-native-roots")]
-impl From<webpki::Error> for Error {
-    fn from(err: webpki::Error) -> Self {
-        Self::Webpki(err)
+impl From<tokio_rustls::rustls::Error> for Error {
+    fn from(err: tokio_rustls::rustls::Error) -> Self {
+        Self::Rustls(err)
     }
 }
 

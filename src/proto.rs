@@ -858,12 +858,19 @@ impl Encoder<Message> for WebsocketProtocol {
             let is_final = chunks.peek().is_none();
             let chunk_size = chunk.len();
             let mask = if self.role == Role::Client {
-                Some([
-                    fastrand::u8(0..=255),
-                    fastrand::u8(0..=255),
-                    fastrand::u8(0..=255),
-                    fastrand::u8(0..=255),
-                ])
+                #[cfg(feature = "client")]
+                {
+                    Some(crate::rand::get_mask())
+                }
+                #[cfg(not(feature = "client"))]
+                {
+                    // This allows for making the dependency on random generators
+                    // only required for clients, servers can avoid it entirely.
+                    // Since it is not possible to create a stream with client role
+                    // without the client builder (and that is locked behind the client feature),
+                    // this branch is impossible to reach.
+                    std::hint::unreachable_unchecked()
+                }
             } else {
                 None
             };

@@ -77,7 +77,7 @@ where
     <Uri as TryFrom<T>>::Error: Into<http::Error>,
 {
     let key_bytes = &mut [0; 24];
-    make_key(None, key_bytes);
+    make_key(key_bytes);
 
     Request::builder()
         .uri(uri)
