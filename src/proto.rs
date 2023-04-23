@@ -577,8 +577,6 @@ pub struct WebsocketStream<T> {
     framing_payload: BytesMut,
     /// Opcode of the full message that is being assembled.
     framing_opcode: OpCode,
-    /// Whether the full message has been assembled.
-    framing_final: bool,
 
     /// Index up to which the full message payload was validated to be valid
     /// UTF-8.
@@ -607,7 +605,6 @@ where
             state: StreamState::Active,
             framing_payload: BytesMut::new(),
             framing_opcode: OpCode::Continuation,
-            framing_final: false,
             utf8_valid_up_to: 0,
         }
     }
@@ -634,7 +631,6 @@ where
             state: StreamState::Active,
             framing_payload: BytesMut::new(),
             framing_opcode: OpCode::Continuation,
-            framing_final: false,
             utf8_valid_up_to: 0,
         }
     }
@@ -651,7 +647,7 @@ where
             return Some(Err(e));
         };
 
-        while !self.framing_final {
+        loop {
             match self.inner.next().await? {
                 Ok(frame) => {
                     // Control frames are allowed in between other frames
@@ -671,13 +667,12 @@ where
                         return Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage)));
                     }
 
-                    self.framing_final = frame.is_final;
                     self.framing_payload.extend_from_slice(&frame.payload);
 
                     if self.framing_opcode == OpCode::Text {
                         let (should_fail, valid_up_to) = utf8::should_fail_fast(
                             unsafe { self.framing_payload.get_unchecked(self.utf8_valid_up_to..) },
-                            self.framing_final,
+                            frame.is_final,
                         );
 
                         if should_fail {
@@ -685,6 +680,10 @@ where
                         }
 
                         self.utf8_valid_up_to += valid_up_to;
+                    }
+
+                    if frame.is_final {
+                        break;
                     }
                 }
                 Err(e) => {
@@ -697,7 +696,6 @@ where
         let payload = take(&mut self.framing_payload).freeze();
 
         self.framing_opcode = OpCode::Continuation;
-        self.framing_final = false;
         self.utf8_valid_up_to = 0;
 
         Some(Ok((opcode, payload)))

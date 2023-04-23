@@ -76,14 +76,13 @@ where
     Uri: TryFrom<T>,
     <Uri as TryFrom<T>>::Error: Into<http::Error>,
 {
-    let key_bytes = &mut [0; 24];
-    make_key(key_bytes);
+    let key_bytes = make_key();
 
     Request::builder()
         .uri(uri)
         .header(CONNECTION, "Upgrade")
         .header(UPGRADE, "websocket")
         .header(SEC_WEBSOCKET_VERSION, "13")
-        .header(SEC_WEBSOCKET_KEY, HeaderValue::from_bytes(key_bytes)?)
+        .header(SEC_WEBSOCKET_KEY, HeaderValue::from_bytes(&key_bytes)?)
         .body(Empty::new())
 }

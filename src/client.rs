@@ -26,15 +26,18 @@ use crate::{
 };
 
 /// Generates a new, random 16-byte websocket key and encodes it as base64.
-pub(crate) fn make_key(key_base64: &mut [u8; 24]) {
+pub(crate) fn make_key() -> [u8; 24] {
+    let mut key_base64 = [0; 24];
     let key_bytes = crate::rand::get_key();
 
     // SAFETY: We know that 16 bytes will be 24 bytes base64-encoded
     unsafe {
         general_purpose::STANDARD
-            .encode_slice(key_bytes, key_base64)
+            .encode_slice(key_bytes, &mut key_base64)
             .unwrap_unchecked()
     };
+
+    key_base64
 }
 
 /// Guesses the port to connect on for a URI. If none is specified, port 443
@@ -245,8 +248,7 @@ impl<'a> Builder<'a> {
     ) -> Result<WebsocketStream<S>, Error> {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
 
-        let mut key_base64 = [0; 24];
-        make_key(&mut key_base64);
+        let key_base64 = make_key();
 
         let upgrade_codec = server_response::Codec::new(&key_base64);
         let request = build_request(uri, &key_base64, &self.headers);
