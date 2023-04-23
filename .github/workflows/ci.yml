@@ -97,7 +97,7 @@ jobs:
           crate: cargo-minimal-versions
 
       - name: Cache dependencies
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
 
       - name: Add problem matchers
         run: echo "::add-matcher::.github/rust.json"
