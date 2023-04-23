@@ -515,6 +515,7 @@ impl Message {
 
 /// The connection state of the stream.
 #[derive(Debug)]
+#[allow(unused)]
 enum StreamState {
     /// The connection is fully active and no close has been initiated.
     Active,
@@ -589,6 +590,7 @@ where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     /// Create a new [`WebsocketStream`] from a raw stream.
+    #[cfg(any(feature = "client", feature = "server"))]
     pub(crate) fn from_raw_stream(stream: T, role: Role, fail_fast_on_invalid_utf8: bool) -> Self {
         Self {
             inner: WebsocketProtocol {
@@ -612,6 +614,7 @@ where
 
     /// Create a new [`WebsocketStream`] from an existing [`Framed`]. This
     /// allows for reusing the internal buffer of the [`Framed`] object.
+    #[cfg(any(feature = "client", feature = "server"))]
     pub(crate) fn from_framed<U>(
         framed: Framed<T, U>,
         role: Role,
@@ -857,7 +860,7 @@ impl Encoder<Message> for WebsocketProtocol {
 
             let is_final = chunks.peek().is_none();
             let chunk_size = chunk.len();
-            let mask = if self.role == Role::Client {
+            let mask: Option<[u8; 4]> = if self.role == Role::Client {
                 #[cfg(feature = "client")]
                 {
                     Some(crate::rand::get_mask())
@@ -869,7 +872,7 @@ impl Encoder<Message> for WebsocketProtocol {
                     // Since it is not possible to create a stream with client role
                     // without the client builder (and that is locked behind the client feature),
                     // this branch is impossible to reach.
-                    std::hint::unreachable_unchecked()
+                    unsafe { std::hint::unreachable_unchecked() }
                 }
             } else {
                 None
