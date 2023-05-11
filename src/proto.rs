@@ -2,6 +2,7 @@
 //!
 //! Any extensions are currently not implemented.
 use std::{
+    fmt,
     mem::take,
     pin::Pin,
     string::FromUtf8Error,
@@ -128,6 +129,31 @@ pub enum ProtocolError {
     /// message was not fully received yet.
     UnfinishedMessage,
 }
+
+impl fmt::Display for ProtocolError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProtocolError::InvalidCloseCode => f.write_str("invalid close code"),
+            ProtocolError::InvalidCloseSequence => f.write_str("invalid close sequence"),
+            ProtocolError::InvalidOpcode => f.write_str("invalid opcode"),
+            ProtocolError::InvalidRsv => f.write_str("invalid or unsupported RSV"),
+            ProtocolError::InvalidPayloadLength => f.write_str("invalid payload length"),
+            ProtocolError::InvalidUtf8 => f.write_str("invalid utf-8"),
+            ProtocolError::DisallowedOpcode => f.write_str("disallowed opcode"),
+            ProtocolError::DisallowedCloseCode => f.write_str("disallowed close code"),
+            ProtocolError::MessageHasWrongOpcode => {
+                f.write_str("attempted to treat message data in invalid way")
+            }
+            ProtocolError::ServerMaskedData => f.write_str("server masked frame"),
+            ProtocolError::InvalidControlFrameLength => f.write_str("invalid control frame length"),
+            ProtocolError::FragmentedControlFrame => f.write_str("fragmented control frame"),
+            ProtocolError::UnexpectedContinuation => f.write_str("unexpected continuation"),
+            ProtocolError::UnfinishedMessage => f.write_str("unfinished message"),
+        }
+    }
+}
+
+impl std::error::Error for ProtocolError {}
 
 impl From<&ProtocolError> for Message {
     fn from(val: &ProtocolError) -> Self {

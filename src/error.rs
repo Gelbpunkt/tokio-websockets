@@ -1,5 +1,5 @@
 //! General error type used in the crate.
-use std::io;
+use std::{fmt, io};
 
 #[cfg(feature = "native-tls")]
 use tokio_native_tls::native_tls;
@@ -77,5 +77,53 @@ impl From<tokio_rustls::rustls::Error> for Error {
 impl From<crate::upgrade::Error> for Error {
     fn from(err: crate::upgrade::Error) -> Self {
         Self::Upgrade(err)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::AlreadyClosed => {
+                f.write_str("attempted to send message after closing connection")
+            }
+            Error::CannotResolveHost => f.write_str("client DNS lookup failed"),
+            Error::ConnectionClosed => f.write_str("connection is closed"),
+            #[cfg(feature = "client")]
+            Error::NoUriConfigured => f.write_str("client has no URI configured"),
+            Error::Protocol(e) => e.fmt(f),
+            Error::Io(e) => e.fmt(f),
+            #[cfg(feature = "native-tls")]
+            Error::NativeTls(e) => e.fmt(f),
+            Error::NoUpgradeResponse => f.write_str("upgrade handshake aborted by other end"),
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            Error::InvalidDNSName(_) => f.write_str("invalid DNS name"),
+            #[cfg(feature = "rustls-native-roots")]
+            Error::Rustls(e) => e.fmt(f),
+            #[cfg(any(feature = "client", feature = "server"))]
+            Error::Upgrade(e) => e.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        match self {
+            Error::AlreadyClosed
+            | Error::CannotResolveHost
+            | Error::ConnectionClosed
+            | Error::NoUpgradeResponse => None,
+            #[cfg(feature = "client")]
+            Error::NoUriConfigured => None,
+            Error::Protocol(e) => Some(e),
+            Error::Io(e) => Some(e),
+            #[cfg(feature = "native-tls")]
+            Error::NativeTls(e) => Some(e),
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            Error::InvalidDNSName(e) => Some(e),
+            #[cfg(feature = "rustls-native-roots")]
+            Error::Rustls(e) => Some(e),
+            #[cfg(any(feature = "client", feature = "server"))]
+            Error::Upgrade(e) => Some(e),
+        }
     }
 }

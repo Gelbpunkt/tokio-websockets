@@ -1,4 +1,6 @@
 //! HTTP upgrade request and response generation and validation helpers.
+
+use std::fmt;
 #[cfg(feature = "server")]
 pub(crate) mod client_request;
 #[cfg(feature = "client")]
@@ -24,6 +26,40 @@ pub enum Error {
     /// Server returned a `Sec-WebSocket-Accept` that is not compatible with the
     /// `Sec-WebSocket-Key sent by the client.
     WrongWebsocketAccept,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::MissingHeader(header) => {
+                f.write_str("missing required header: ")?;
+                f.write_str(header)
+            }
+            Error::UpgradeNotWebsocket => f.write_str("upgrade header value was not websocket"),
+            Error::ConnectionNotUpgrade => f.write_str("connection header value was not upgrade"),
+            Error::UnsupportedWebsocketVersion => f.write_str("unsupported websocket version"),
+            Error::Parsing(e) => e.fmt(f),
+            Error::DidNotSwitchProtocols(status) => {
+                f.write_str("expected HTTP 101 Switching Protocols, got status code ")?;
+                f.write_fmt(format_args!("{status}"))
+            }
+            Error::WrongWebsocketAccept => f.write_str("mismatching sec-websocket-accept header"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::MissingHeader(_)
+            | Error::UpgradeNotWebsocket
+            | Error::ConnectionNotUpgrade
+            | Error::UnsupportedWebsocketVersion
+            | Error::DidNotSwitchProtocols(_)
+            | Error::WrongWebsocketAccept => None,
+            Error::Parsing(e) => Some(e),
+        }
+    }
 }
 
 impl From<httparse::Error> for Error {
