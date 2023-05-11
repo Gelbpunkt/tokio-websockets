@@ -114,7 +114,6 @@ impl Decoder for Codec {
             parse_str(h.value).ok()
         })?
         .ws_accept();
-        println!("Sending {}", ws_accept.len());
 
         src.advance(request_len);
 
