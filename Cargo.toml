@@ -60,7 +60,7 @@ hyper = { version = "0.14", default-features = false, features = ["client", "htt
 # This is just a little bit of performance tuning
 parking_lot = { version = "0.12", default-features = false, features = ["nightly", "hardware-lock-elision"] }
 tokio = { version = "1", default-features = false, features = ["net", "macros", "parking_lot", "rt-multi-thread"] }
-tokio-tungstenite = { version = "0.18", default-features = false, features = ["connect"] }
+tokio-tungstenite = { version = "0.19", default-features = false, features = ["connect"] }
 
 [package.metadata.docs.rs]
 all-features = true
