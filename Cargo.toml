@@ -59,7 +59,9 @@ rustls-native-roots = ["tokio-rustls", "ring", "rustls-native-certs"]
 hyper = { version = "0.14", default-features = false, features = ["client", "http1", "tcp"] }
 # This is just a little bit of performance tuning
 parking_lot = { version = "0.12", default-features = false, features = ["nightly", "hardware-lock-elision"] }
+rustls-pemfile = "1"
 tokio = { version = "1", default-features = false, features = ["net", "macros", "parking_lot", "rt-multi-thread"] }
+tokio-rustls = "0.24"
 tokio-tungstenite = { version = "0.19", default-features = false, features = ["connect"] }
 
 [package.metadata.docs.rs]
