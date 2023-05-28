@@ -64,6 +64,10 @@ tokio = { version = "1", default-features = false, features = ["net", "macros", 
 tokio-rustls = "0.24"
 tokio-tungstenite = { version = "0.19", default-features = false, features = ["connect"] }
 
+[[example]]
+name = "native_tls_self_signed_client"
+required-features = ["native-tls"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
