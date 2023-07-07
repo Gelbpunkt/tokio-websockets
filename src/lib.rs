@@ -30,7 +30,7 @@ pub mod server;
 mod sha;
 pub mod tls;
 #[cfg(any(feature = "client", feature = "server"))]
-mod upgrade;
+pub mod upgrade;
 mod utf8;
 
 #[cfg(feature = "client")]
