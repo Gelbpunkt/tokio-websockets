@@ -4,7 +4,7 @@ use std::{hint::unreachable_unchecked, str::FromStr};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
-use http::{HeaderName, HeaderValue, StatusCode, Version};
+use http::{header::HeaderName, HeaderValue, StatusCode, Version};
 use httparse::{Header, Response};
 use tokio_util::codec::{Decoder, Encoder};
 
