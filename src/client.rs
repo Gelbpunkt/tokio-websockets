@@ -22,7 +22,9 @@ use tokio::{
 use tokio_util::codec::Decoder;
 
 use crate::{
-    proto::Role, upgrade::server_response, Connector, Error, MaybeTlsStream, WebsocketStream,
+    proto::Role,
+    upgrade::{self, server_response},
+    Connector, Error, MaybeTlsStream, WebsocketStream,
 };
 
 /// Generates a new, random 16-byte websocket key and encodes it as base64.
@@ -209,7 +211,15 @@ impl<'a> Builder<'a> {
     ///
     /// This method returns an [`Error`] if connecting to the server fails or no
     /// URI has been configured.
-    pub async fn connect(&self) -> Result<WebsocketStream<MaybeTlsStream<TcpStream>>, Error> {
+    pub async fn connect(
+        &self,
+    ) -> Result<
+        (
+            WebsocketStream<MaybeTlsStream<TcpStream>>,
+            upgrade::Response,
+        ),
+        Error,
+    > {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
         let host = uri.host().ok_or(Error::CannotResolveHost)?;
         let port = default_port(uri).unwrap_or(80);
@@ -236,7 +246,7 @@ impl<'a> Builder<'a> {
     ///
     /// This method assumes that the TLS connection has already been
     /// established, if needed. It sends an HTTP upgrade request and waits
-    /// for an HTTP OK response before proceeding.
+    /// for an HTTP Switching Protocols response before proceeding.
     ///
     /// # Errors
     ///
@@ -245,7 +255,7 @@ impl<'a> Builder<'a> {
     pub async fn connect_on<S: AsyncRead + AsyncWrite + Unpin>(
         &self,
         mut stream: S,
-    ) -> Result<WebsocketStream<S>, Error> {
+    ) -> Result<(WebsocketStream<S>, upgrade::Response), Error> {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
 
         let key_base64 = make_key();
@@ -255,12 +265,11 @@ impl<'a> Builder<'a> {
         stream.write_all(&request).await?;
 
         let (opt, framed) = upgrade_codec.framed(stream).into_future().await;
-        opt.ok_or(Error::NoUpgradeResponse)??;
+        let res = opt.ok_or(Error::NoUpgradeResponse)??;
 
-        Ok(WebsocketStream::from_framed(
-            framed,
-            Role::Client,
-            self.fail_fast_on_invalid_utf8,
+        Ok((
+            WebsocketStream::from_framed(framed, Role::Client, self.fail_fast_on_invalid_utf8),
+            res,
         ))
     }
 

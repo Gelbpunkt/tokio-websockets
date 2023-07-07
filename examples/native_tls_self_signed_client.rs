@@ -10,7 +10,7 @@ async fn main() -> Result<(), Error> {
     let connector = TlsConnector::builder().add_root_certificate(cert).build()?;
     let connector = tokio_websockets::Connector::NativeTls(connector.into());
 
-    let mut client = ClientBuilder::from_uri(uri)
+    let (mut client, _) = ClientBuilder::from_uri(uri)
         .connector(&connector)
         .connect()
         .await?;

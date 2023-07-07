@@ -1,9 +1,10 @@
 //! A [`Codec`] to perform a HTTP Upgrade handshake with a server and validate
 //! the response.
-use std::hint::unreachable_unchecked;
+use std::{hint::unreachable_unchecked, str::FromStr};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
+use http::{HeaderName, HeaderValue, StatusCode, Version};
 use httparse::{Header, Response};
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -47,7 +48,7 @@ impl Codec {
 
 impl Decoder for Codec {
     type Error = crate::Error;
-    type Item = ();
+    type Item = super::Response;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let mut headers = [httparse::EMPTY_HEADER; 25];
@@ -75,9 +76,27 @@ impl Decoder for Codec {
             return Err(crate::Error::Upgrade(Error::WrongWebsocketAccept));
         }
 
+        let mut parsed_response = http::Response::new(());
+        *parsed_response.status_mut() =
+            StatusCode::from_u16(code).map_err(|_| Error::Parsing(httparse::Error::Status))?;
+        *parsed_response.version_mut() = Version::HTTP_11;
+
+        let header_map = parsed_response.headers_mut();
+
+        header_map.reserve(response.headers.len());
+
+        for header in response.headers {
+            let name = HeaderName::from_str(header.name)
+                .map_err(|_| Error::Parsing(httparse::Error::HeaderName))?;
+            let value = HeaderValue::from_bytes(header.value)
+                .map_err(|_| Error::Parsing(httparse::Error::HeaderValue))?;
+
+            header_map.insert(name, value);
+        }
+
         src.advance(response_len);
 
-        Ok(Some(()))
+        Ok(Some(parsed_response))
     }
 }
 
