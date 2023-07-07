@@ -180,7 +180,7 @@ impl From<std::str::Utf8Error> for ProtocolError {
 }
 
 /// Role assumed by the [`WebsocketStream`] in a connection.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Role {
     /// The client end.
     Client,
@@ -591,6 +591,7 @@ impl StreamState {
 ///
 /// [`ClientBuilder`]: crate::ClientBuilder
 /// [`ServerBuilder`]: crate::ServerBuilder
+#[derive(Debug)]
 pub struct WebsocketStream<T> {
     /// The underlying stream using the [`WebsocketProtocol`] to read and write
     /// full frames.
@@ -843,6 +844,7 @@ where
 /// It provides an [`Encoder`] for entire [`Message`]s and a [`Decoder`] for
 /// single frames that must be assembled by a client such as the
 /// [`WebsocketStream`] later.
+#[derive(Debug)]
 struct WebsocketProtocol {
     /// The [`Role`] this implementation should assume for the stream.
     role: Role,

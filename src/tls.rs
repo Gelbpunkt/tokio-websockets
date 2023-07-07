@@ -53,6 +53,7 @@ impl Debug for Connector {
 
 /// A stream that might be protected with TLS.
 #[allow(clippy::large_enum_variant)] // Only one or two of these will be used
+#[derive(Debug)]
 pub enum MaybeTlsStream<S> {
     /// Unencrypted socket stream.
     Plain(S),
