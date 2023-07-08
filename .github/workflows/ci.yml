@@ -90,11 +90,13 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-hack
+          locked: false
 
       - name: Install cargo-minimal-versions
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-minimal-versions
+          locked: false
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
@@ -123,6 +125,7 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-hack
+          locked: false
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
