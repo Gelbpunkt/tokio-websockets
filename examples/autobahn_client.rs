@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use futures_util::SinkExt;
+use futures_util::{SinkExt, StreamExt};
 use http::Uri;
 use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error};
 

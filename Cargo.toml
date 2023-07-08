@@ -78,7 +78,3 @@ debug = false
 incremental = false
 lto = true
 opt-level = 3
-panic = "abort"
-
-[profile.dev]
-panic = "abort"

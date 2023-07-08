@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 use http::Uri;
 use tokio_websockets::{ClientBuilder, Error};
 

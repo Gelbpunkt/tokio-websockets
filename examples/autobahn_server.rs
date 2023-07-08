@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use futures_util::SinkExt;
+use futures_util::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_websockets::{Error, ServerBuilder};
 

@@ -109,8 +109,4 @@ async fn main() -> Result<(), Error> {
 
 ## Caveats / Limitations / ToDo
 
-Currently, `WebsocketStream` does not implement `Stream` due to the `poll_next` nature of the trait, which makes implementing it with actual async code near impossible.
-
-I am waiting for async traits and will implement it once possible. Until then, a method called `next` already exists and serves as a replacement for [futures-util's `next`](https://docs.rs/futures-util/latest/futures_util/stream/trait.StreamExt.html#method.next), which most users were probably looking for.
-
-Further, websocket compression is currently unsupported.
+Websocket compression is currently unsupported.

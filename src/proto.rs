@@ -2,15 +2,17 @@
 //!
 //! Any extensions are currently not implemented.
 use std::{
+    collections::VecDeque,
     fmt,
-    mem::take,
+    hint::unreachable_unchecked,
+    mem::{replace, take},
     pin::Pin,
     string::FromUtf8Error,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures_util::{Sink, SinkExt, StreamExt};
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
@@ -601,13 +603,19 @@ pub struct WebsocketStream<T> {
     state: StreamState,
 
     /// Payload of the full message that is being assembled.
-    framing_payload: BytesMut,
+    partial_payload: BytesMut,
     /// Opcode of the full message that is being assembled.
-    framing_opcode: OpCode,
+    partial_opcode: OpCode,
 
     /// Index up to which the full message payload was validated to be valid
     /// UTF-8.
     utf8_valid_up_to: usize,
+
+    /// Whether the sink needs to be flushed.
+    needs_flush: bool,
+
+    /// Pending messages to be encoded once the sink is ready.
+    pending_messages: VecDeque<Message>,
 }
 
 impl<T> WebsocketStream<T>
@@ -630,9 +638,11 @@ where
             }
             .framed(stream),
             state: StreamState::Active,
-            framing_payload: BytesMut::new(),
-            framing_opcode: OpCode::Continuation,
+            partial_payload: BytesMut::new(),
+            partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
+            needs_flush: false,
+            pending_messages: VecDeque::new(),
         }
     }
 
@@ -656,9 +666,11 @@ where
                 },
             }),
             state: StreamState::Active,
-            framing_payload: BytesMut::new(),
-            framing_opcode: OpCode::Continuation,
+            partial_payload: BytesMut::new(),
+            partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
+            needs_flush: false,
+            pending_messages: VecDeque::new(),
         }
     }
 
@@ -669,134 +681,124 @@ where
     ///
     /// This method returns an [`Error`] if reading from the stream fails or a
     /// protocol violation is encountered.
-    async fn read_full_message(&mut self) -> Option<Result<(OpCode, Bytes), Error>> {
+    fn poll_read_next_message(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<(OpCode, Bytes), Error>>> {
         if let Err(e) = self.state.check_active() {
-            return Some(Err(e));
+            return Poll::Ready(Some(Err(e)));
         };
 
         loop {
-            match self.inner.next().await? {
-                Ok(frame) => {
-                    // Control frames are allowed in between other frames
-                    if frame.opcode.is_control() {
-                        return Some(Ok((frame.opcode, frame.payload)));
-                    }
+            let frame = match ready!(self.inner.poll_next_unpin(cx)) {
+                Some(Ok(frame)) => frame,
+                Some(Err(e)) => return Poll::Ready(Some(Err(e))),
+                None => return Poll::Ready(None),
+            };
 
-                    if self.framing_opcode == OpCode::Continuation {
-                        if frame.opcode == OpCode::Continuation {
-                            return Some(Err(Error::Protocol(
-                                ProtocolError::UnexpectedContinuation,
-                            )));
-                        }
+            // Control frames are allowed in between other frames
+            if frame.opcode.is_control() {
+                return Poll::Ready(Some(Ok((frame.opcode, frame.payload))));
+            }
 
-                        self.framing_opcode = frame.opcode;
-                    } else if frame.opcode != OpCode::Continuation {
-                        return Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage)));
-                    }
-
-                    self.framing_payload.extend_from_slice(&frame.payload);
-
-                    if self.framing_opcode == OpCode::Text {
-                        let (should_fail, valid_up_to) = utf8::should_fail_fast(
-                            unsafe { self.framing_payload.get_unchecked(self.utf8_valid_up_to..) },
-                            frame.is_final,
-                        );
-
-                        if should_fail {
-                            return Some(Err(Error::Protocol(ProtocolError::InvalidUtf8)));
-                        }
-
-                        self.utf8_valid_up_to += valid_up_to;
-                    }
-
-                    if frame.is_final {
-                        break;
-                    }
+            if self.partial_opcode == OpCode::Continuation {
+                if frame.opcode == OpCode::Continuation {
+                    return Poll::Ready(Some(Err(Error::Protocol(
+                        ProtocolError::UnexpectedContinuation,
+                    ))));
                 }
-                Err(e) => {
-                    return Some(Err(e));
+
+                self.partial_opcode = frame.opcode;
+            } else if frame.opcode != OpCode::Continuation {
+                return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage))));
+            }
+
+            self.partial_payload.extend_from_slice(&frame.payload);
+
+            if self.partial_opcode == OpCode::Text {
+                let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                    unsafe { self.partial_payload.get_unchecked(self.utf8_valid_up_to..) },
+                    frame.is_final,
+                );
+
+                if should_fail {
+                    return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::InvalidUtf8))));
                 }
+
+                self.utf8_valid_up_to += valid_up_to;
+            }
+
+            if frame.is_final {
+                break;
             }
         }
 
-        let opcode = self.framing_opcode;
-        let payload = take(&mut self.framing_payload).freeze();
+        let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
+        let payload = take(&mut self.partial_payload).freeze();
 
-        self.framing_opcode = OpCode::Continuation;
         self.utf8_valid_up_to = 0;
 
-        Some(Ok((opcode, payload)))
+        Poll::Ready(Some(Ok((opcode, payload))))
     }
 
-    /// Receive the next full [`Message`] from the websocket stream, assembling
-    /// intermediate frames from the underlying codec together.
-    ///
-    /// This method has the same semantics as [`futures_util::StreamExt::next`].
-    ///
-    /// # Errors
-    ///
-    /// This method returns an [`Error`] if reading from the stream fails or a
-    /// protocol violation is encountered.
-    pub async fn next(&mut self) -> Option<Result<Message, Error>> {
-        if !self.state.can_read() {
-            return None;
+    /// Attempts to write a message to the sink immediately. If if can't be done
+    /// immediately, it is queued for sending later.
+    fn try_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        message: Message,
+    ) -> Result<(), Error> {
+        // Make sure that the sink can be written to
+        if self.as_mut().poll_ready(cx).is_pending() {
+            // Postpone it
+            self.pending_messages.push_back(message);
+            return Ok(());
         }
 
-        let (opcode, payload) = match self.read_full_message().await? {
-            Ok((opcode, payload)) => (opcode, payload),
-            Err(e) => {
-                if let Error::Protocol(protocol) = &e {
-                    let close_msg = protocol.into();
-
-                    if let Err(e) = self.send(close_msg).await {
-                        return Some(Err(e));
-                    };
-                }
-
-                return Some(Err(e));
-            }
-        };
-
-        let message = match Message::from_raw(opcode, payload) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let close_msg = Message::from(&e);
-
-                if let Err(e) = self.send(close_msg).await {
-                    return Some(Err(e));
-                };
-
-                return Some(Err(Error::Protocol(e)));
-            }
-        };
-
-        match &message.opcode {
-            OpCode::Close => match self.state {
-                StreamState::Active => {
-                    self.state = StreamState::ClosedByPeer;
-                    if let Err(e) = self.send(message.clone()).await {
-                        return Some(Err(e));
-                    };
-                }
-                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => return None,
-                StreamState::ClosedByUs => {
-                    self.state = StreamState::CloseAcknowledged;
-                }
-                // SAFETY: can_read at the beginning of the method ensures that this is not the case
-                StreamState::Terminated => unreachable!(),
-            },
-            OpCode::Ping => {
-                let mut msg = message.clone();
-                msg.opcode = OpCode::Pong;
-
-                if let Err(e) = self.send(msg).await {
-                    return Some(Err(e));
-                };
-            }
-            _ => {}
+        // Encode it into the buffer
+        if let Err(e) = self.as_mut().start_send(message) {
+            return Err(e);
         }
 
-        Some(Ok(message))
+        // Attempt to write other pending messages
+        self.as_mut().try_write_pending(cx)?;
+
+        // Attempt to flush, and postpone it if pending
+        if self.as_mut().poll_flush(cx).is_pending() {
+            self.needs_flush = true;
+        }
+
+        Ok(())
+    }
+
+    /// Attempts to write all pending messages to the sink.
+    fn try_write_pending(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Result<(), Error> {
+        while !self.pending_messages.is_empty() {
+            // Make sure that the sink can be written to
+            if self.as_mut().poll_ready(cx).is_pending() {
+                break;
+            };
+
+            // We know that the pending_messages are not empty
+            let item = unsafe { self.pending_messages.pop_front().unwrap_unchecked() };
+
+            // Encode it into the buffer
+            self.as_mut().start_send(item)?;
+
+            self.needs_flush = true;
+        }
+
+        // If an item is buffered, but not written yet, flush the transport
+        if self.needs_flush {
+            // We will try flush again on the next invocation if it is pending
+            match self.as_mut().poll_flush(cx) {
+                Poll::Ready(Ok(_)) => self.needs_flush = false,
+                Poll::Ready(Err(e)) => return Err(e),
+                Poll::Pending => {}
+            }
+        }
+
+        Ok(())
     }
 
     /// Send a close [`Message`] with an optional [`CloseCode`] and reason for
@@ -814,6 +816,80 @@ where
         reason: Option<&str>,
     ) -> Result<(), Error> {
         self.send(Message::close(close_code, reason)).await
+    }
+}
+
+impl<T> Stream for WebsocketStream<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    type Item = Result<Message, Error>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if !self.state.can_read() {
+            return Poll::Ready(None);
+        }
+
+        self.as_mut().try_write_pending(cx)?;
+
+        let (opcode, payload) = match ready!(self.as_mut().poll_read_next_message(cx)) {
+            Some(Ok((opcode, payload))) => (opcode, payload),
+            Some(Err(e)) => {
+                if let Error::Protocol(protocol) = &e {
+                    let close_msg = protocol.into();
+
+                    if let Err(e) = self.try_write(cx, close_msg) {
+                        return Poll::Ready(Some(Err(e)));
+                    };
+                }
+
+                return Poll::Ready(Some(Err(e)));
+            }
+            None => return Poll::Ready(None),
+        };
+
+        let message = match Message::from_raw(opcode, payload) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let close_msg = Message::from(&e);
+
+                if let Err(e) = self.try_write(cx, close_msg) {
+                    return Poll::Ready(Some(Err(e)));
+                };
+
+                return Poll::Ready(Some(Err(Error::Protocol(e))));
+            }
+        };
+
+        match &message.opcode {
+            OpCode::Close => match self.state {
+                StreamState::Active => {
+                    self.state = StreamState::ClosedByPeer;
+                    if let Err(e) = self.try_write(cx, message.clone()) {
+                        return Poll::Ready(Some(Err(e)));
+                    };
+                }
+                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => {
+                    return Poll::Ready(None)
+                }
+                StreamState::ClosedByUs => {
+                    self.state = StreamState::CloseAcknowledged;
+                }
+                // SAFETY: can_read at the beginning of the method ensures that this is not the case
+                StreamState::Terminated => unsafe { unreachable_unchecked() },
+            },
+            OpCode::Ping => {
+                let mut msg = message.clone();
+                msg.opcode = OpCode::Pong;
+
+                if let Err(e) = self.try_write(cx, msg) {
+                    return Poll::Ready(Some(Err(e)));
+                };
+            }
+            _ => {}
+        }
+
+        Poll::Ready(Some(Ok(message)))
     }
 }
 
