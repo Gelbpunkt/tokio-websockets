@@ -29,8 +29,6 @@ jobs:
           echo "<!DOCTYPE html><html><head><title>Autobahn test suite results</title></head><body><a href="clients/index.html">Clients</a><br><a href="servers/index.html">Servers</a></body></html>" > autobahn/reports/index.html
 
       - name: Build tokio-websockets (SIMD)
-        env:
-          RUSTFLAGS: -C target-cpu=native
         run: |
           cargo build --release --examples --features simd
           mv target/x86_64-unknown-linux-gnu/release/examples/autobahn_client target/x86_64-unknown-linux-gnu/release/examples/autobahn_client_simd
