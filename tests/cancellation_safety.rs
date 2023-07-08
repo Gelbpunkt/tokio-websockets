@@ -70,7 +70,7 @@ impl AsyncWrite for SuperSlow {
     }
 }
 
-const TO_SEND: &'static [u8] = &[1, 2, 3, 4];
+const TO_SEND: &[u8] = &[1, 2, 3, 4];
 
 #[tokio::test]
 async fn test_cancellation_safety() {
@@ -83,11 +83,7 @@ async fn test_cancellation_safety() {
     loop {
         // Cancellable futures should be possible to re-create at any time and resume as
         // if they were created once and then polled a few times
-        let recv_fut = server.next();
-        tokio::pin!(recv_fut);
-
-        // Poll the future once
-        if let Poll::Ready(val) = recv_fut.poll_unpin(&mut cx) {
+        if let Poll::Ready(val) = server.next().poll_unpin(&mut cx) {
             let msg = val.expect("eof").expect("err");
             assert_eq!(msg.as_data(), TO_SEND);
             break;

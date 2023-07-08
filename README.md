@@ -60,7 +60,7 @@ This is a simple websocket echo server without any proper error handling.
 More examples can be found in the [examples folder](https://github.com/Gelbpunkt/tokio-websockets/tree/main/examples).
 
 ```rust
-use futures_util::SinkExt;
+use futures_util::{SinkExt, StreamExt};
 use http::Uri;
 use tokio::net::TcpListener;
 use tokio_websockets::{ClientBuilder, Error, Message, ServerBuilder};
@@ -91,7 +91,7 @@ async fn main() -> Result<(), Error> {
   });
 
   let uri = Uri::from_static("ws://127.0.0.1:3000");
-  let mut client = ClientBuilder::from_uri(uri).connect().await?;
+  let (mut client, _) = ClientBuilder::from_uri(uri).connect().await?;
 
   client.send(Message::text(String::from("Hello world!"))).await?;
 

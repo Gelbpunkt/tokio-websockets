@@ -581,9 +581,7 @@ impl StreamState {
 
 /// A websocket stream that full messages can be read from and written to.
 ///
-/// The stream implements [`futures_util::Sink`], but due to language
-/// limitations it currently does not implement [`futures_util::Stream`]. A
-/// [`WebsocketStream::next`] method serves as a replacement.
+/// The stream implements [`futures_util::Sink`] and [`futures_util::Stream`].
 ///
 /// You must use a [`ClientBuilder`] or [`ServerBuilder`] to
 /// obtain a websocket stream.
@@ -756,9 +754,7 @@ where
         }
 
         // Encode it into the buffer
-        if let Err(e) = self.as_mut().start_send(message) {
-            return Err(e);
-        }
+        self.as_mut().start_send(message)?;
 
         // Attempt to write other pending messages
         self.as_mut().try_write_pending(cx)?;
