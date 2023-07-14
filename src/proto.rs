@@ -579,6 +579,38 @@ impl StreamState {
     }
 }
 
+/// Configuration for limitations on reading of [`Message`]s from a
+/// [`WebsocketStream`] to prevent high memory usage caused by malicious actors.
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    /// The maximum allowed frame size. `None` equals no limit. The default is
+    /// 16 MiB.
+    pub max_frame_size: Option<usize>,
+    /// The maximum allowed message size. `None` equals no limit. The default is
+    /// 64 MiB.
+    pub max_message_size: Option<usize>,
+}
+
+impl Limits {
+    /// A limit configuration without any limits.
+    #[must_use]
+    pub fn unlimited() -> Self {
+        Self {
+            max_frame_size: None,
+            max_message_size: None,
+        }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_frame_size: Some(16 * 1024 * 1024),
+            max_message_size: Some(64 * 1024 * 1024),
+        }
+    }
+}
+
 /// A websocket stream that full messages can be read from and written to.
 ///
 /// The stream implements [`futures_util::Sink`] and [`futures_util::Stream`].
@@ -622,10 +654,16 @@ where
 {
     /// Create a new [`WebsocketStream`] from a raw stream.
     #[cfg(any(feature = "client", feature = "server"))]
-    pub(crate) fn from_raw_stream(stream: T, role: Role, fail_fast_on_invalid_utf8: bool) -> Self {
+    pub(crate) fn from_raw_stream(
+        stream: T,
+        role: Role,
+        limits: Limits,
+        fail_fast_on_invalid_utf8: bool,
+    ) -> Self {
         Self {
             inner: WebsocketProtocol {
                 role,
+                limits,
                 state: StreamState::Active,
                 payload_in: 0,
                 utf8_valid_up_to: if fail_fast_on_invalid_utf8 {
@@ -650,11 +688,13 @@ where
     pub(crate) fn from_framed<U>(
         framed: Framed<T, U>,
         role: Role,
+        limits: Limits,
         fail_fast_on_invalid_utf8: bool,
     ) -> Self {
         Self {
             inner: framed.map_codec(|_| WebsocketProtocol {
                 role,
+                limits,
                 state: StreamState::Active,
                 payload_in: 0,
                 utf8_valid_up_to: if fail_fast_on_invalid_utf8 {
@@ -709,6 +749,17 @@ where
                 self.partial_opcode = frame.opcode;
             } else if frame.opcode != OpCode::Continuation {
                 return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage))));
+            }
+
+            if let Some(max_message_size) = self.inner.codec().limits.max_frame_size {
+                let message_size = self.partial_payload.len() + frame.payload.len();
+
+                if message_size > max_message_size {
+                    return Poll::Ready(Some(Err(Error::MessageTooLong {
+                        size: message_size,
+                        max_size: max_message_size,
+                    })));
+                }
             }
 
             self.partial_payload.extend_from_slice(&frame.payload);
@@ -920,6 +971,8 @@ where
 struct WebsocketProtocol {
     /// The [`Role`] this implementation should assume for the stream.
     role: Role,
+    /// The [`Limits`] imposed on this stream.
+    limits: Limits,
     /// The [`StreamState`] of the current stream.
     state: StreamState,
     /// Length of the processed (unmasked) part of the payload.
@@ -1088,6 +1141,15 @@ impl Decoder for WebsocketProtocol {
                 offset = 10;
             } else {
                 return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
+            }
+        }
+
+        if let Some(max_frame_size) = self.limits.max_frame_size {
+            if payload_length > max_frame_size {
+                return Err(Error::FrameTooLong {
+                    size: payload_length,
+                    max_size: max_frame_size,
+                });
             }
         }
 

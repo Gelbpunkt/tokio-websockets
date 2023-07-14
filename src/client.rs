@@ -22,7 +22,7 @@ use tokio::{
 use tokio_util::codec::Decoder;
 
 use crate::{
-    proto::Role,
+    proto::{Limits, Role},
     upgrade::{self, server_response},
     Connector, Error, MaybeTlsStream, WebsocketStream,
 };
@@ -123,6 +123,8 @@ pub struct Builder<'a> {
     /// A TLS connector to use for the connection. If not set and required, a
     /// new one will be created.
     connector: Option<&'a Connector>,
+    /// Limits to impose on the websocket stream.
+    limits: Limits,
     /// Headers to be sent with the upgrade request.
     headers: HeaderMap,
     /// Whether to perform UTF-8 checks on incomplete frame parts.
@@ -142,6 +144,7 @@ impl<'a> Builder<'a> {
         Self {
             uri: None,
             connector: None,
+            limits: Limits::default(),
             headers: HeaderMap::new(),
             fail_fast_on_invalid_utf8: true,
         }
@@ -167,6 +170,7 @@ impl<'a> Builder<'a> {
         Self {
             uri: Some(uri),
             connector: None,
+            limits: Limits::default(),
             headers: HeaderMap::new(),
             fail_fast_on_invalid_utf8: true,
         }
@@ -179,6 +183,14 @@ impl<'a> Builder<'a> {
     #[must_use]
     pub fn connector(mut self, connector: &'a Connector) -> Self {
         self.connector = Some(connector);
+
+        self
+    }
+
+    /// Sets the limits for the websocket stream.
+    #[must_use]
+    pub fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
 
         self
     }
@@ -268,7 +280,12 @@ impl<'a> Builder<'a> {
         let res = opt.ok_or(Error::NoUpgradeResponse)??;
 
         Ok((
-            WebsocketStream::from_framed(framed, Role::Client, self.fail_fast_on_invalid_utf8),
+            WebsocketStream::from_framed(
+                framed,
+                Role::Client,
+                self.limits,
+                self.fail_fast_on_invalid_utf8,
+            ),
             res,
         ))
     }
@@ -281,7 +298,12 @@ impl<'a> Builder<'a> {
     /// handshake, it assumes the stream is ready to use for writing and
     /// reading the websocket protocol.
     pub fn take_over<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(stream, Role::Client, self.fail_fast_on_invalid_utf8)
+        WebsocketStream::from_raw_stream(
+            stream,
+            Role::Client,
+            self.limits,
+            self.fail_fast_on_invalid_utf8,
+        )
     }
 }
 
