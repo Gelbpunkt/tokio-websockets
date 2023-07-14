@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use futures_util::{SinkExt, StreamExt};
 use http::Uri;
-use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error};
+use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error, Limits};
 
 fn get_agent() -> &'static str {
     #[cfg(feature = "simd")]
@@ -69,6 +69,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
 
     let (mut stream, _) = ClientBuilder::from_uri(uri)
         .fail_fast_on_invalid_utf8(fail_fast_on_invalid_utf8)
+        .limits(Limits::unlimited())
         .connector(&Connector::Plain)
         .connect()
         .await?;

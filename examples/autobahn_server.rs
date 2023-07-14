@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_websockets::{Error, ServerBuilder};
+use tokio_websockets::{Error, Limits, ServerBuilder};
 
 fn get_port() -> u16 {
     #[cfg(feature = "simd")]
@@ -35,6 +35,7 @@ async fn accept_connection(stream: TcpStream) {
 async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
     let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_err();
     let mut ws_stream = ServerBuilder::new()
+        .limits(Limits::unlimited())
         .fail_fast_on_invalid_utf8(fail_fast_on_invalid_utf8)
         .accept(stream)
         .await?;
