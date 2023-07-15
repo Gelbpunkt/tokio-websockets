@@ -751,7 +751,7 @@ where
                 return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage))));
             }
 
-            if let Some(max_message_size) = self.inner.codec().limits.max_frame_size {
+            if let Some(max_message_size) = self.inner.codec().limits.max_message_size {
                 let message_size = self.partial_payload.len() + frame.payload.len();
 
                 if message_size > max_message_size {
