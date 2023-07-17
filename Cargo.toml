@@ -23,7 +23,7 @@ getrandom = { version = "0.2", default-features = false, optional = true }
 rand = { version = "0.8", default-features = false, features = ["std", "std_rng"], optional = true }
 
 # SIMD
-simdutf8 = { version = "0.1", default-features = false, features = ["std", "public_imp", "aarch64_neon"], optional = true }
+simdutf8 = { version = "0.1", default-features = false, features = ["std", "aarch64_neon"], optional = true }
 
 # Client
 base64 = { version = "0.21", optional = true }
