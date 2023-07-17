@@ -5,6 +5,8 @@
 //!   - A fallback implementation without SIMD
 //!
 //! The SIMD implementations will only be used if the `simd` feature is active.
+#[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+use std::arch::aarch64::{veorq_u8, vld1q_u8, vst1q_u8};
 #[cfg(all(feature = "simd", target_feature = "avx2"))]
 use std::arch::x86_64::{
     _mm256_load_si256, _mm256_loadu_si256, _mm256_storeu_si256, _mm256_xor_si256,
@@ -17,7 +19,11 @@ use std::arch::x86_64::{
 use std::arch::x86_64::{_mm_load_si128, _mm_loadu_si128, _mm_storeu_si128, _mm_xor_si128};
 #[cfg(all(
     feature = "simd",
-    any(target_feature = "avx2", target_feature = "sse2")
+    any(
+        target_feature = "avx2",
+        target_feature = "sse2",
+        all(target_arch = "aarch64", target_feature = "neon")
+    )
 ))]
 use std::{
     alloc::{alloc, dealloc, Layout},
@@ -35,6 +41,10 @@ const AVX2_ALIGNMENT: usize = 32;
     target_feature = "sse2"
 ))]
 const SSE2_ALIGNMENT: usize = 16;
+
+/// NEON can operate on 128-bit input data.
+#[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+const NEON_ALIGNMENT: usize = 16;
 
 /// (Un-)masks input bytes with the framing key using AVX2.
 ///
@@ -143,6 +153,58 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
             let mut v = _mm_loadu_si128(memory_addr);
             v = _mm_xor_si128(v, mask);
             _mm_storeu_si128(memory_addr, v);
+        }
+
+        dealloc(mem_ptr, layout);
+
+        if postamble_start != payload_len {
+            // Run fallback implementation on postamble data
+            fallback_frame(key, input.get_unchecked_mut(postamble_start..), offset);
+        }
+    }
+}
+
+#[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+#[inline]
+pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
+    unsafe {
+        let payload_len = input.len();
+
+        // We might be done already
+        if payload_len < NEON_ALIGNMENT {
+            // Run fallback implementation on small data
+            fallback_frame(key, input, offset);
+            return;
+        }
+
+        let postamble_start = payload_len - payload_len % NEON_ALIGNMENT;
+
+        // vld1q_u8 has no alignment requirements whatsoever, ARM accepts unaligned
+        // pointers. However, it seems that on 32-bit ARM, alignment is an optional
+        // parameter in the instruction. It does not really hurt to align it to allow
+        // the compiler to generate the optimized 32-bit instructions just in case it
+        // matters.
+        let layout = Layout::from_size_align_unchecked(NEON_ALIGNMENT, NEON_ALIGNMENT);
+        let mem_ptr = alloc(layout);
+
+        ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
+
+        for j in (4 - offset..NEON_ALIGNMENT).step_by(4) {
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+        }
+
+        if offset > 0 {
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(NEON_ALIGNMENT - offset), offset);
+        }
+
+        let mask = vld1q_u8(mem_ptr);
+
+        for index in (0..postamble_start).step_by(NEON_ALIGNMENT) {
+            let memory_addr = input.as_mut_ptr().add(index).cast();
+            // Input data is not aligned on any particular boundary
+            let mut v = vld1q_u8(memory_addr);
+            v = veorq_u8(v, mask);
+            vst1q_u8(memory_addr, v);
         }
 
         dealloc(mem_ptr, layout);
