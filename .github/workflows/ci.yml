@@ -108,7 +108,7 @@ jobs:
         run: cargo minimal-versions check
 
   features:
-    name: Feature powerset
+    name: Feature powerset (nightly)
     runs-on: ubuntu-latest
 
     steps:
@@ -136,6 +136,71 @@ jobs:
       - name: Check powerset
         run: |
           cargo hack check \
+            --feature-powerset \
+            --no-dev-deps \
+            --group-features client,fastrand,sha1_smol \
+            --group-features server,sha1_smol
+
+  msrv:
+    name: Feature powerset (MSRV)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Use MSRV-specific .cargo/config.toml
+        run: |
+          mv .cargo/config.toml.msrv .cargo/config.toml
+
+      - name: Install GCC for aarch64-linux-gnu
+        run: |
+          sudo apt update -y
+          sudo apt install -y gcc-aarch64-linux-gnu
+
+      - name: Install 1.64.0 toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.64.0
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cargo-hack
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-hack
+          locked: false
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Add problem matchers
+        run: echo "::add-matcher::.github/rust.json"
+
+      - name: Check powerset on x86_64
+        run: |
+          cargo hack check \
+            --feature-powerset \
+            --no-dev-deps \
+            --group-features client,fastrand,sha1_smol \
+            --group-features server,sha1_smol
+
+      - name: Cross-compile and install OpenSSL
+        env:
+          CROSS_COMPILE: aarch64-linux-gnu-
+        run: |
+          wget https://www.openssl.org/source/openssl-3.1.1.tar.gz
+          tar xzf openssl-3.1.1.tar.gz
+          cd openssl-3.1.1
+          ./Configure linux-aarch64 --cross-compile-prefix=aarch64-linux-gnu- --prefix=/usr/aarch64-linux-gnu
+          make -j$(nproc)
+          sudo make install
+
+      - name: Check powerset on aarch64
+        env:
+          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR: /usr/aarch64-linux-gnu
+        run: |
+          cargo hack check \
+            --target aarch64-unknown-linux-gnu \
             --feature-powerset \
             --no-dev-deps \
             --group-features client,fastrand,sha1_smol \
