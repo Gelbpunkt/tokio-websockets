@@ -184,7 +184,15 @@ jobs:
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol
 
+      - name: Install cached cross-compiled OpenSSL
+        id: cache-openssl
+        uses: actions/cache@v3
+        with:
+          path: /usr/aarch64-linux-gnu
+          key: ${{ runner.os }}-openssl-3.1.1
+
       - name: Cross-compile and install OpenSSL
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
         env:
           CROSS_COMPILE: aarch64-linux-gnu-
         run: |
