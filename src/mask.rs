@@ -2,6 +2,7 @@
 //! unmasking, both ways use the same algorithm and methods:
 //!   - One AVX2-based implementation that masks 32 bytes per cycle
 //!   - One SSE2-based implementation that masks 16 bytes per cycle
+//!   - One NEON-based implementation that masks 16 bytes per cycle
 //!   - A fallback implementation without SIMD
 //!
 //! The SIMD implementations will only be used if the `simd` feature is active.

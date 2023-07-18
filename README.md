@@ -9,7 +9,7 @@ High performance, strict, tokio-util based websockets implementation.
   - tokio, tokio-util, bytes, futures-util (which almost all tokio projects depend on)
   - SHA1 backend, e.g. sha1_smol (see [Feature flags](#feature-flags))
 - Big selection of features to tailor dependencies to any project (see [Feature flags](#feature-flags))
-- SIMD support: AVX2 or SSE2 for frame (un)masking and accelerated UTF-8 validation
+- SIMD support: AVX2, SSE2 or NEON for frame (un)masking and accelerated UTF-8 validation
 - Strict conformance with the websocket specification, passes the [Autobahn test suite](https://github.com/crossbario/autobahn-testsuite) without relaxations [by default](https://gelbpunkt.github.io/tokio-websockets/index.html) (some can be enabled for performance)
 - TLS support
 - Reusable TLS connectors
@@ -21,7 +21,7 @@ High performance, strict, tokio-util based websockets implementation.
 
 Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 
-- `simd` will enable AVX2 and SSE2 accelerated masking and UTF-8 validation
+- `simd` will enable AVX2, SSE2 or NEON accelerated masking and UTF-8 validation
 - `client` enables a tiny client implementation
 - `server` enables a tiny server implementation
 - `http-integration` enables a method for websocket upgrade [`http::Request`](https://docs.rs/http/latest/http/request/struct.Request.html) generation
