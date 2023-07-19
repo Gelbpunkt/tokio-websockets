@@ -104,6 +104,8 @@ impl Encoder<()> for Codec {
     type Error = crate::Error;
 
     fn encode(&mut self, _item: (), _dst: &mut BytesMut) -> Result<(), Self::Error> {
+        // SAFETY: This is never called. Encoder is implemented to satisfy requirements
+        // for Framed.
         unsafe { unreachable_unchecked() }
     }
 }
