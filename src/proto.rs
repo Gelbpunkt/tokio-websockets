@@ -639,9 +639,6 @@ pub struct WebsocketStream<T> {
     /// full frames.
     inner: Framed<T, WebsocketProtocol>,
 
-    /// State of the websocket connection.
-    state: StreamState,
-
     /// Payload of the full message that is being assembled.
     partial_payload: BytesMut,
     /// Opcode of the full message that is being assembled.
@@ -683,7 +680,6 @@ where
                 },
             }
             .framed(stream),
-            state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
@@ -713,7 +709,6 @@ where
                     None
                 },
             }),
-            state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
@@ -733,7 +728,7 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(OpCode, Bytes), Error>>> {
-        if let Err(e) = self.state.check_active() {
+        if let Err(e) = self.inner.codec().state.check_active() {
             return Poll::Ready(Some(Err(e)));
         };
 
@@ -896,7 +891,7 @@ where
     type Item = Result<Message, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if !self.state.can_read() {
+        if !self.inner.codec().state.can_read() {
             return Poll::Ready(None);
         }
 
@@ -932,9 +927,9 @@ where
         };
 
         match &message.opcode {
-            OpCode::Close => match self.state {
+            OpCode::Close => match self.inner.codec().state {
                 StreamState::Active => {
-                    self.state = StreamState::ClosedByPeer;
+                    self.inner.codec_mut().state = StreamState::ClosedByPeer;
                     if let Err(e) = self.try_write(cx, message.clone()) {
                         return Poll::Ready(Some(Err(e)));
                     };
@@ -943,7 +938,7 @@ where
                     return Poll::Ready(None)
                 }
                 StreamState::ClosedByUs => {
-                    self.state = StreamState::CloseAcknowledged;
+                    self.inner.codec_mut().state = StreamState::CloseAcknowledged;
                 }
                 // SAFETY: can_read at the beginning of the method ensures that this is not the case
                 StreamState::Terminated => unsafe { unreachable_unchecked() },
