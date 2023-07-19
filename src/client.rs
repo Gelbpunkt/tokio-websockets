@@ -8,12 +8,14 @@
 //!   - By performing the handshake yourself and then using
 //!     [`Builder::take_over`] to let it take over a websocket stream
 use std::{
+    future::poll_fn,
     net::{SocketAddr, ToSocketAddrs},
+    pin::Pin,
     str::FromStr,
 };
 
 use base64::{engine::general_purpose, Engine};
-use futures_util::StreamExt;
+use futures_core::Stream;
 use http::{header::HeaderName, HeaderMap, HeaderValue, Uri};
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
@@ -276,8 +278,10 @@ impl<'a> Builder<'a> {
         let request = build_request(uri, &key_base64, &self.headers);
         stream.write_all(&request).await?;
 
-        let (opt, framed) = upgrade_codec.framed(stream).into_future().await;
-        let res = opt.ok_or(Error::NoUpgradeResponse)??;
+        let mut framed = upgrade_codec.framed(stream);
+        let res = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx))
+            .await
+            .ok_or(Error::NoUpgradeResponse)??;
 
         Ok((
             WebsocketStream::from_framed(

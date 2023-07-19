@@ -4,6 +4,7 @@
 use std::{
     collections::VecDeque,
     fmt,
+    future::poll_fn,
     hint::unreachable_unchecked,
     mem::{replace, take},
     pin::Pin,
@@ -12,7 +13,8 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures_util::{Sink, SinkExt, Stream, StreamExt};
+use futures_core::Stream;
+use futures_sink::Sink;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
@@ -613,7 +615,7 @@ impl Default for Limits {
 
 /// A websocket stream that full messages can be read from and written to.
 ///
-/// The stream implements [`futures_util::Sink`] and [`futures_util::Stream`].
+/// The stream implements [`futures_sink::Sink`] and [`futures_core::Stream`].
 ///
 /// You must use a [`ClientBuilder`] or [`ServerBuilder`] to
 /// obtain a websocket stream.
@@ -728,7 +730,7 @@ where
         };
 
         loop {
-            let frame = match ready!(self.inner.poll_next_unpin(cx)) {
+            let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
                 Some(Ok(frame)) => frame,
                 Some(Err(e)) => return Poll::Ready(Some(Err(e))),
                 None => return Poll::Ready(None),
@@ -862,7 +864,18 @@ where
         close_code: Option<CloseCode>,
         reason: Option<&str>,
     ) -> Result<(), Error> {
-        self.send(Message::close(close_code, reason)).await
+        let mut item = Some(Message::close(close_code, reason));
+        let mut this = Pin::new(self);
+        poll_fn(|cx| {
+            if item.is_some() {
+                ready!(this.as_mut().poll_ready(cx)?);
+            }
+            if let Some(item) = item.take() {
+                this.as_mut().start_send(item)?;
+            }
+            this.as_mut().poll_flush(cx)
+        })
+        .await
     }
 }
 

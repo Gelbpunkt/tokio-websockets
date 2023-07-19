@@ -5,7 +5,9 @@
 //!     established stream, via [`Builder::accept`]
 //!   - By performing the handshake yourself and then using [`Builder::serve`]
 //!     to let it take over a websocket stream
-use futures_util::StreamExt;
+use std::{future::poll_fn, pin::Pin};
+
+use futures_core::Stream;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Framed};
 
@@ -79,7 +81,8 @@ impl Builder {
         &self,
         stream: S,
     ) -> Result<WebsocketStream<S>, Error> {
-        let (reply, framed) = client_request::Codec {}.framed(stream).into_future().await;
+        let mut framed = client_request::Codec {}.framed(stream);
+        let reply = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx)).await;
         let mut parts = framed.into_parts();
 
         match reply {
