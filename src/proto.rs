@@ -726,6 +726,8 @@ where
                     return Poll::Ready(Some(Err(Error::Protocol(
                         ProtocolError::UnexpectedContinuation,
                     ))));
+                } else if frame.is_final && frame.opcode != OpCode::Text {
+                    return Poll::Ready(Some(Ok((frame.opcode, frame.payload))));
                 }
 
                 self.partial_opcode = frame.opcode;
