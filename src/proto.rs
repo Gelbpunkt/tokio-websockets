@@ -1115,7 +1115,7 @@ impl Decoder for WebsocketProtocol {
         let payload_len_1 = unsafe { src.get_unchecked(1) };
 
         // Bit 0
-        let fin = fin_and_rsv & 1 << 7 != 0;
+        let fin = fin_and_rsv >> 7 != 0;
 
         // Bits 1-3
         let rsv = fin_and_rsv & 0x70;
@@ -1125,13 +1125,14 @@ impl Decoder for WebsocketProtocol {
         }
 
         // Bits 4-7
-        let opcode_value = fin_and_rsv & 31;
+        let opcode_value = fin_and_rsv & 0xF;
         let opcode = OpCode::try_from(opcode_value)?;
 
         if !fin && opcode.is_control() {
             return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
         }
 
+        // Bit 0
         let mask = payload_len_1 >> 7 != 0;
 
         if mask && self.role == Role::Client {
