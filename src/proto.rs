@@ -1150,7 +1150,7 @@ impl Decoder for WebsocketProtocol {
             }
 
             if payload_length == 126 {
-                ensure_buffer_has_space!(src, 4);
+                ensure_buffer_has_space!(src, offset + 2);
                 // SAFETY: The ensure_buffer_has_space call has validated this
                 // A conversion from two u8s to a u16 cannot fail
                 payload_length = u16::from_be_bytes(unsafe {
@@ -1158,7 +1158,7 @@ impl Decoder for WebsocketProtocol {
                 }) as usize;
                 offset = 4;
             } else if payload_length == 127 {
-                ensure_buffer_has_space!(src, 10);
+                ensure_buffer_has_space!(src, offset + 8);
                 // SAFETY: The ensure_buffer_has_space call has validated this
                 // A conversion from 8 u8s to a u64 cannot fail
                 payload_length = u64::from_be_bytes(unsafe {
