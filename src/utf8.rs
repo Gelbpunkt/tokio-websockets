@@ -37,14 +37,18 @@ pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
 #[cfg(feature = "simd")]
 #[inline]
 pub fn should_fail_fast(input: &[u8], is_complete: bool) -> (bool, usize) {
-    match simdutf8::compat::from_utf8(input) {
-        Ok(_) => (false, input.len()),
-        Err(utf8_error) => {
-            if is_complete {
-                (true, 0)
-            } else {
-                (utf8_error.error_len().is_some(), utf8_error.valid_up_to())
-            }
+    // We only need the extra info about the valid codepoints if the frame is
+    // incomplete
+    if is_complete {
+        if simdutf8::basic::from_utf8(input).is_ok() {
+            (false, input.len())
+        } else {
+            (true, 0)
+        }
+    } else {
+        match simdutf8::compat::from_utf8(input) {
+            Ok(_) => (false, input.len()),
+            Err(utf8_error) => (utf8_error.error_len().is_some(), utf8_error.valid_up_to()),
         }
     }
 }
