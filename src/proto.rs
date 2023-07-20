@@ -1166,7 +1166,8 @@ impl Decoder for WebsocketProtocol {
                 }) as usize;
                 offset = 10;
             } else {
-                return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
+                // SAFETY: Constructed from 7 bits so the max value is 127
+                unsafe { unreachable_unchecked() }
             }
         }
 
