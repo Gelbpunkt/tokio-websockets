@@ -132,6 +132,8 @@ pub enum ProtocolError {
     /// A non-continuation and non-control frame was received when the previous
     /// message was not fully received yet.
     UnfinishedMessage,
+    /// The client on the other end did not mask the payload.
+    UnmaskedData,
 }
 
 impl fmt::Display for ProtocolError {
@@ -153,6 +155,7 @@ impl fmt::Display for ProtocolError {
             ProtocolError::FragmentedControlFrame => f.write_str("fragmented control frame"),
             ProtocolError::UnexpectedContinuation => f.write_str("unexpected continuation"),
             ProtocolError::UnfinishedMessage => f.write_str("unfinished message"),
+            ProtocolError::UnmaskedData => f.write_str("client did not mask frame"),
         }
     }
 }
@@ -1137,6 +1140,10 @@ impl Decoder for WebsocketProtocol {
 
         if mask && self.role == Role::Client {
             return Err(Error::Protocol(ProtocolError::ServerMaskedData));
+        }
+
+        if !mask && self.role == Role::Server {
+            return Err(Error::Protocol(ProtocolError::UnmaskedData));
         }
 
         // Bits 1-7
