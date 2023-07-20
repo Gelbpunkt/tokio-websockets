@@ -40,6 +40,10 @@ jobs:
           ./scripts/autobahn_client_ci.sh
           ./scripts/autobahn_server_ci.sh
 
+      - name: Ensure testsuite results are okay
+        run: |
+          python3 autobahn/validate.py
+
       - name: Upload results to GitHub pages
         if: success() && github.ref == 'refs/heads/main'
         uses: crazy-max/ghaction-github-pages@v3
