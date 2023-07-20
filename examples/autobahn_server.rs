@@ -26,7 +26,7 @@ fn get_port() -> u16 {
 async fn accept_connection(stream: TcpStream) {
     if let Err(e) = handle_connection(stream).await {
         match e {
-            Error::ConnectionClosed | Error::Protocol(_) => (),
+            Error::Protocol(_) => (),
             err => eprintln!("Error processing connection: {err:?}"),
         }
     }

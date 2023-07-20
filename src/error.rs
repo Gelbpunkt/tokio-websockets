@@ -15,8 +15,6 @@ pub enum Error {
     AlreadyClosed,
     /// DNS lookup failed.
     CannotResolveHost,
-    /// Attempted to send a message on a closed stream.
-    ConnectionClosed,
     /// Attempted to connect a client to a remote without configured URI.
     #[cfg(feature = "client")]
     NoUriConfigured,
@@ -91,7 +89,6 @@ impl fmt::Display for Error {
                 f.write_str("attempted to send message after closing connection")
             }
             Error::CannotResolveHost => f.write_str("client DNS lookup failed"),
-            Error::ConnectionClosed => f.write_str("connection is closed"),
             #[cfg(feature = "client")]
             Error::NoUriConfigured => f.write_str("client has no URI configured"),
             Error::Protocol(e) => e.fmt(f),
@@ -126,7 +123,6 @@ impl std::error::Error for Error {
         match self {
             Error::AlreadyClosed
             | Error::CannotResolveHost
-            | Error::ConnectionClosed
             | Error::NoUpgradeResponse
             | Error::FrameTooLong { .. }
             | Error::MessageTooLong { .. } => None,
