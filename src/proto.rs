@@ -726,7 +726,7 @@ where
                     return Poll::Ready(Some(Err(Error::Protocol(
                         ProtocolError::UnexpectedContinuation,
                     ))));
-                } else if frame.is_final && frame.opcode != OpCode::Text {
+                } else if frame.is_final {
                     return Poll::Ready(Some(Ok((frame.opcode, frame.payload))));
                 }
 
@@ -1262,6 +1262,15 @@ impl Decoder for WebsocketProtocol {
                 };
 
                 mask::frame(masking_key, to_unmask, self.payload_in & 3);
+            }
+
+            if fin && opcode == OpCode::Text {
+                let utf8_valid_up_to = self.utf8_valid_up_to.unwrap_or_default();
+                // SAFETY: offset + utf8_valid_up_to is the index until which utf8 was
+                // validated for this frame and therefore guaranteed to be in bounds.
+                utf8::parse_str(unsafe {
+                    src.get_unchecked(offset + utf8_valid_up_to..offset + payload_length)
+                })?;
             }
         }
 
