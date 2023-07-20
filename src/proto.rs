@@ -568,28 +568,6 @@ enum StreamState {
     /// The close has been acknowledged by the end that did not initiate the
     /// close.
     CloseAcknowledged,
-    /// The connection has been terminated by both ends.
-    Terminated,
-}
-
-impl StreamState {
-    /// Returns whether the connection can still be read from, i.e. if it is
-    /// still active or we are waiting for a close acknowledge.
-    fn can_read(&self) -> bool {
-        matches!(self, Self::Active | Self::ClosedByUs)
-    }
-
-    /// Returns whether the connection is still active.
-    ///
-    /// # Errors
-    ///
-    /// This method returns an [`Error`] if the stream is terminated already.
-    fn check_active(&self) -> Result<(), Error> {
-        match self {
-            Self::Terminated => Err(Error::AlreadyClosed),
-            _ => Ok(()),
-        }
-    }
 }
 
 /// Configuration for limitations on reading of [`Message`]s from a
@@ -731,10 +709,6 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(OpCode, Bytes), Error>>> {
-        if let Err(e) = self.inner.codec().state.check_active() {
-            return Poll::Ready(Some(Err(e)));
-        };
-
         loop {
             let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
                 Some(Ok(frame)) => frame,
@@ -894,8 +868,18 @@ where
     type Item = Result<Message, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if !self.inner.codec().state.can_read() {
-            return Poll::Ready(None);
+        match self.inner.codec().state {
+            StreamState::Active | StreamState::ClosedByUs => {}
+            StreamState::ClosedByPeer => {
+                ready!(self.as_mut().poll_ready(cx))?;
+                self.as_mut().try_write_pending(cx)?;
+                ready!(self.as_mut().poll_flush(cx))?;
+                return Poll::Ready(None);
+            }
+            StreamState::CloseAcknowledged => {
+                ready!(self.as_mut().poll_flush(cx))?;
+                return Poll::Ready(None);
+            }
         }
 
         self.as_mut().try_write_pending(cx)?;
@@ -943,8 +927,6 @@ where
                 StreamState::ClosedByUs => {
                     self.inner.codec_mut().state = StreamState::CloseAcknowledged;
                 }
-                // SAFETY: can_read at the beginning of the method ensures that this is not the case
-                StreamState::Terminated => unsafe { unreachable_unchecked() },
             },
             OpCode::Ping => {
                 let mut msg = message.clone();
@@ -1008,7 +990,11 @@ impl Encoder<Message> for WebsocketProtocol {
 
     #[allow(clippy::cast_possible_truncation)]
     fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        self.state.check_active()?;
+        if !matches!(self.state, StreamState::Active)
+            && !matches!(self.state, StreamState::ClosedByPeer if item.is_close())
+        {
+            return Err(Error::AlreadyClosed);
+        }
 
         if item.is_close() {
             if matches!(self.state, StreamState::ClosedByPeer) {
@@ -1083,12 +1069,7 @@ impl Encoder<Message> for WebsocketProtocol {
             chunk_number += 1;
         }
 
-        if self.role == Role::Server && !self.state.can_read() {
-            self.state = StreamState::Terminated;
-            Err(Error::ConnectionClosed)
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }
 
