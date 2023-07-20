@@ -1,16 +1,13 @@
-name: Run autobahn testsuite and publish results
+name: Run autobahn testsuite
 
-on:
-  push:
-    branches:
-      - main
+on: [push, pull_request]
 
 env:
   CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
 
 jobs:
   autobahn:
-    name: Run autobahn testsuite and publish results
+    name: Run autobahn testsuite
     runs-on: ubuntu-latest
 
     steps:
@@ -44,7 +41,7 @@ jobs:
           ./scripts/autobahn_server_ci.sh
 
       - name: Upload results to GitHub pages
-        if: success()
+        if: success() && github.ref == 'refs/heads/main'
         uses: crazy-max/ghaction-github-pages@v3
         with:
           target_branch: gh-pages
