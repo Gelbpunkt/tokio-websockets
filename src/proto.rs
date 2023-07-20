@@ -1053,7 +1053,7 @@ impl Encoder<Message> for WebsocketProtocol {
 
             dst.put_u8(initial_byte);
 
-            if chunk_size > u16::MAX as usize {
+            if u16::try_from(chunk_size).is_err() {
                 dst.put_u8(127 + mask_bit);
                 dst.put_u64(chunk_size as u64);
             } else if chunk_size > 125 {
@@ -1156,6 +1156,9 @@ impl Decoder for WebsocketProtocol {
                 payload_length = u16::from_be_bytes(unsafe {
                     src.get_unchecked(2..4).try_into().unwrap_unchecked()
                 }) as usize;
+                if payload_length <= 125 {
+                    return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
+                }
                 offset = 4;
             } else if payload_length == 127 {
                 ensure_buffer_has_space!(src, offset + 8);
@@ -1164,6 +1167,9 @@ impl Decoder for WebsocketProtocol {
                 payload_length = u64::from_be_bytes(unsafe {
                     src.get_unchecked(2..10).try_into().unwrap_unchecked()
                 }) as usize;
+                if u16::try_from(payload_length).is_ok() {
+                    return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
+                }
                 offset = 10;
             } else {
                 // SAFETY: Constructed from 7 bits so the max value is 127
