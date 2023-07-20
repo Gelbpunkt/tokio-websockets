@@ -4,3 +4,4 @@ Cargo.lock
 /autobahn/reports
 flamegraph.svg
 perf.data*
+/benches/*.svg

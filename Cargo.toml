@@ -76,6 +76,10 @@ name = "client"
 required-features = ["client"]
 
 [[example]]
+name = "echo-server"
+required-features = ["server"]
+
+[[example]]
 name = "native_tls_self_signed_client"
 required-features = ["client", "native-tls"]
 
