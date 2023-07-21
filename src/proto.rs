@@ -163,11 +163,10 @@ impl std::error::Error for ProtocolError {}
 impl From<&ProtocolError> for Message {
     fn from(val: &ProtocolError) -> Self {
         match val {
-            ProtocolError::InvalidUtf8 => Message::close(
-                Some(CloseCode::InvalidFramePayloadData),
-                Some("invalid utf8"),
-            ),
-            _ => Message::close(Some(CloseCode::ProtocolError), Some("protocol violation")),
+            ProtocolError::InvalidUtf8 => {
+                Message::close(Some(CloseCode::InvalidFramePayloadData), "invalid utf8")
+            }
+            _ => Message::close(Some(CloseCode::ProtocolError), "protocol violation"),
         }
     }
 }
@@ -420,18 +419,16 @@ impl Message {
         }
     }
 
-    /// Create a new close message. If a reason is specified, a [`CloseCode`]
-    /// must be specified for it to be included in the payload.
+    /// Create a new close message. If an non-empty reason is specified, a
+    /// [`CloseCode`] must be specified for it to be included.
     #[must_use]
-    pub fn close(code: Option<CloseCode>, reason: Option<&str>) -> Self {
+    pub fn close(code: Option<CloseCode>, reason: &str) -> Self {
         let mut data = BytesMut::new();
 
         if let Some(code) = code {
             data.put_u16(code.into());
 
-            if let Some(reason) = reason {
-                data.extend_from_slice(reason.as_bytes());
-            }
+            data.extend_from_slice(reason.as_bytes());
         }
 
         Self {
@@ -526,23 +523,23 @@ impl Message {
     /// # Errors
     ///
     /// This method returns an [`Error`] if the message is not a close message.
-    pub fn as_close(&self) -> Result<(Option<CloseCode>, Option<&str>), ProtocolError> {
+    pub fn as_close(&self) -> Result<(CloseCode, &str), ProtocolError> {
         if self.opcode == OpCode::Close {
             let close_code = if self.data.len() >= 2 {
                 // SAFETY: self.data.len() is greater or equal to 2
                 let close_code_value = u16::from_be_bytes(unsafe {
                     self.data.get_unchecked(0..2).try_into().unwrap_unchecked()
                 });
-                Some(CloseCode::try_from(close_code_value)?)
+                CloseCode::try_from(close_code_value)?
             } else {
-                None
+                CloseCode::NoStatusReceived
             };
 
             let reason = if self.data.len() > 2 {
                 // SAFETY: self.data.len() is greater or equal to 2
-                Some(unsafe { std::str::from_utf8_unchecked(self.data.get_unchecked(2..)) })
+                unsafe { std::str::from_utf8_unchecked(self.data.get_unchecked(2..)) }
             } else {
-                None
+                ""
             };
 
             Ok((close_code, reason))
@@ -899,7 +896,7 @@ where
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let res = Pin::new(&mut self.inner).poll_flush(cx);
-        if let Poll::Ready(Ok(())) = res {
+        if matches!(res, Poll::Ready(Ok(()))) {
             self.needs_flush = false;
         }
 
@@ -913,7 +910,7 @@ where
                 .as_ref()
                 .map_or(false, Message::is_close)
         {
-            self.pending_message = Some(Message::close(None, None));
+            self.pending_message = Some(Message::close(None, ""));
         }
         while ready!(self.as_mut().poll_next(cx)).is_some() {}
         Poll::Ready(Ok(()))
