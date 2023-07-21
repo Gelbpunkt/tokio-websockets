@@ -1,4 +1,4 @@
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use http::Uri;
 use tokio_native_tls::native_tls::{Certificate, TlsConnector};
 use tokio_websockets::{ClientBuilder, Error};
