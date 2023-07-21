@@ -6,6 +6,27 @@ env:
   CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
 
 jobs:
+  build-examples:
+    name: Build examples
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      - name: Add problem matchers
+        run: echo "::add-matcher::.github/rust.json"
+
+      - name: Build examples
+        run: |
+          cargo check --examples --all-features
+
   build-docs:
     name: Build docs
     runs-on: ubuntu-latest
