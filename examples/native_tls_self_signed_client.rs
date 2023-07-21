@@ -20,7 +20,7 @@ async fn main() -> Result<(), Error> {
 
     println!("Got message: {msg:?}");
 
-    client.close(None, None).await?;
+    client.close().await?;
 
     Ok(())
 }
