@@ -60,7 +60,7 @@ async fn main() -> io::Result<()> {
             ws.send(Message::text(String::from("Hello, world!")))
                 .await?;
 
-            ws.close(None, None).await?;
+            ws.close().await?;
 
             Ok(()) as Result<(), tokio_websockets::Error>
         };

@@ -3,7 +3,6 @@
 //! Any extensions are currently not implemented.
 use std::{
     fmt,
-    future::poll_fn,
     hint::unreachable_unchecked,
     mem::{replace, take},
     pin::Pin,
@@ -798,34 +797,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Send a close [`Message`] with an optional [`CloseCode`] and reason for
-    /// closure.
-    ///
-    /// The reason will only be included in the sent payload if a close code was
-    /// specified.
-    ///
-    /// # Errors
-    ///
-    /// This method returns an [`Error`] if sending the close frame fails.
-    pub async fn close(
-        &mut self,
-        close_code: Option<CloseCode>,
-        reason: Option<&str>,
-    ) -> Result<(), Error> {
-        let mut item = Some(Message::close(close_code, reason));
-        let mut this = Pin::new(self);
-        poll_fn(|cx| {
-            if item.is_some() {
-                ready!(this.as_mut().poll_ready(cx)?);
-            }
-            if let Some(item) = item.take() {
-                this.as_mut().start_send(item)?;
-            }
-            this.as_mut().poll_flush(cx)
-        })
-        .await
     }
 }
 

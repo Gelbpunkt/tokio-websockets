@@ -99,7 +99,7 @@ async fn main() -> Result<(), Error> {
     if let Ok(text) = msg.as_text() {
       assert_eq!(text, "Hello world!");
       // We got one message, just stop now
-      client.close(None, None).await?;
+      client.close().await?;
     }
   }
 

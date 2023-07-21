@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use futures_util::{SinkExt, StreamExt};
 use http::Uri;
-use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error, Limits};
+use tokio_websockets::{ClientBuilder, CloseCode, Connector, Error, Limits, Message};
 
 fn get_agent() -> &'static str {
     #[cfg(feature = "simd")]
@@ -32,9 +32,10 @@ async fn get_case_count() -> Result<u32, Error> {
     let msg = stream.next().await.unwrap()?;
 
     stream
-        .close(Some(CloseCode::NormalClosure), None)
+        .feed(Message::close(Some(CloseCode::NormalClosure), None))
         .await
         .unwrap();
+    stream.close().await.unwrap();
 
     Ok(msg.as_text().unwrap().parse::<u32>().unwrap())
 }
@@ -50,7 +51,10 @@ async fn update_reports() -> Result<(), Error> {
         .connect()
         .await?;
 
-    stream.close(Some(CloseCode::NormalClosure), None).await?;
+    stream
+        .feed(Message::close(Some(CloseCode::NormalClosure), None))
+        .await?;
+    stream.close().await?;
 
     Ok(())
 }
