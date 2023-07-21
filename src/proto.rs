@@ -553,8 +553,7 @@ impl Message {
 }
 
 /// The connection state of the stream.
-#[derive(Debug)]
-#[allow(unused)]
+#[derive(Debug, PartialEq)]
 enum StreamState {
     /// The connection is fully active and no close has been initiated.
     Active,
@@ -819,7 +818,7 @@ where
         let (opcode, payload) = match ready!(self.as_mut().poll_read_next_message(cx)) {
             Some(Ok((opcode, payload))) => (opcode, payload),
             Some(Err(e)) => {
-                if matches!(self.inner.codec().state, StreamState::Active) {
+                if self.inner.codec().state == StreamState::Active {
                     if let Error::Protocol(protocol) = &e {
                         self.pending_message = Some(protocol.into());
                     }
@@ -833,7 +832,7 @@ where
         let message = match Message::from_raw(opcode, payload) {
             Ok(msg) => msg,
             Err(e) => {
-                if matches!(self.inner.codec().state, StreamState::Active) {
+                if self.inner.codec().state == StreamState::Active {
                     self.pending_message = Some(Message::from(&e));
                 }
 
@@ -857,7 +856,7 @@ where
                 }
             },
             OpCode::Ping
-                if matches!(self.inner.codec().state, StreamState::Active)
+                if self.inner.codec().state == StreamState::Active
                     && !self
                         .pending_message
                         .as_ref()
@@ -908,7 +907,7 @@ where
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if matches!(self.inner.codec().state, StreamState::Active)
+        if self.inner.codec().state == StreamState::Active
             && !self
                 .pending_message
                 .as_ref()
@@ -945,14 +944,14 @@ impl Encoder<Message> for WebsocketProtocol {
 
     #[allow(clippy::cast_possible_truncation)]
     fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        if !matches!(self.state, StreamState::Active)
-            && !matches!(self.state, StreamState::ClosedByPeer if item.is_close())
+        if !(self.state == StreamState::Active
+            || matches!(self.state, StreamState::ClosedByPeer if item.is_close()))
         {
             return Err(Error::AlreadyClosed);
         }
 
         if item.is_close() {
-            if matches!(self.state, StreamState::ClosedByPeer) {
+            if self.state == StreamState::ClosedByPeer {
                 self.state = StreamState::CloseAcknowledged;
             } else {
                 self.state = StreamState::ClosedByUs;
