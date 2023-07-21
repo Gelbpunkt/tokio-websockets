@@ -785,7 +785,7 @@ where
         match self.inner.codec().state {
             StreamState::Active | StreamState::ClosedByUs => {}
             StreamState::ClosedByPeer => {
-                ready!(self.as_mut().poll_ready(cx))?;
+                ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
                 // SAFETY: arm is only taken until the pending close message is encoded
                 let item = unsafe { self.pending_message.take().unwrap_unchecked() };
                 self.as_mut().start_send(item)?;
@@ -806,8 +806,8 @@ where
             }
         }
 
-        if self.pending_message.is_some() && self.as_mut().poll_ready(cx).is_ready() {
-            // SAFETY: We just ensured that the pending_message is some
+        if self.pending_message.is_some() && Pin::new(&mut self.inner).poll_ready(cx).is_ready() {
+            // SAFETY: We just ensured that the pending message is some
             let item = unsafe { self.pending_message.take().unwrap_unchecked() };
             self.as_mut().start_send(item)?;
 
@@ -883,6 +883,10 @@ where
     type Error = Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
+        if let Some(item) = self.pending_message.take() {
+            self.as_mut().start_send(item)?;
+        }
         Pin::new(&mut self.inner).poll_ready(cx)
     }
 
