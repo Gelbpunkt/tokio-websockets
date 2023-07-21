@@ -800,31 +800,6 @@ where
         Ok(())
     }
 
-    /// Attempts to write the pending message to the sink.
-    fn try_write_pending(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Result<(), Error> {
-        // Make sure that the sink can be written to
-        if self.pending_message.is_some() && self.as_mut().poll_ready(cx).is_ready() {
-            // SAFETY: We just ensured that the pending_message is some
-            let item = unsafe { self.pending_message.take().unwrap_unchecked() };
-            // Encode it into the buffer
-            self.as_mut().start_send(item)?;
-
-            self.needs_flush = true;
-        }
-
-        // If an item is buffered, but not written yet, flush the transport
-        if self.needs_flush {
-            // We will try flush again on the next invocation if it is pending
-            match self.as_mut().poll_flush(cx) {
-                Poll::Ready(Ok(_)) => self.needs_flush = false,
-                Poll::Ready(Err(e)) => return Err(e),
-                Poll::Pending => {}
-            }
-        }
-
-        Ok(())
-    }
-
     /// Send a close [`Message`] with an optional [`CloseCode`] and reason for
     /// closure.
     ///
@@ -865,7 +840,9 @@ where
             StreamState::Active | StreamState::ClosedByUs => {}
             StreamState::ClosedByPeer => {
                 ready!(self.as_mut().poll_ready(cx))?;
-                self.as_mut().try_write_pending(cx)?;
+                // SAFETY: arm is only taken until the pending close message is encoded
+                let item = unsafe { self.pending_message.take().unwrap_unchecked() };
+                self.as_mut().start_send(item)?;
                 ready!(self.as_mut().poll_flush(cx))?;
                 return Poll::Ready(None);
             }
@@ -875,7 +852,22 @@ where
             }
         }
 
-        self.as_mut().try_write_pending(cx)?;
+        if self.pending_message.is_some() && self.as_mut().poll_ready(cx).is_ready() {
+            // SAFETY: We just ensured that the pending_message is some
+            let item = unsafe { self.pending_message.take().unwrap_unchecked() };
+            self.as_mut().start_send(item)?;
+
+            self.needs_flush = true;
+        }
+
+        if self.needs_flush {
+            // We will try flush again on the next invocation if it is pending
+            match self.as_mut().poll_flush(cx) {
+                Poll::Ready(Ok(_)) => self.needs_flush = false,
+                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
+                Poll::Pending => {}
+            }
+        }
 
         let (opcode, payload) = match ready!(self.as_mut().poll_read_next_message(cx)) {
             Some(Ok((opcode, payload))) => (opcode, payload),
