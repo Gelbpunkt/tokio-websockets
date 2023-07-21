@@ -2,7 +2,6 @@
 //!
 //! Any extensions are currently not implemented.
 use std::{
-    collections::VecDeque,
     fmt,
     future::poll_fn,
     hint::unreachable_unchecked,
@@ -632,8 +631,8 @@ pub struct WebsocketStream<T> {
     /// Whether the sink needs to be flushed.
     needs_flush: bool,
 
-    /// Pending messages to be encoded once the sink is ready.
-    pending_messages: VecDeque<Message>,
+    /// Pending message to be encoded once the sink is ready.
+    pending_message: Option<Message>,
 }
 
 impl<T> WebsocketStream<T>
@@ -665,7 +664,7 @@ where
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
             needs_flush: false,
-            pending_messages: VecDeque::new(),
+            pending_message: None,
         }
     }
 
@@ -694,7 +693,7 @@ where
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
             needs_flush: false,
-            pending_messages: VecDeque::new(),
+            pending_message: None,
         }
     }
 
@@ -786,15 +785,12 @@ where
         // Make sure that the sink can be written to
         if self.as_mut().poll_ready(cx).is_pending() {
             // Postpone it
-            self.pending_messages.push_back(message);
+            self.pending_message = Some(message);
             return Ok(());
         }
 
         // Encode it into the buffer
         self.as_mut().start_send(message)?;
-
-        // Attempt to write other pending messages
-        self.as_mut().try_write_pending(cx)?;
 
         // Attempt to flush, and postpone it if pending
         if self.as_mut().poll_flush(cx).is_pending() {
@@ -804,17 +800,12 @@ where
         Ok(())
     }
 
-    /// Attempts to write all pending messages to the sink.
+    /// Attempts to write the pending message to the sink.
     fn try_write_pending(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Result<(), Error> {
-        while !self.pending_messages.is_empty() {
-            // Make sure that the sink can be written to
-            if self.as_mut().poll_ready(cx).is_pending() {
-                break;
-            };
-
-            // SAFETY: We just ensured that the pending_messages are not empty
-            let item = unsafe { self.pending_messages.pop_front().unwrap_unchecked() };
-
+        // Make sure that the sink can be written to
+        if self.pending_message.is_some() && self.as_mut().poll_ready(cx).is_ready() {
+            // SAFETY: We just ensured that the pending_message is some
+            let item = unsafe { self.pending_message.take().unwrap_unchecked() };
             // Encode it into the buffer
             self.as_mut().start_send(item)?;
 
