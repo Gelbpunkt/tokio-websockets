@@ -886,8 +886,10 @@ where
         ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
         if let Some(item) = self.pending_message.take() {
             self.as_mut().start_send(item)?;
+            Pin::new(&mut self.inner).poll_ready(cx)
+        } else {
+            Poll::Ready(Ok(()))
         }
-        Pin::new(&mut self.inner).poll_ready(cx)
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
