@@ -843,11 +843,19 @@ where
                 // SAFETY: arm is only taken until the pending close message is encoded
                 let item = unsafe { self.pending_message.take().unwrap_unchecked() };
                 self.as_mut().start_send(item)?;
-                ready!(self.as_mut().poll_flush(cx))?;
+                if self.inner.codec().role == Role::Server {
+                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
+                } else {
+                    ready!(self.poll_flush(cx))?;
+                }
                 return Poll::Ready(None);
             }
             StreamState::CloseAcknowledged => {
-                ready!(self.as_mut().poll_flush(cx))?;
+                if self.inner.codec().role == Role::Server {
+                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
+                } else {
+                    ready!(self.poll_flush(cx))?;
+                }
                 return Poll::Ready(None);
             }
         }
@@ -961,8 +969,10 @@ where
         {
             ready!(self.as_mut().poll_ready(cx))?;
             self.as_mut().start_send(Message::close(None, None))?;
+            self.needs_flush = true;
         }
-        Pin::new(&mut self.inner).poll_close(cx)
+        while ready!(self.as_mut().poll_next(cx)).is_some() {}
+        Poll::Ready(Ok(()))
     }
 }
 
