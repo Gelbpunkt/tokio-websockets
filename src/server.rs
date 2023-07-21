@@ -24,13 +24,6 @@ const BAD_REQUEST: &[u8] = b"HTTP/1.1 400 Bad Request\r\n\r\n";
 pub struct Builder {
     /// Limits to impose on the websocket stream.
     limits: Limits,
-    /// Whether to perform UTF-8 checks on incomplete frame parts.
-    /// This is not technically required by the websocket specification and adds
-    /// a decent amount of overhead, especially when messages are sent in
-    /// small chops.
-    ///
-    /// Because this is SHOULD behaviour, it is enabled by default.
-    fail_fast_on_invalid_utf8: bool,
 }
 
 impl Default for Builder {
@@ -46,7 +39,6 @@ impl Builder {
     pub fn new() -> Self {
         Self {
             limits: Limits::default(),
-            fail_fast_on_invalid_utf8: true,
         }
     }
 
@@ -54,19 +46,6 @@ impl Builder {
     #[must_use]
     pub fn limits(mut self, limits: Limits) -> Self {
         self.limits = limits;
-
-        self
-    }
-
-    /// Toggle whether to perform UTF-8 checks on incomplete frame parts.
-    /// This is not technically required by the websocket specification and adds
-    /// a decent amount of overhead, especially when messages are sent in
-    /// small chops.
-    ///
-    /// Because this is SHOULD behaviour, it is enabled by default.
-    #[must_use]
-    pub fn fail_fast_on_invalid_utf8(mut self, value: bool) -> Self {
-        self.fail_fast_on_invalid_utf8 = value;
 
         self
     }
@@ -93,7 +72,6 @@ impl Builder {
                     framed,
                     Role::Server,
                     self.limits,
-                    self.fail_fast_on_invalid_utf8,
                 ))
             }
             Some(Err(e)) => {
@@ -110,11 +88,6 @@ impl Builder {
     ///
     /// This does not perform a HTTP upgrade handshake.
     pub fn serve<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(
-            stream,
-            Role::Server,
-            self.limits,
-            self.fail_fast_on_invalid_utf8,
-        )
+        WebsocketStream::from_raw_stream(stream, Role::Server, self.limits)
     }
 }

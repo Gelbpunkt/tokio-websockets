@@ -129,13 +129,6 @@ pub struct Builder<'a> {
     limits: Limits,
     /// Headers to be sent with the upgrade request.
     headers: HeaderMap,
-    /// Whether to perform UTF-8 checks on incomplete frame parts.
-    /// This is not technically required by the websocket specification and adds
-    /// a decent amount of overhead, especially when messages are sent in
-    /// small chops.
-    ///
-    /// Because this is SHOULD behaviour, it is enabled by default.
-    fail_fast_on_invalid_utf8: bool,
 }
 
 impl<'a> Builder<'a> {
@@ -148,7 +141,6 @@ impl<'a> Builder<'a> {
             connector: None,
             limits: Limits::default(),
             headers: HeaderMap::new(),
-            fail_fast_on_invalid_utf8: true,
         }
     }
 
@@ -174,7 +166,6 @@ impl<'a> Builder<'a> {
             connector: None,
             limits: Limits::default(),
             headers: HeaderMap::new(),
-            fail_fast_on_invalid_utf8: true,
         }
     }
 
@@ -201,19 +192,6 @@ impl<'a> Builder<'a> {
     #[must_use]
     pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Self {
         self.headers.insert(name, value);
-
-        self
-    }
-
-    /// Toggle whether to perform UTF8 checks on incomplete frame parts.
-    /// This is not technically required by the websocket specification and adds
-    /// a decent amount of overhead, especially when messages are sent in
-    /// small chops.
-    ///
-    /// Because this is SHOULD behaviour, it is enabled by default.
-    #[must_use]
-    pub fn fail_fast_on_invalid_utf8(mut self, value: bool) -> Self {
-        self.fail_fast_on_invalid_utf8 = value;
 
         self
     }
@@ -284,12 +262,7 @@ impl<'a> Builder<'a> {
             .ok_or(Error::NoUpgradeResponse)??;
 
         Ok((
-            WebsocketStream::from_framed(
-                framed,
-                Role::Client,
-                self.limits,
-                self.fail_fast_on_invalid_utf8,
-            ),
+            WebsocketStream::from_framed(framed, Role::Client, self.limits),
             res,
         ))
     }
@@ -302,12 +275,7 @@ impl<'a> Builder<'a> {
     /// handshake, it assumes the stream is ready to use for writing and
     /// reading the websocket protocol.
     pub fn take_over<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(
-            stream,
-            Role::Client,
-            self.limits,
-            self.fail_fast_on_invalid_utf8,
-        )
+        WebsocketStream::from_raw_stream(stream, Role::Client, self.limits)
     }
 }
 

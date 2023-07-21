@@ -4,23 +4,18 @@ use futures_util::{SinkExt, StreamExt};
 use http::Uri;
 use tokio_websockets::{ClientBuilder, Connector, Error, Limits};
 
-fn get_agent() -> &'static str {
-    #[cfg(feature = "simd")]
-    {
-        if std::env::var("SKIP_FAIL_FAST").is_ok() {
-            "tokio-websockets-avx2-skip-fail-fast"
-        } else {
-            "tokio-websockets-avx2"
-        }
-    }
-    #[cfg(not(feature = "simd"))]
-    {
-        if std::env::var("SKIP_FAIL_FAST").is_ok() {
-            "tokio-websockets-skip-fail-fast"
-        } else {
-            "tokio-websockets"
-        }
-    }
+#[cfg(feature = "simd")]
+macro_rules! agent {
+    () => {
+        "tokio-websockets-simd"
+    };
+}
+
+#[cfg(not(feature = "simd"))]
+macro_rules! agent {
+    () => {
+        "tokio-websockets"
+    };
 }
 
 async fn get_case_count() -> Result<u32, Error> {
@@ -37,11 +32,8 @@ async fn get_case_count() -> Result<u32, Error> {
 }
 
 async fn update_reports() -> Result<(), Error> {
-    let uri = Uri::from_str(&format!(
-        "ws://localhost:9001/updateReports?agent={}",
-        get_agent()
-    ))
-    .unwrap();
+    let uri_str = concat!("ws://localhost:9001/updateReports?agent=", agent!());
+    let uri = Uri::from_static(uri_str);
     let (mut stream, _) = ClientBuilder::from_uri(uri)
         .connector(&Connector::Plain)
         .connect()
@@ -55,17 +47,14 @@ async fn update_reports() -> Result<(), Error> {
 async fn run_test(case: u32) -> Result<(), Error> {
     println!("Running test case {case}");
 
-    let fail_fast_on_invalid_utf8 = std::env::var("SKIP_FAIL_FAST").is_err();
-
     let uri = Uri::from_str(&format!(
         "ws://localhost:9001/runCase?case={}&agent={}",
         case,
-        get_agent()
+        agent!()
     ))
     .unwrap();
 
     let (mut stream, _) = ClientBuilder::from_uri(uri)
-        .fail_fast_on_invalid_utf8(fail_fast_on_invalid_utf8)
         .limits(Limits::unlimited())
         .connector(&Connector::Plain)
         .connect()

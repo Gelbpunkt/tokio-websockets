@@ -642,23 +642,14 @@ where
 {
     /// Create a new [`WebsocketStream`] from a raw stream.
     #[cfg(any(feature = "client", feature = "server"))]
-    pub(crate) fn from_raw_stream(
-        stream: T,
-        role: Role,
-        limits: Limits,
-        fail_fast_on_invalid_utf8: bool,
-    ) -> Self {
+    pub(crate) fn from_raw_stream(stream: T, role: Role, limits: Limits) -> Self {
         Self {
             inner: WebsocketProtocol {
                 role,
                 limits,
                 state: StreamState::Active,
                 payload_in: 0,
-                utf8_valid_up_to: if fail_fast_on_invalid_utf8 {
-                    Some(0)
-                } else {
-                    None
-                },
+                utf8_valid_up_to: 0,
             }
             .framed(stream),
             partial_payload: BytesMut::new(),
@@ -672,23 +663,14 @@ where
     /// Create a new [`WebsocketStream`] from an existing [`Framed`]. This
     /// allows for reusing the internal buffer of the [`Framed`] object.
     #[cfg(any(feature = "client", feature = "server"))]
-    pub(crate) fn from_framed<U>(
-        framed: Framed<T, U>,
-        role: Role,
-        limits: Limits,
-        fail_fast_on_invalid_utf8: bool,
-    ) -> Self {
+    pub(crate) fn from_framed<U>(framed: Framed<T, U>, role: Role, limits: Limits) -> Self {
         Self {
             inner: framed.map_codec(|_| WebsocketProtocol {
                 role,
                 limits,
                 state: StreamState::Active,
                 payload_in: 0,
-                utf8_valid_up_to: if fail_fast_on_invalid_utf8 {
-                    Some(0)
-                } else {
-                    None
-                },
+                utf8_valid_up_to: 0,
             }),
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
@@ -941,8 +923,7 @@ struct WebsocketProtocol {
     /// Length of the processed (unmasked) part of the payload.
     payload_in: usize,
     /// Index up to which the payload was validated to be valid UTF-8.
-    /// `None` if the UTF-8 validation on partial frames is disabled.
-    utf8_valid_up_to: Option<usize>,
+    utf8_valid_up_to: usize,
 }
 
 impl Encoder<Message> for WebsocketProtocol {
@@ -1148,49 +1129,47 @@ impl Decoder for WebsocketProtocol {
 
             if bytes_missing > 0 {
                 // If data is missing, we might have to fail fast on invalid UTF8
-                if let Some(utf8_valid_up_to) = &mut self.utf8_valid_up_to {
-                    if opcode == OpCode::Text {
-                        let to_read = data_available - self.payload_in;
+                if opcode == OpCode::Text {
+                    let to_read = data_available - self.payload_in;
 
-                        // Data might be masked, so unmask it here
-                        if mask {
-                            let unmasked_until = offset + self.payload_in;
+                    // Data might be masked, so unmask it here
+                    if mask {
+                        let unmasked_until = offset + self.payload_in;
 
-                            // SAFETY: The masking key and the payload do not overlap in src
-                            // TODO: Replace with split_at_mut_unchecked when stable
-                            let (masking_key, to_unmask) = unsafe {
-                                let masking_key_ptr =
-                                    src.get_unchecked(offset - 4..offset) as *const [u8];
-                                let to_unmask_ptr = src
-                                    .get_unchecked_mut(unmasked_until..unmasked_until + to_read)
-                                    as *mut [u8];
+                        // SAFETY: The masking key and the payload do not overlap in src
+                        // TODO: Replace with split_at_mut_unchecked when stable
+                        let (masking_key, to_unmask) = unsafe {
+                            let masking_key_ptr =
+                                src.get_unchecked(offset - 4..offset) as *const [u8];
+                            let to_unmask_ptr = src
+                                .get_unchecked_mut(unmasked_until..unmasked_until + to_read)
+                                as *mut [u8];
 
-                                (&*masking_key_ptr, &mut *to_unmask_ptr)
-                            };
+                            (&*masking_key_ptr, &mut *to_unmask_ptr)
+                        };
 
-                            mask::frame(masking_key, to_unmask, self.payload_in & 3);
-                        }
-
-                        self.payload_in = data_available;
-
-                        // SAFETY: offset + utf8_valid_up_to is the index until which utf8 was
-                        // validated for this frame and therefore guaranteed to be in bounds.
-                        // self.payload_in is data_available, which is at most src.len()
-                        let (should_fail, valid_up_to) = utf8::should_fail_fast(
-                            unsafe {
-                                src.get_unchecked(
-                                    offset + *utf8_valid_up_to..offset + self.payload_in,
-                                )
-                            },
-                            false,
-                        );
-
-                        if should_fail {
-                            return Err(Error::Protocol(ProtocolError::InvalidUtf8));
-                        }
-
-                        *utf8_valid_up_to += valid_up_to;
+                        mask::frame(masking_key, to_unmask, self.payload_in & 3);
                     }
+
+                    self.payload_in = data_available;
+
+                    // SAFETY: offset + utf8_valid_up_to is the index until which utf8 was
+                    // validated for this frame and therefore guaranteed to be in bounds.
+                    // self.payload_in is data_available, which is at most src.len()
+                    let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                        unsafe {
+                            src.get_unchecked(
+                                offset + self.utf8_valid_up_to..offset + self.payload_in,
+                            )
+                        },
+                        false,
+                    );
+
+                    if should_fail {
+                        return Err(Error::Protocol(ProtocolError::InvalidUtf8));
+                    }
+
+                    self.utf8_valid_up_to += valid_up_to;
                 }
 
                 src.reserve(bytes_missing);
@@ -1223,11 +1202,10 @@ impl Decoder for WebsocketProtocol {
             }
 
             if fin && opcode == OpCode::Text {
-                let utf8_valid_up_to = self.utf8_valid_up_to.unwrap_or_default();
                 // SAFETY: offset + utf8_valid_up_to is the index until which utf8 was
                 // validated for this frame and therefore guaranteed to be in bounds.
                 utf8::parse_str(unsafe {
-                    src.get_unchecked(offset + utf8_valid_up_to..offset + payload_length)
+                    src.get_unchecked(offset + self.utf8_valid_up_to..offset + payload_length)
                 })?;
             }
         }
@@ -1238,10 +1216,7 @@ impl Decoder for WebsocketProtocol {
         let payload = src.split_to(payload_length).freeze();
 
         self.payload_in = 0;
-
-        if let Some(valid_up_to) = &mut self.utf8_valid_up_to {
-            *valid_up_to = 0;
-        };
+        self.utf8_valid_up_to = 0;
 
         let frame = Frame {
             opcode,

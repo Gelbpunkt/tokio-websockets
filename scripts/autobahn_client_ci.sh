@@ -21,8 +21,3 @@ sleep 3
 target/x86_64-unknown-linux-gnu/release/examples/autobahn_client
 target/x86_64-unknown-linux-gnu/release/examples/autobahn_client_simd
 tokio-tungstenite/target/x86_64-unknown-linux-gnu/release/examples/autobahn-client
-
-export SKIP_FAIL_FAST=1
-
-target/x86_64-unknown-linux-gnu/release/examples/autobahn_client
-target/x86_64-unknown-linux-gnu/release/examples/autobahn_client_simd
