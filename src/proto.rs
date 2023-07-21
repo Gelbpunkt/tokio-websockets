@@ -863,7 +863,13 @@ where
                     self.inner.codec_mut().state = StreamState::CloseAcknowledged;
                 }
             },
-            OpCode::Ping if matches!(self.inner.codec().state, StreamState::Active) => {
+            OpCode::Ping
+                if matches!(self.inner.codec().state, StreamState::Active)
+                    && !self
+                        .pending_message
+                        .as_ref()
+                        .map_or(false, Message::is_close) =>
+            {
                 let mut msg = message.clone();
                 msg.opcode = OpCode::Pong;
 
