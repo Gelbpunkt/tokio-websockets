@@ -773,31 +773,6 @@ where
 
         Poll::Ready(Some(Ok((opcode, payload))))
     }
-
-    /// Attempts to write a message to the sink immediately. If if can't be done
-    /// immediately, it is queued for sending later.
-    fn try_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        message: Message,
-    ) -> Result<(), Error> {
-        // Make sure that the sink can be written to
-        if self.as_mut().poll_ready(cx).is_pending() {
-            // Postpone it
-            self.pending_message = Some(message);
-            return Ok(());
-        }
-
-        // Encode it into the buffer
-        self.as_mut().start_send(message)?;
-
-        // Attempt to flush, and postpone it if pending
-        if self.as_mut().poll_flush(cx).is_pending() {
-            self.needs_flush = true;
-        }
-
-        Ok(())
-    }
 }
 
 impl<T> Stream for WebsocketStream<T>
@@ -853,11 +828,7 @@ where
             Some(Err(e)) => {
                 if matches!(self.inner.codec().state, StreamState::Active) {
                     if let Error::Protocol(protocol) = &e {
-                        let close_msg = protocol.into();
-
-                        if let Err(e) = self.try_write(cx, close_msg) {
-                            return Poll::Ready(Some(Err(e)));
-                        };
+                        self.pending_message = Some(protocol.into());
                     }
                 }
 
@@ -870,11 +841,7 @@ where
             Ok(msg) => msg,
             Err(e) => {
                 if matches!(self.inner.codec().state, StreamState::Active) {
-                    let close_msg = Message::from(&e);
-
-                    if let Err(e) = self.try_write(cx, close_msg) {
-                        return Poll::Ready(Some(Err(e)));
-                    };
+                    self.pending_message = Some(Message::from(&e));
                 }
 
                 return Poll::Ready(Some(Err(Error::Protocol(e))));
@@ -885,9 +852,7 @@ where
             OpCode::Close => match self.inner.codec().state {
                 StreamState::Active => {
                     self.inner.codec_mut().state = StreamState::ClosedByPeer;
-                    if let Err(e) = self.try_write(cx, message.clone()) {
-                        return Poll::Ready(Some(Err(e)));
-                    };
+                    self.pending_message = Some(message.clone());
                 }
                 // SAFETY: match statement at the start of the method ensures that this is not the
                 // case
@@ -902,9 +867,7 @@ where
                 let mut msg = message.clone();
                 msg.opcode = OpCode::Pong;
 
-                if let Err(e) = self.try_write(cx, msg) {
-                    return Poll::Ready(Some(Err(e)));
-                };
+                self.pending_message = Some(msg);
             }
             _ => {}
         }
@@ -938,9 +901,7 @@ where
                 .as_ref()
                 .map_or(false, Message::is_close)
         {
-            ready!(self.as_mut().poll_ready(cx))?;
-            self.as_mut().start_send(Message::close(None, None))?;
-            self.needs_flush = true;
+            self.pending_message = Some(Message::close(None, None));
         }
         while ready!(self.as_mut().poll_next(cx)).is_some() {}
         Poll::Ready(Ok(()))
