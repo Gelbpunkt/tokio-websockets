@@ -787,11 +787,11 @@ where
                 ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
                 // SAFETY: arm is only taken until the pending close message is encoded
                 let item = unsafe { self.pending_message.take().unwrap_unchecked() };
-                self.as_mut().start_send(item)?;
+                Pin::new(&mut self.inner).start_send(item)?;
                 if self.inner.codec().role == Role::Server {
                     ready!(Pin::new(&mut self.inner).poll_close(cx))?;
                 } else {
-                    ready!(self.poll_flush(cx))?;
+                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
                 }
                 return Poll::Ready(None);
             }
@@ -799,7 +799,7 @@ where
                 if self.inner.codec().role == Role::Server {
                     ready!(Pin::new(&mut self.inner).poll_close(cx))?;
                 } else {
-                    ready!(self.poll_flush(cx))?;
+                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
                 }
                 return Poll::Ready(None);
             }
