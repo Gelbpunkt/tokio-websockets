@@ -6,8 +6,6 @@ function cleanup() {
     kill -9 ${WSSERVER1_PID} || true
     kill -9 ${WSSERVER2_PID} || true
     kill -9 ${WSSERVER3_PID} || true
-    kill -9 ${WSSERVER4_PID} || true
-    kill -9 ${WSSERVER5_PID} || true
 }
 
 trap cleanup TERM EXIT
@@ -15,11 +13,6 @@ trap cleanup TERM EXIT
 target/x86_64-unknown-linux-gnu/release/examples/autobahn_server & WSSERVER1_PID=$!
 target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_simd & WSSERVER2_PID=$!
 tokio-tungstenite/target/x86_64-unknown-linux-gnu/release/examples/autobahn-server & WSSERVER3_PID=$!
-
-export SKIP_FAIL_FAST=1
-
-target/x86_64-unknown-linux-gnu/release/examples/autobahn_server & WSSERVER4_PID=$!
-target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_simd & WSSERVER5_PID=$!
 
 sleep 3
 

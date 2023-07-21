@@ -6,16 +6,8 @@
             "url": "ws://127.0.0.1:9006"
         },
         {
-            "agent": "tokio-websockets-skip-fail-fast",
-            "url": "ws://127.0.0.1:9003"
-        },
-        {
-            "agent": "tokio-websockets-avx2",
+            "agent": "tokio-websockets-simd",
             "url": "ws://127.0.0.1:9004"
-        },
-        {
-            "agent": "tokio-websockets-avx2-skip-fail-fast",
-            "url": "ws://127.0.0.1:9005"
         },
         {
             "agent": "tokio-tungstenite",
