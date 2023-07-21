@@ -914,9 +914,11 @@ where
                         return Poll::Ready(Some(Err(e)));
                     };
                 }
-                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => {
-                    return Poll::Ready(None)
-                }
+                // SAFETY: match statement at the start of the method ensures that this is not the
+                // case
+                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => unsafe {
+                    unreachable_unchecked()
+                },
                 StreamState::ClosedByUs => {
                     self.inner.codec_mut().state = StreamState::CloseAcknowledged;
                 }
