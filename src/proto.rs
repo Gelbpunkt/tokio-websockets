@@ -810,17 +810,10 @@ where
             // SAFETY: We just ensured that the pending message is some
             let item = unsafe { self.pending_message.take().unwrap_unchecked() };
             self.as_mut().start_send(item)?;
-
-            self.needs_flush = true;
         }
 
         if self.needs_flush {
-            // We will try flush again on the next invocation if it is pending
-            match self.as_mut().poll_flush(cx) {
-                Poll::Ready(Ok(_)) => self.needs_flush = false,
-                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
-                Poll::Pending => {}
-            }
+            _ = self.as_mut().poll_flush(cx)?;
         }
 
         let (opcode, payload) = match ready!(self.as_mut().poll_read_next_message(cx)) {
@@ -899,11 +892,19 @@ where
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
-        Pin::new(&mut self.inner).start_send(item)
+        Pin::new(&mut self.inner).start_send(item)?;
+        self.needs_flush = true;
+
+        Ok(())
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
+        let res = Pin::new(&mut self.inner).poll_flush(cx);
+        if let Poll::Ready(Ok(())) = res {
+            self.needs_flush = false;
+        }
+
+        res
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
