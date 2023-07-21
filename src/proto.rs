@@ -880,12 +880,14 @@ where
         let (opcode, payload) = match ready!(self.as_mut().poll_read_next_message(cx)) {
             Some(Ok((opcode, payload))) => (opcode, payload),
             Some(Err(e)) => {
-                if let Error::Protocol(protocol) = &e {
-                    let close_msg = protocol.into();
+                if matches!(self.inner.codec().state, StreamState::Active) {
+                    if let Error::Protocol(protocol) = &e {
+                        let close_msg = protocol.into();
 
-                    if let Err(e) = self.try_write(cx, close_msg) {
-                        return Poll::Ready(Some(Err(e)));
-                    };
+                        if let Err(e) = self.try_write(cx, close_msg) {
+                            return Poll::Ready(Some(Err(e)));
+                        };
+                    }
                 }
 
                 return Poll::Ready(Some(Err(e)));
@@ -896,11 +898,13 @@ where
         let message = match Message::from_raw(opcode, payload) {
             Ok(msg) => msg,
             Err(e) => {
-                let close_msg = Message::from(&e);
+                if matches!(self.inner.codec().state, StreamState::Active) {
+                    let close_msg = Message::from(&e);
 
-                if let Err(e) = self.try_write(cx, close_msg) {
-                    return Poll::Ready(Some(Err(e)));
-                };
+                    if let Err(e) = self.try_write(cx, close_msg) {
+                        return Poll::Ready(Some(Err(e)));
+                    };
+                }
 
                 return Poll::Ready(Some(Err(Error::Protocol(e))));
             }
