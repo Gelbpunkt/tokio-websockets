@@ -953,6 +953,15 @@ where
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if matches!(self.inner.codec().state, StreamState::Active)
+            && !self
+                .pending_message
+                .as_ref()
+                .map_or(false, Message::is_close)
+        {
+            ready!(self.as_mut().poll_ready(cx))?;
+            self.as_mut().start_send(Message::close(None, None))?;
+        }
         Pin::new(&mut self.inner).poll_close(cx)
     }
 }
