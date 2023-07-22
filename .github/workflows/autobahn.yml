@@ -31,9 +31,16 @@ jobs:
           mv target/x86_64-unknown-linux-gnu/release/examples/autobahn_client target/x86_64-unknown-linux-gnu/release/examples/autobahn_client_simd
           mv target/x86_64-unknown-linux-gnu/release/examples/autobahn_server target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_simd
 
-      - name: Build tokio-websockets (no SIMD) and tokio-tungstenite
+      - name: Build tokio-websockets (no SIMD)
         run: |
           cargo build --release --examples
+
+      - name: Build tokio-tungstenite
+        run: |
+          git clone https://github.com/snapview/tokio-tungstenite.git
+          cd tokio-tungstenite
+          cargo build --release --examples
+          cd ..
 
       - name: Run testsuite
         run: |
