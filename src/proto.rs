@@ -841,7 +841,10 @@ where
             OpCode::Close => match self.inner.codec().state {
                 StreamState::Active => {
                     self.inner.codec_mut().state = StreamState::ClosedByPeer;
-                    self.pending_message = Some(message.clone());
+                    let mut msg = message.clone();
+                    msg.data.truncate(2);
+
+                    self.pending_message = Some(msg);
                 }
                 // SAFETY: match statement at the start of the method ensures that this is not the
                 // case
