@@ -14,7 +14,7 @@ trap cleanup TERM EXIT
 
 target/x86_64-unknown-linux-gnu/release/examples/autobahn_server & WSSERVER1_PID=$!
 target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_simd & WSSERVER2_PID=$!
-target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_tungstenite & WSSERVER3_PID=$!
+tokio-tungstenite/target/x86_64-unknown-linux-gnu/release/examples/autobahn-server & WSSERVER3_PID=$!
 
 export SKIP_FAIL_FAST=1
 

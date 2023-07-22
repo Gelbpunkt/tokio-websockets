@@ -40,8 +40,6 @@ jobs:
           git clone https://github.com/snapview/tokio-tungstenite.git
           cd tokio-tungstenite
           cargo build --release --examples
-          mv target/${CARGO_BUILD_TARGET}/release/examples/autobahn-client ../target/x86_64-unknown-linux-gnu/release/examples/autobahn_client_tungstenite
-          mv target/${CARGO_BUILD_TARGET}/release/examples/autobahn-server ../target/x86_64-unknown-linux-gnu/release/examples/autobahn_server_tungstenite
           cd ..
 
       - name: Run testsuite
