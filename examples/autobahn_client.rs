@@ -89,7 +89,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
     let total = get_case_count().await?;
     println!("Running {total} tests");

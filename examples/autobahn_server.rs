@@ -51,7 +51,7 @@ async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let addr: SocketAddr = ([127, 0, 0, 1], get_port()).into();
     let listener = TcpListener::bind(&addr).await.expect("Can't listen");
