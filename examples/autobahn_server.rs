@@ -18,7 +18,7 @@ fn get_port() -> u16 {
         if std::env::var("SKIP_FAIL_FAST").is_ok() {
             9003
         } else {
-            9002
+            9006
         }
     }
 }
