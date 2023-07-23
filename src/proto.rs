@@ -1033,12 +1033,12 @@ impl Encoder<Message> for WebsocketProtocol {
     }
 }
 
-/// Macro that returns with `Ok(None)` early and reserves missing space if not
-/// enough bytes are in a specified buffer.
+/// Macro that returns `Ok(None)` early and reserves missing capacity if buf is
+/// not large enough.
 macro_rules! ensure_buffer_has_space {
     ($buf:expr, $space:expr) => {
         if $buf.len() < $space {
-            $buf.reserve($space);
+            $buf.reserve(($space as usize).saturating_sub($buf.capacity()));
 
             return Ok(None);
         }
