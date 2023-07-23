@@ -429,7 +429,7 @@ impl Message {
     /// [`CloseCode`] must be specified for it to be included.
     #[must_use]
     pub fn close(code: Option<CloseCode>, reason: &str) -> Self {
-        let mut data = BytesMut::new();
+        let mut data = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
 
         if let Some(code) = code {
             data.put_u16(code.into());
