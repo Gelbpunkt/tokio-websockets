@@ -354,6 +354,12 @@ pub struct Message {
 }
 
 impl Message {
+    /// Default close message.
+    const DEFAULT_CLOSE: Self = Self {
+        opcode: OpCode::Close,
+        data: Bytes::from_static(&1000_u16.to_be_bytes()),
+    };
+
     /// Assembles and verifies a message from raw message payload and
     /// [`OpCode`].
     ///
@@ -913,7 +919,7 @@ where
                 .as_ref()
                 .map_or(false, Message::is_close)
         {
-            self.pending_message = Some(Message::close(None, ""));
+            self.pending_message = Some(Message::DEFAULT_CLOSE);
         }
         while ready!(self.as_mut().poll_next(cx)).is_some() {}
         Poll::Ready(Ok(()))

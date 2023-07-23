@@ -31,10 +31,6 @@ async fn get_case_count() -> Result<u32, Error> {
         .await?;
     let msg = stream.next().await.unwrap()?;
 
-    stream
-        .feed(Message::close(Some(CloseCode::NormalClosure), ""))
-        .await
-        .unwrap();
     stream.close().await.unwrap();
 
     Ok(msg.as_text().unwrap().parse::<u32>().unwrap())
@@ -51,9 +47,6 @@ async fn update_reports() -> Result<(), Error> {
         .connect()
         .await?;
 
-    stream
-        .feed(Message::close(Some(CloseCode::NormalClosure), ""))
-        .await?;
     stream.close().await?;
 
     Ok(())
