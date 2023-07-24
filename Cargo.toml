@@ -48,13 +48,13 @@ openssl = { version = "0.10", default-features = false, optional = true }
 
 [features]
 default = ["client", "fastrand", "server", "sha1_smol"]
-client = ["base64", "http", "httparse"]
-http-integration = ["http-body"]
-server = ["base64", "http", "httparse"]
-simd = ["simdutf8"]
-native-tls = ["tokio-native-tls"]
-rustls-webpki-roots = ["tokio-rustls", "ring", "webpki", "webpki-roots"]
-rustls-native-roots = ["tokio-rustls", "ring", "rustls-native-certs"]
+client = ["dep:base64", "dep:http", "dep:httparse"]
+http-integration = ["dep:http-body"]
+server = ["dep:base64", "dep:http", "dep:httparse"]
+simd = ["dep:simdutf8"]
+native-tls = ["dep:tokio-native-tls"]
+rustls-webpki-roots = ["dep:tokio-rustls", "ring", "dep:webpki", "dep:webpki-roots"]
+rustls-native-roots = ["dep:tokio-rustls", "ring", "dep:rustls-native-certs"]
 
 [dev-dependencies]
 futures-util = { version = "0.3.14", default-features = false, features = ["sink"] }
