@@ -17,14 +17,13 @@ use std::{
 };
 
 use bytes::{BufMut, Bytes, BytesMut};
-use tokio_websockets::OpCode;
 
 const DELIMITER: char = '+';
 
 // No-op mask
 const MASK: [u8; 4] = [0, 0, 0, 0];
 
-fn encode_message(opcode: OpCode, data: Vec<u8>, frame_size: usize) -> Bytes {
+fn encode_message(data: Vec<u8>, frame_size: usize) -> Bytes {
     let mut dst = BytesMut::new();
 
     let mut chunks = data.chunks(frame_size).peekable();
@@ -32,15 +31,10 @@ fn encode_message(opcode: OpCode, data: Vec<u8>, frame_size: usize) -> Bytes {
     let mut chunk_number = 0;
 
     while let Some(chunk) = next_chunk {
-        let frame_opcode = if chunk_number == 0 {
-            opcode
-        } else {
-            OpCode::Continuation
-        };
+        let opcode_value = if chunk_number == 0 { 1 } else { 0 };
 
         let is_final = chunks.peek().is_none();
         let chunk_size = chunk.len();
-        let opcode_value: u8 = frame_opcode.into();
 
         let initial_byte = (u8::from(is_final) << 7) + opcode_value;
 
@@ -86,7 +80,7 @@ fn main() -> io::Result<()> {
         .collect();
     payload.push(DELIMITER);
 
-    let encoded_message = encode_message(OpCode::Text, payload.into_bytes(), frame_size);
+    let encoded_message = encode_message(payload.into_bytes(), frame_size);
 
     // We use Unix sockets because they are a lot faster than TCP and have no
     // buffering
