@@ -2,73 +2,68 @@
 //! `simd` feature is enabled, otherwise fall back to [`std`] equivalents.
 use crate::proto::ProtocolError;
 
-/// Attempts to parse an input of bytes as a UTF-8 string with SIMD
-/// acceleration.
+/// Converts a slice of bytes to a string slice with SIMD acceleration.
 ///
 /// # Errors
 ///
-/// This method returns a [`ProtocolError`] if the input is invalid UTF-8.
+/// Returns a [`ProtocolError`] if the input is invalid UTF-8.
 #[cfg(feature = "simd")]
 #[inline]
 pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
-    match simdutf8::basic::from_utf8(input) {
-        Ok(string) => Ok(string),
-        Err(_) => Err(ProtocolError::InvalidUtf8),
-    }
+    simdutf8::basic::from_utf8(input).map_err(|_| ProtocolError::InvalidUtf8)
 }
 
-/// Attempts to parse an input of bytes as a UTF-8 string.
+/// Converts a slice of bytes to a string slice.
 ///
 /// # Errors
 ///
-/// This method returns a [`ProtocolError`] if the input is invalid UTF-8.
+/// Returns a [`ProtocolError`] if the input is invalid UTF-8.
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
-    Ok(std::str::from_utf8(input)?)
+    std::str::from_utf8(input).map_err(|_| ProtocolError::InvalidUtf8)
 }
 
-/// Attempts to parse an input of bytes as a partial UTF-8 string with SIMD
-/// acceleration.
+/// Retrieve the index of the last valid UTF-8 codepoint with SIMD acceleration.
 ///
-/// The return type is a tuple with a boolean indicating whether the input is
-/// invalid UTF-8 up to this point and the index of the last valid UTF-8
-/// codepoint byte.
+/// # Errors
+///
+/// Returns [`ProtocolError`] if the input is invalid UTF-8 or if the input is
+/// complete but did ended on a partial codepoint.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn should_fail_fast(input: &[u8], is_complete: bool) -> (bool, usize) {
+pub fn should_fail_fast(input: &[u8], is_complete: bool) -> Result<usize, ProtocolError> {
     // We only need the extra info about the valid codepoints if the frame is
     // incomplete
     if is_complete {
         if simdutf8::basic::from_utf8(input).is_ok() {
-            (false, input.len())
+            Ok(input.len())
         } else {
-            (true, 0)
+            Err(ProtocolError::InvalidUtf8)
         }
     } else {
         match simdutf8::compat::from_utf8(input) {
-            Ok(_) => (false, input.len()),
-            Err(utf8_error) => (utf8_error.error_len().is_some(), utf8_error.valid_up_to()),
+            Ok(_) => Ok(input.len()),
+            Err(utf8_error) if utf8_error.error_len().is_some() => Err(ProtocolError::InvalidUtf8),
+            Err(utf8_error) => Ok(utf8_error.valid_up_to()),
         }
     }
 }
 
-/// Attempts to parse an input of bytes as a partial UTF-8 string.
+/// Retrieve the index of the last valid UTF-8 codepoint.
 ///
-/// The return type is a tuple with a boolean indicating whether the input is
-/// invalid UTF-8 up to this point and the index of the last valid UTF-8
-/// codepoint byte.
+/// # Errors
+///
+/// Returns [`ProtocolError`] if the input is invalid UTF-8 or if the input is
+/// complete but did ended on a partial codepoint.
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn should_fail_fast(input: &[u8], is_complete: bool) -> (bool, usize) {
+pub fn should_fail_fast(input: &[u8], is_complete: bool) -> Result<usize, ProtocolError> {
     match std::str::from_utf8(input) {
-        Ok(_) => (false, input.len()),
-        Err(utf8_error) => {
-            if is_complete {
-                (true, 0)
-            } else {
-                (utf8_error.error_len().is_some(), utf8_error.valid_up_to())
-            }
+        Ok(_) => Ok(input.len()),
+        Err(utf8_error) if utf8_error.error_len().is_some() || is_complete => {
+            Err(ProtocolError::InvalidUtf8)
         }
+        Err(utf8_error) => Ok(utf8_error.valid_up_to()),
     }
 }

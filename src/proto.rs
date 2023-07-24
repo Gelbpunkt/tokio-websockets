@@ -733,16 +733,10 @@ where
             if self.partial_opcode == OpCode::Text {
                 // SAFETY: self.utf8_valid_up_to is an index in self.partial_payload and cannot
                 // exceed its length
-                let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                self.utf8_valid_up_to += utf8::should_fail_fast(
                     unsafe { self.partial_payload.get_unchecked(self.utf8_valid_up_to..) },
                     frame.is_final,
-                );
-
-                if should_fail {
-                    return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::InvalidUtf8))));
-                }
-
-                self.utf8_valid_up_to += valid_up_to;
+                )?;
             }
 
             if frame.is_final {
@@ -1156,20 +1150,14 @@ impl Decoder for WebsocketProtocol {
                     // SAFETY: offset + utf8_valid_up_to is the index until which utf8 was
                     // validated for this frame and therefore guaranteed to be in bounds.
                     // self.payload_in is data_available, which is at most src.len()
-                    let (should_fail, valid_up_to) = utf8::should_fail_fast(
+                    self.utf8_valid_up_to += utf8::should_fail_fast(
                         unsafe {
                             src.get_unchecked(
                                 offset + self.utf8_valid_up_to..offset + self.payload_in,
                             )
                         },
                         false,
-                    );
-
-                    if should_fail {
-                        return Err(Error::Protocol(ProtocolError::InvalidUtf8));
-                    }
-
-                    self.utf8_valid_up_to += valid_up_to;
+                    )?;
                 }
 
                 src.reserve(bytes_missing);
