@@ -6,7 +6,7 @@ pub(crate) mod client_request;
 #[cfg(feature = "client")]
 pub(crate) mod server_response;
 
-/// A parsed HTTP/1.1 101 Swiching Protocols response.
+/// A parsed HTTP/1.1 101 Switching Protocols response.
 /// These responses typically do not contain a body, therefore it is omitted.
 #[cfg(feature = "client")]
 pub type Response = http::Response<()>;

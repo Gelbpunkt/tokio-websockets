@@ -35,7 +35,7 @@ TLS support is supported via any of the following feature flags:
 One SHA1 implementation is required, usually provided by the TLS implementation:
 
 - [`ring`](https://docs.rs/ring/latest/ring/) is used if `rustls` is the TLS library
-- The `openssl` feature will use [`openssl`](https://docs.rs/openssl/latest/openssl/), usually prefered on most Linux/BSD systems with `native-tls`
+- The `openssl` feature will use [`openssl`](https://docs.rs/openssl/latest/openssl/), usually preferred on most Linux/BSD systems with `native-tls`
 - The [`sha1_smol`](https://docs.rs/sha1_smol/latest/sha1_smol/) feature can be used as a fallback if no TLS is needed
 
 The `client` feature requires enabling one random number generator:

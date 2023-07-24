@@ -996,7 +996,7 @@ impl Encoder<Message> for WebsocketProtocol {
             if let Some(mask) = mask {
                 let start_of_data = dst.len() - chunk.len();
                 // SAFETY: We called dst.extend_from_slice(chunk), so start_of_data is an index
-                // in dst, to be exact, the lenth of dst before the extend_from_slice call
+                // in dst, to be exact, the length of dst before the extend_from_slice call
                 mask::frame(&mask, unsafe { dst.get_unchecked_mut(start_of_data..) }, 0);
             }
 

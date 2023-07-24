@@ -29,7 +29,7 @@ pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
 /// # Errors
 ///
 /// Returns [`ProtocolError`] if the input is invalid UTF-8 or if the input is
-/// complete but did ended on a partial codepoint.
+/// complete but did end on a partial codepoint.
 #[cfg(feature = "simd")]
 #[inline]
 pub fn should_fail_fast(input: &[u8], is_complete: bool) -> Result<usize, ProtocolError> {
@@ -55,7 +55,7 @@ pub fn should_fail_fast(input: &[u8], is_complete: bool) -> Result<usize, Protoc
 /// # Errors
 ///
 /// Returns [`ProtocolError`] if the input is invalid UTF-8 or if the input is
-/// complete but did ended on a partial codepoint.
+/// complete but did end on a partial codepoint.
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn should_fail_fast(input: &[u8], is_complete: bool) -> Result<usize, ProtocolError> {
