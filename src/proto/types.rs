@@ -1,4 +1,6 @@
 //! Types required for the websocket protocol implementation.
+use std::{mem::replace, slice::Chunks};
+
 use bytes::{BufMut, Bytes, BytesMut};
 
 use super::error::ProtocolError;
@@ -230,11 +232,6 @@ impl Message {
         payload: Bytes::from_static(&1000_u16.to_be_bytes()),
     };
 
-    /// Returns the raw [`OpCode`] and payload of the message and consumes it.
-    pub(super) fn into_raw(self) -> (OpCode, Bytes) {
-        (self.opcode, self.payload)
-    }
-
     /// Create a new text message.
     #[must_use]
     pub fn text(payload: String) -> Self {
@@ -375,7 +372,7 @@ impl Message {
 
             let reason = if self.payload.len() > 2 {
                 // SAFETY: self.data.len() is greater or equal to 2
-                unsafe { std::str::from_utf8_unchecked(&self.payload.get_unchecked(2..)) }
+                unsafe { std::str::from_utf8_unchecked(self.payload.get_unchecked(2..)) }
             } else {
                 ""
             };
@@ -384,6 +381,45 @@ impl Message {
         } else {
             Err(ProtocolError::MessageHasWrongOpcode)
         }
+    }
+
+    /// Returns an iterator over frames of `frame_size` length to split this
+    /// message into.
+    pub(super) fn as_frames(&self, frame_size: usize) -> MessageFrames<'_> {
+        MessageFrames {
+            inner: self.payload.chunks(frame_size),
+            payload: &self.payload,
+            opcode: self.opcode,
+        }
+    }
+}
+
+/// Iterator over frames of a chunked message.
+pub(super) struct MessageFrames<'a> {
+    /// Iterator over payload chunks.
+    inner: Chunks<'a, u8>,
+    /// The full message payload this iterates over.
+    payload: &'a Bytes,
+    /// Opcode for the next frame.
+    opcode: OpCode,
+}
+
+impl Iterator for MessageFrames<'_> {
+    type Item = Frame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let chunk = if self.opcode == OpCode::Continuation {
+            self.inner.next()?
+        } else {
+            self.inner.next().unwrap_or_default()
+        };
+
+        Some(Frame {
+            opcode: replace(&mut self.opcode, OpCode::Continuation),
+            // TODO: Use ExactSizeIterator::is_empty when stable
+            is_final: self.inner.len() == 0,
+            payload: self.payload.slice_ref(chunk),
+        })
     }
 }
 

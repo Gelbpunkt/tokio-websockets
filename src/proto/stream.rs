@@ -22,6 +22,9 @@ use super::{
 };
 use crate::{utf8, Error};
 
+/// Outgoing messages are split into frames of this size.
+const FRAME_SIZE: usize = 4096;
+
 /// A websocket stream that full messages can be read from and written to.
 ///
 /// The stream implements [`futures_sink::Sink`] and [`futures_core::Stream`].
@@ -181,7 +184,9 @@ where
                 ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
                 // SAFETY: arm is only taken until the pending close message is encoded
                 let item = unsafe { self.pending_message.take().unwrap_unchecked() };
-                Pin::new(&mut self.inner).start_send(item)?;
+                for frame in item.as_frames(FRAME_SIZE) {
+                    Pin::new(&mut self.inner).start_send(frame)?;
+                }
                 if self.inner.codec().role == Role::Server {
                     ready!(Pin::new(&mut self.inner).poll_close(cx))?;
                 } else {
@@ -291,7 +296,11 @@ where
             }
         }
 
-        Pin::new(&mut self.inner).start_send(item)?;
+        // Chunk the message into frames
+        for frame in item.as_frames(FRAME_SIZE) {
+            Pin::new(&mut self.inner).start_send(frame)?;
+        }
+
         self.needs_flush = true;
 
         Ok(())
