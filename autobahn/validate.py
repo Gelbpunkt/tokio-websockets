@@ -9,12 +9,8 @@ def validate_report_json(json):
     for (client, cases) in json.items():
         if "tokio-websockets" not in client:
             continue # We do not care about other libraries' results
-        non_strict_allowed = "skip-fail-fast" in client
 
-        if non_strict_allowed:
-            allowed_behavior = ("OK", "INFORMATIONAL", "NON-STRICT", "UNIMPLEMENTED")
-        else:
-            allowed_behavior = ("OK", "INFORMATIONAL", "UNIMPLEMENTED")
+        allowed_behavior = ("OK", "INFORMATIONAL", "UNIMPLEMENTED")
 
         for (report, result) in cases.items():
             behavior = result["behavior"]
