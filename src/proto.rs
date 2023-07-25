@@ -360,48 +360,6 @@ impl Message {
         payload: Bytes::from_static(&1000_u16.to_be_bytes()),
     };
 
-    /// Assembles and verifies a message from raw message payload and
-    /// [`OpCode`].
-    ///
-    /// # Errors
-    ///
-    /// This method returns an [`Error`] if the message has a continuation
-    /// opcode or a disallowed close code.
-    fn from_raw(opcode: OpCode, payload: Bytes) -> Result<Self, ProtocolError> {
-        match opcode {
-            OpCode::Continuation => Err(ProtocolError::DisallowedOpcode),
-            OpCode::Text | OpCode::Binary | OpCode::Ping | OpCode::Pong => {
-                Ok(Self { opcode, payload })
-            }
-            OpCode::Close => {
-                if payload.is_empty() {
-                    Ok(Self { opcode, payload })
-                } else {
-                    // SAFETY: The Decoder ensures that close frames consist of at least two bytes
-                    // A conversion from two u8s to a u16 cannot fail.
-                    let close_code_value = u16::from_be_bytes(unsafe {
-                        payload.get_unchecked(0..2).try_into().unwrap_unchecked()
-                    });
-                    let close_code = CloseCode::try_from(close_code_value)?;
-
-                    // Verify that the close code is allowed
-                    if !close_code.is_allowed() {
-                        return Err(ProtocolError::DisallowedCloseCode);
-                    }
-
-                    // Verify that the reason is allowed
-                    if payload.len() > 2 {
-                        // SAFETY: The Decoder ensures that close frames consist of at least two
-                        // bytes
-                        utf8::parse_str(unsafe { payload.get_unchecked(2..) })?;
-                    }
-
-                    Ok(Self { opcode, payload })
-                }
-            }
-        }
-    }
-
     /// Returns the raw [`OpCode`] and payload of the message and consumes it.
     fn into_raw(self) -> (OpCode, Bytes) {
         (self.opcode, self.payload)
@@ -693,35 +651,35 @@ where
     fn poll_read_next_message(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<(OpCode, Bytes), Error>>> {
+    ) -> Poll<Option<Result<Message, Error>>> {
         loop {
-            let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
-                Some(Ok(frame)) => frame,
+            let (opcode, payload, fin) = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
+                Some(Ok(frame)) => (frame.opcode, frame.payload, frame.is_final),
                 Some(Err(e)) => return Poll::Ready(Some(Err(e))),
                 None => return Poll::Ready(None),
             };
 
             // Control frames are allowed in between other frames
-            if frame.opcode.is_control() {
-                return Poll::Ready(Some(Ok((frame.opcode, frame.payload))));
+            if opcode.is_control() {
+                return Poll::Ready(Some(Ok(Message { opcode, payload })));
             }
 
             if self.partial_opcode == OpCode::Continuation {
-                if frame.opcode == OpCode::Continuation {
+                if opcode == OpCode::Continuation {
                     return Poll::Ready(Some(Err(Error::Protocol(
                         ProtocolError::UnexpectedContinuation,
                     ))));
-                } else if frame.is_final {
-                    return Poll::Ready(Some(Ok((frame.opcode, frame.payload))));
+                } else if fin {
+                    return Poll::Ready(Some(Ok(Message { opcode, payload })));
                 }
 
-                self.partial_opcode = frame.opcode;
-            } else if frame.opcode != OpCode::Continuation {
+                self.partial_opcode = opcode;
+            } else if opcode != OpCode::Continuation {
                 return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage))));
             }
 
             if let Some(max_message_size) = self.inner.codec().limits.max_message_size {
-                let message_size = self.partial_payload.len() + frame.payload.len();
+                let message_size = self.partial_payload.len() + payload.len();
 
                 if message_size > max_message_size {
                     return Poll::Ready(Some(Err(Error::MessageTooLong {
@@ -731,18 +689,18 @@ where
                 }
             }
 
-            self.partial_payload.extend_from_slice(&frame.payload);
+            self.partial_payload.extend_from_slice(&payload);
 
             if self.partial_opcode == OpCode::Text {
                 // SAFETY: self.utf8_valid_up_to is an index in self.partial_payload and cannot
                 // exceed its length
                 self.utf8_valid_up_to += utf8::should_fail_fast(
                     unsafe { self.partial_payload.get_unchecked(self.utf8_valid_up_to..) },
-                    frame.is_final,
+                    fin,
                 )?;
             }
 
-            if frame.is_final {
+            if fin {
                 break;
             }
         }
@@ -752,7 +710,7 @@ where
 
         self.utf8_valid_up_to = 0;
 
-        Poll::Ready(Some(Ok((opcode, payload))))
+        Poll::Ready(Some(Ok(Message { opcode, payload })))
     }
 }
 
@@ -797,8 +755,8 @@ where
             _ = self.as_mut().poll_flush(cx)?;
         }
 
-        let (opcode, payload) = match ready!(self.as_mut().poll_read_next_message(cx)) {
-            Some(Ok((opcode, payload))) => (opcode, payload),
+        let message = match ready!(self.as_mut().poll_read_next_message(cx)) {
+            Some(Ok(msg)) => msg,
             Some(Err(e)) => {
                 if self.inner.codec().state == StreamState::Active {
                     if let Error::Protocol(protocol) = &e {
@@ -809,17 +767,6 @@ where
                 return Poll::Ready(Some(Err(e)));
             }
             None => return Poll::Ready(None),
-        };
-
-        let message = match Message::from_raw(opcode, payload) {
-            Ok(msg) => msg,
-            Err(e) => {
-                if self.inner.codec().state == StreamState::Active {
-                    self.pending_message = Some(Message::from(&e));
-                }
-
-                return Poll::Ready(Some(Err(Error::Protocol(e))));
-            }
         };
 
         match &message.opcode {
@@ -1177,6 +1124,23 @@ impl Decoder for WebsocketProtocol {
                 // SAFETY: self.payload_data_validated <= payload_length
                 utf8::parse_str(unsafe {
                     src.get_unchecked(offset + self.payload_data_validated..offset + payload_length)
+                })?;
+            } else if opcode == OpCode::Close {
+                // SAFETY: Close frames with a non-zero payload length are validated to not have
+                // a length of 1
+                // A conversion from two u8s to a u16 cannot fail
+                let code = CloseCode::try_from(u16::from_be_bytes(unsafe {
+                    src.get_unchecked(offset..offset + 2)
+                        .try_into()
+                        .unwrap_unchecked()
+                }))?;
+                if !code.is_allowed() {
+                    return Err(Error::Protocol(ProtocolError::DisallowedCloseCode));
+                }
+
+                // SAFETY: payload_length <= src.len()
+                let _reason = utf8::parse_str(unsafe {
+                    src.get_unchecked(offset + 2..offset + payload_length)
                 })?;
             }
         }
