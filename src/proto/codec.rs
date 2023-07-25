@@ -5,11 +5,8 @@ use std::hint::unreachable_unchecked;
 use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-use super::types::{Frame, Limits, Message, OpCode, Role};
+use super::types::{Frame, Limits, OpCode, Role};
 use crate::{mask, proto::ProtocolError, utf8, CloseCode, Error};
-
-/// Outgoing messages are split into frames of this size.
-const FRAME_SIZE: usize = 4096;
 
 /// The actual implementation of the websocket byte-level protocol.
 /// It provides an [`Encoder`] for entire [`Message`]s and a [`Decoder`] for
@@ -39,74 +36,58 @@ impl WebsocketProtocol {
     }
 }
 
-impl Encoder<Message> for WebsocketProtocol {
+impl Encoder<Frame> for WebsocketProtocol {
     type Error = Error;
 
     #[allow(clippy::cast_possible_truncation)]
-    fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let (opcode, data) = item.into_raw();
-        let mut chunks = data.chunks(FRAME_SIZE).peekable();
-        let mut next_chunk = Some(chunks.next().unwrap_or_default());
-        let mut chunk_number = 0;
-
-        while let Some(chunk) = next_chunk {
-            let frame_opcode = if chunk_number == 0 {
-                opcode
-            } else {
-                OpCode::Continuation
-            };
-
-            let is_final = chunks.peek().is_none();
-            let chunk_size = chunk.len();
-            let mask: Option<[u8; 4]> = if self.role == Role::Client {
-                #[cfg(feature = "client")]
-                {
-                    Some(crate::rand::get_mask())
-                }
-                #[cfg(not(feature = "client"))]
-                {
-                    // SAFETY: This allows for making the dependency on random generators
-                    // only required for clients, servers can avoid it entirely.
-                    // Since it is not possible to create a stream with client role
-                    // without the client builder (and that is locked behind the client feature),
-                    // this branch is impossible to reach.
-                    unsafe { std::hint::unreachable_unchecked() }
-                }
-            } else {
-                None
-            };
-            let mask_bit = 128 * u8::from(mask.is_some());
-            let opcode_value: u8 = frame_opcode.into();
-
-            let initial_byte = (u8::from(is_final) << 7) + opcode_value;
-
-            dst.put_u8(initial_byte);
-
-            if u16::try_from(chunk_size).is_err() {
-                dst.put_u8(127 + mask_bit);
-                dst.put_u64(chunk_size as u64);
-            } else if chunk_size > 125 {
-                dst.put_u8(126 + mask_bit);
-                dst.put_u16(chunk_size as u16);
-            } else {
-                dst.put_u8(chunk_size as u8 + mask_bit);
+    fn encode(&mut self, item: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let mask: Option<[u8; 4]> = if self.role == Role::Client {
+            #[cfg(feature = "client")]
+            {
+                Some(crate::rand::get_mask())
             }
-
-            if let Some(mask) = &mask {
-                dst.extend_from_slice(mask);
+            #[cfg(not(feature = "client"))]
+            {
+                // SAFETY: This allows for making the dependency on random generators
+                // only required for clients, servers can avoid it entirely.
+                // Since it is not possible to create a stream with client role
+                // without the client builder (and that is locked behind the client feature),
+                // this branch is impossible to reach.
+                unsafe { std::hint::unreachable_unchecked() }
             }
+        } else {
+            None
+        };
+        let mask_bit = 128 * u8::from(mask.is_some());
+        let opcode_value: u8 = item.opcode.into();
 
-            dst.extend_from_slice(chunk);
+        let initial_byte = (u8::from(item.is_final) << 7) + opcode_value;
 
-            if let Some(mask) = mask {
-                let start_of_data = dst.len() - chunk.len();
-                // SAFETY: We called dst.extend_from_slice(chunk), so start_of_data is an index
-                // in dst, to be exact, the length of dst before the extend_from_slice call
-                mask::frame(&mask, unsafe { dst.get_unchecked_mut(start_of_data..) }, 0);
-            }
+        dst.put_u8(initial_byte);
 
-            next_chunk = chunks.next();
-            chunk_number += 1;
+        let payload_len = item.payload.len();
+
+        if u16::try_from(payload_len).is_err() {
+            dst.put_u8(127 + mask_bit);
+            dst.put_u64(payload_len as u64);
+        } else if payload_len > 125 {
+            dst.put_u8(126 + mask_bit);
+            dst.put_u16(payload_len as u16);
+        } else {
+            dst.put_u8(payload_len as u8 + mask_bit);
+        }
+
+        if let Some(mask) = &mask {
+            dst.extend_from_slice(mask);
+        }
+
+        dst.extend_from_slice(&item.payload);
+
+        if let Some(mask) = mask {
+            let start_of_data = dst.len() - payload_len;
+            // SAFETY: We called dst.extend_from_slice(chunk), so start_of_data is an index
+            // in dst, to be exact, the length of dst before the extend_from_slice call
+            mask::frame(&mask, unsafe { dst.get_unchecked_mut(start_of_data..) }, 0);
         }
 
         Ok(())
