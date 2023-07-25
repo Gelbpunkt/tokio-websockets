@@ -442,10 +442,10 @@ impl From<&ProtocolError> for Message {
 pub struct Limits {
     /// The maximum allowed frame size. `None` equals no limit. The default is
     /// 16 MiB.
-    pub max_frame_size: Option<usize>,
+    pub(super) max_frame_size: Option<usize>,
     /// The maximum allowed message size. `None` equals no limit. The default is
     /// 64 MiB.
-    pub max_message_size: Option<usize>,
+    pub(super) max_message_size: Option<usize>,
 }
 
 impl Limits {
@@ -456,6 +456,24 @@ impl Limits {
             max_frame_size: None,
             max_message_size: None,
         }
+    }
+
+    /// Sets the maximum allowed frame size. `None` equals no limit. The default
+    /// is 16 MiB.
+    #[must_use]
+    pub fn max_frame_size(mut self, size: Option<usize>) -> Self {
+        self.max_frame_size = size;
+
+        self
+    }
+
+    /// Sets the maximum allowed message size. `None` equals no limit. The
+    /// default is 64 MiB.
+    #[must_use]
+    pub fn max_message_size(mut self, size: Option<usize>) -> Self {
+        self.max_message_size = size;
+
+        self
     }
 }
 
