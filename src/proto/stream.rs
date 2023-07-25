@@ -41,6 +41,9 @@ pub struct WebsocketStream<T> {
     /// full frames.
     inner: Framed<T, WebsocketProtocol>,
 
+    /// The [`StreamState`] of the current stream.
+    state: StreamState,
+
     /// Payload of the full message that is being assembled.
     partial_payload: BytesMut,
     /// Opcode of the full message that is being assembled.
@@ -68,6 +71,7 @@ where
 
         Self {
             inner: WebsocketProtocol::new(role, limits).framed(stream),
+            state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
@@ -82,6 +86,7 @@ where
     pub(crate) fn from_framed<U>(framed: Framed<T, U>, role: Role, limits: Limits) -> Self {
         Self {
             inner: framed.map_codec(|_| WebsocketProtocol::new(role, limits)),
+            state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
@@ -170,7 +175,7 @@ where
     type Item = Result<Message, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.inner.codec().state {
+        match self.state {
             StreamState::Active | StreamState::ClosedByUs => {}
             StreamState::ClosedByPeer => {
                 ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
@@ -207,7 +212,7 @@ where
         let message = match ready!(self.as_mut().poll_read_next_message(cx)) {
             Some(Ok(msg)) => msg,
             Some(Err(e)) => {
-                if self.inner.codec().state == StreamState::Active {
+                if self.state == StreamState::Active {
                     if let Error::Protocol(protocol) = &e {
                         self.pending_message = Some(protocol.into());
                     }
@@ -219,9 +224,9 @@ where
         };
 
         match &message.opcode {
-            OpCode::Close => match self.inner.codec().state {
+            OpCode::Close => match self.state {
                 StreamState::Active => {
-                    self.inner.codec_mut().state = StreamState::ClosedByPeer;
+                    self.state = StreamState::ClosedByPeer;
                     let mut msg = message.clone();
                     msg.payload.truncate(2);
 
@@ -233,11 +238,11 @@ where
                     unreachable_unchecked()
                 },
                 StreamState::ClosedByUs => {
-                    self.inner.codec_mut().state = StreamState::CloseAcknowledged;
+                    self.state = StreamState::CloseAcknowledged;
                 }
             },
             OpCode::Ping
-                if self.inner.codec().state == StreamState::Active
+                if self.state == StreamState::Active
                     && !self
                         .pending_message
                         .as_ref()
@@ -272,6 +277,20 @@ where
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
+        if !(self.state == StreamState::Active
+            || matches!(self.state, StreamState::ClosedByPeer if item.is_close()))
+        {
+            return Err(Error::AlreadyClosed);
+        }
+
+        if item.is_close() {
+            if self.state == StreamState::ClosedByPeer {
+                self.state = StreamState::CloseAcknowledged;
+            } else {
+                self.state = StreamState::ClosedByUs;
+            }
+        }
+
         Pin::new(&mut self.inner).start_send(item)?;
         self.needs_flush = true;
 
@@ -288,7 +307,7 @@ where
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.inner.codec().state == StreamState::Active
+        if self.state == StreamState::Active
             && !self
                 .pending_message
                 .as_ref()

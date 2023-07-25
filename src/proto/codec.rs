@@ -5,7 +5,7 @@ use std::hint::unreachable_unchecked;
 use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-use super::types::{Frame, Limits, Message, OpCode, Role, StreamState};
+use super::types::{Frame, Limits, Message, OpCode, Role};
 use crate::{mask, proto::ProtocolError, utf8, CloseCode, Error};
 
 /// Outgoing messages are split into frames of this size.
@@ -21,8 +21,6 @@ pub(super) struct WebsocketProtocol {
     pub(super) role: Role,
     /// The [`Limits`] imposed on this stream.
     pub(super) limits: Limits,
-    /// The [`StreamState`] of the current stream.
-    pub(super) state: StreamState,
     /// Index up to which the payload was unmasked.
     payload_unmasked: usize,
     /// Index up to which the payload data was validated.
@@ -35,7 +33,6 @@ impl WebsocketProtocol {
         Self {
             role,
             limits,
-            state: StreamState::Active,
             payload_unmasked: 0,
             payload_data_validated: 0,
         }
@@ -47,20 +44,6 @@ impl Encoder<Message> for WebsocketProtocol {
 
     #[allow(clippy::cast_possible_truncation)]
     fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        if !(self.state == StreamState::Active
-            || matches!(self.state, StreamState::ClosedByPeer if item.is_close()))
-        {
-            return Err(Error::AlreadyClosed);
-        }
-
-        if item.is_close() {
-            if self.state == StreamState::ClosedByPeer {
-                self.state = StreamState::CloseAcknowledged;
-            } else {
-                self.state = StreamState::ClosedByUs;
-            }
-        }
-
         let (opcode, data) = item.into_raw();
         let mut chunks = data.chunks(FRAME_SIZE).peekable();
         let mut next_chunk = Some(chunks.next().unwrap_or_default());
