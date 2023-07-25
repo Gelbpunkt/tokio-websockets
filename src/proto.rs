@@ -1067,7 +1067,10 @@ impl Decoder for WebsocketProtocol {
 
         let mut offset = 2;
 
-        if payload_length > 125 {
+        // Close frames must be at least 2 bytes in length
+        if opcode == OpCode::Close && payload_length == 1 {
+            return Err(Error::Protocol(ProtocolError::InvalidCloseSequence));
+        } else if payload_length > 125 {
             if opcode.is_control() {
                 return Err(Error::Protocol(ProtocolError::InvalidControlFrameLength));
             }
@@ -1163,11 +1166,6 @@ impl Decoder for WebsocketProtocol {
                 src.reserve(bytes_missing);
 
                 return Ok(None);
-            }
-
-            // Close frames must be at least 2 bytes in length
-            if opcode == OpCode::Close && payload_length == 1 {
-                return Err(Error::Protocol(ProtocolError::InvalidCloseSequence));
             }
 
             // Since we only unmasked if data was previously incomplete, unmask the entire
