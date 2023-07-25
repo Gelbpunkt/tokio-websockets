@@ -648,8 +648,8 @@ where
                 role,
                 limits,
                 state: StreamState::Active,
-                payload_in: 0,
-                utf8_valid_up_to: 0,
+                payload_unmasked: 0,
+                payload_data_validated: 0,
             }
             .framed(stream),
             partial_payload: BytesMut::new(),
@@ -669,8 +669,8 @@ where
                 role,
                 limits,
                 state: StreamState::Active,
-                payload_in: 0,
-                utf8_valid_up_to: 0,
+                payload_unmasked: 0,
+                payload_data_validated: 0,
             }),
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
@@ -914,10 +914,10 @@ struct WebsocketProtocol {
     limits: Limits,
     /// The [`StreamState`] of the current stream.
     state: StreamState,
-    /// Length of the processed (unmasked) part of the payload.
-    payload_in: usize,
-    /// Index up to which the payload was validated to be valid UTF-8.
-    utf8_valid_up_to: usize,
+    /// Index up to which the payload was unmasked.
+    payload_unmasked: usize,
+    /// Index up to which the payload data was validated.
+    payload_data_validated: usize,
 }
 
 impl Encoder<Message> for WebsocketProtocol {
@@ -1119,79 +1119,64 @@ impl Decoder for WebsocketProtocol {
             offset += 4;
         }
 
-        if payload_length > 0 {
-            // Get the actual payload, if any
-            let data_available = (src.len() - offset).min(payload_length);
-            let bytes_missing = payload_length - data_available;
+        if payload_length != 0 {
+            let payload_available = (src.len() - offset).min(payload_length);
 
-            if bytes_missing > 0 {
-                // If data is missing, we might have to fail fast on invalid UTF8
+            if payload_length != payload_available {
+                // Validate partial frame payload data
                 if opcode == OpCode::Text {
-                    let to_read = data_available - self.payload_in;
-
-                    // Data might be masked, so unmask it here
                     if mask {
-                        let unmasked_until = offset + self.payload_in;
-
                         // SAFETY: The masking key and the payload do not overlap in src
                         // TODO: Replace with split_at_mut_unchecked when stable
-                        let (masking_key, to_unmask) = unsafe {
+                        let (masking_key, payload_masked) = unsafe {
                             let masking_key_ptr =
                                 src.get_unchecked(offset - 4..offset) as *const [u8];
-                            let to_unmask_ptr = src
-                                .get_unchecked_mut(unmasked_until..unmasked_until + to_read)
-                                as *mut [u8];
+                            let payload_masked_ptr = src.get_unchecked_mut(
+                                offset + self.payload_unmasked..offset + payload_available,
+                            ) as *mut [u8];
 
-                            (&*masking_key_ptr, &mut *to_unmask_ptr)
+                            (&*masking_key_ptr, &mut *payload_masked_ptr)
                         };
 
-                        mask::frame(masking_key, to_unmask, self.payload_in & 3);
+                        mask::frame(masking_key, payload_masked, self.payload_unmasked & 3);
+                        self.payload_unmasked = payload_available;
                     }
 
-                    self.payload_in = data_available;
-
-                    // SAFETY: offset + utf8_valid_up_to is the index until which utf8 was
-                    // validated for this frame and therefore guaranteed to be in bounds.
-                    // self.payload_in is data_available, which is at most src.len()
-                    self.utf8_valid_up_to += utf8::should_fail_fast(
+                    // SAFETY: self.payload_data_validated <= payload_available
+                    self.payload_data_validated += utf8::should_fail_fast(
                         unsafe {
                             src.get_unchecked(
-                                offset + self.utf8_valid_up_to..offset + self.payload_in,
+                                offset + self.payload_data_validated..offset + payload_available,
                             )
                         },
                         false,
                     )?;
                 }
 
-                src.reserve(bytes_missing.saturating_sub(src.capacity()));
+                src.reserve((payload_length - payload_available).saturating_sub(src.capacity()));
 
                 return Ok(None);
             }
 
-            // Since we only unmasked if data was previously incomplete, unmask the entire
-            // rest
             if mask {
-                let unmasked_until = offset + self.payload_in;
-
                 // SAFETY: The masking key and the payload do not overlap in src
                 // TODO: Replace with split_at_mut_unchecked when stable
-                let (masking_key, to_unmask) = unsafe {
+                let (masking_key, payload_masked) = unsafe {
                     let masking_key_ptr = src.get_unchecked(offset - 4..offset) as *const [u8];
-                    let to_unmask_ptr = src
-                        .get_unchecked_mut(unmasked_until..offset + payload_length)
+                    let payload_masked_ptr = src
+                        .get_unchecked_mut(offset + self.payload_unmasked..offset + payload_length)
                         as *mut [u8];
 
-                    (&*masking_key_ptr, &mut *to_unmask_ptr)
+                    (&*masking_key_ptr, &mut *payload_masked_ptr)
                 };
 
-                mask::frame(masking_key, to_unmask, self.payload_in & 3);
+                mask::frame(masking_key, payload_masked, self.payload_unmasked & 3);
             }
 
             if fin && opcode == OpCode::Text {
-                // SAFETY: offset + utf8_valid_up_to is the index until which utf8 was
-                // validated for this frame and therefore guaranteed to be in bounds.
+                // SAFETY: self.payload_data_validated <= payload_length
                 utf8::parse_str(unsafe {
-                    src.get_unchecked(offset + self.utf8_valid_up_to..offset + payload_length)
+                    src.get_unchecked(offset + self.payload_data_validated..offset + payload_length)
                 })?;
             }
         }
@@ -1201,8 +1186,8 @@ impl Decoder for WebsocketProtocol {
         // Take the payload
         let payload = src.split_to(payload_length).freeze();
 
-        self.payload_in = 0;
-        self.utf8_valid_up_to = 0;
+        self.payload_unmasked = 0;
+        self.payload_data_validated = 0;
 
         let frame = Frame {
             opcode,
