@@ -10,6 +10,7 @@ use crate::proto::ProtocolError;
 
 /// Generic error when using websockets with this crate.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// Attempted to read from or write to a closed stream.
     AlreadyClosed,

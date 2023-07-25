@@ -4,6 +4,7 @@ use std::{fmt, string::FromUtf8Error};
 /// Error encountered on protocol violations by the other end of the connection.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ProtocolError {
     /// An invalid close code (smaller than 1000 or greater or equal than 5000)
     /// has been received.

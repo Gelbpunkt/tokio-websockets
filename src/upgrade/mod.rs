@@ -14,6 +14,7 @@ pub type Response = http::Response<()>;
 /// Errors that occur during the HTTP upgrade handshake between client and
 /// server.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// Header required in the request or response is not present.
     MissingHeader(&'static str),
