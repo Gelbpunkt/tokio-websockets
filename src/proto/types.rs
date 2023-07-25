@@ -1,5 +1,5 @@
 //! Types required for the websocket protocol implementation.
-use std::{iter::Peekable, mem::replace, slice::Chunks};
+use std::{mem::replace, slice::Chunks};
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -387,7 +387,7 @@ impl Message {
     /// message into.
     pub(super) fn as_frames(&self, frame_size: usize) -> MessageFrames<'_> {
         MessageFrames {
-            inner: self.payload.chunks(frame_size).peekable(),
+            inner: self.payload.chunks(frame_size),
             payload: &self.payload,
             opcode: self.opcode,
         }
@@ -397,7 +397,7 @@ impl Message {
 /// Iterator over frames of a chunked message.
 pub(super) struct MessageFrames<'a> {
     /// Iterator over payload chunks.
-    inner: Peekable<Chunks<'a, u8>>,
+    inner: Chunks<'a, u8>,
     /// The full message payload this iterates over.
     payload: &'a Bytes,
     /// Opcode for the next frame.
@@ -415,7 +415,8 @@ impl Iterator for MessageFrames<'_> {
         };
 
         let opcode = replace(&mut self.opcode, OpCode::Continuation);
-        let is_final = self.inner.peek().is_none();
+        // TODO: Use ExactSizeIterator::is_empty when stable
+        let is_final = self.inner.len() == 0;
         let payload = self.payload.slice_ref(chunk);
 
         Some(Frame {
