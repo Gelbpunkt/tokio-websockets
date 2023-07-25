@@ -1163,7 +1163,7 @@ impl Decoder for WebsocketProtocol {
                     )?;
                 }
 
-                src.reserve(bytes_missing);
+                src.reserve(bytes_missing.saturating_sub(src.capacity()));
 
                 return Ok(None);
             }
