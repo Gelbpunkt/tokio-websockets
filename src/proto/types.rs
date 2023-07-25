@@ -414,15 +414,11 @@ impl Iterator for MessageFrames<'_> {
             self.inner.next().unwrap_or_default()
         };
 
-        let opcode = replace(&mut self.opcode, OpCode::Continuation);
-        // TODO: Use ExactSizeIterator::is_empty when stable
-        let is_final = self.inner.len() == 0;
-        let payload = self.payload.slice_ref(chunk);
-
         Some(Frame {
-            opcode,
-            is_final,
-            payload,
+            opcode: replace(&mut self.opcode, OpCode::Continuation),
+            // TODO: Use ExactSizeIterator::is_empty when stable
+            is_final: self.inner.len() == 0,
+            payload: self.payload.slice_ref(chunk),
         })
     }
 }
