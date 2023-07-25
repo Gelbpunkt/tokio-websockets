@@ -350,14 +350,14 @@ pub struct Message {
     /// The [`OpCode`] of the message.
     opcode: OpCode,
     /// The payload of the message.
-    data: Bytes,
+    payload: Bytes,
 }
 
 impl Message {
     /// Default close message.
     const DEFAULT_CLOSE: Self = Self {
         opcode: OpCode::Close,
-        data: Bytes::from_static(&1000_u16.to_be_bytes()),
+        payload: Bytes::from_static(&1000_u16.to_be_bytes()),
     };
 
     /// Assembles and verifies a message from raw message payload and
@@ -367,20 +367,20 @@ impl Message {
     ///
     /// This method returns an [`Error`] if the message has a continuation
     /// opcode or a disallowed close code.
-    fn from_raw(opcode: OpCode, data: Bytes) -> Result<Self, ProtocolError> {
+    fn from_raw(opcode: OpCode, payload: Bytes) -> Result<Self, ProtocolError> {
         match opcode {
             OpCode::Continuation => Err(ProtocolError::DisallowedOpcode),
             OpCode::Text | OpCode::Binary | OpCode::Ping | OpCode::Pong => {
-                Ok(Self { opcode, data })
+                Ok(Self { opcode, payload })
             }
             OpCode::Close => {
-                if data.is_empty() {
-                    Ok(Self { opcode, data })
+                if payload.is_empty() {
+                    Ok(Self { opcode, payload })
                 } else {
                     // SAFETY: The Decoder ensures that close frames consist of at least two bytes
                     // A conversion from two u8s to a u16 cannot fail.
                     let close_code_value = u16::from_be_bytes(unsafe {
-                        data.get_unchecked(0..2).try_into().unwrap_unchecked()
+                        payload.get_unchecked(0..2).try_into().unwrap_unchecked()
                     });
                     let close_code = CloseCode::try_from(close_code_value)?;
 
@@ -390,13 +390,13 @@ impl Message {
                     }
 
                     // Verify that the reason is allowed
-                    if data.len() > 2 {
+                    if payload.len() > 2 {
                         // SAFETY: The Decoder ensures that close frames consist of at least two
                         // bytes
-                        utf8::parse_str(unsafe { data.get_unchecked(2..) })?;
+                        utf8::parse_str(unsafe { payload.get_unchecked(2..) })?;
                     }
 
-                    Ok(Self { opcode, data })
+                    Ok(Self { opcode, payload })
                 }
             }
         }
@@ -404,24 +404,24 @@ impl Message {
 
     /// Returns the raw [`OpCode`] and payload of the message and consumes it.
     fn into_raw(self) -> (OpCode, Bytes) {
-        (self.opcode, self.data)
+        (self.opcode, self.payload)
     }
 
     /// Create a new text message.
     #[must_use]
-    pub fn text(data: String) -> Self {
+    pub fn text(payload: String) -> Self {
         Self {
             opcode: OpCode::Text,
-            data: data.into(),
+            payload: payload.into(),
         }
     }
 
     /// Create a new binary message.
     #[must_use]
-    pub fn binary<D: Into<Bytes>>(data: D) -> Self {
+    pub fn binary<D: Into<Bytes>>(payload: D) -> Self {
         Self {
             opcode: OpCode::Binary,
-            data: data.into(),
+            payload: payload.into(),
         }
     }
 
@@ -429,35 +429,35 @@ impl Message {
     /// [`CloseCode`] must be specified for it to be included.
     #[must_use]
     pub fn close(code: Option<CloseCode>, reason: &str) -> Self {
-        let mut data = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
+        let mut payload = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
 
         if let Some(code) = code {
-            data.put_u16(code.into());
+            payload.put_u16(code.into());
 
-            data.extend_from_slice(reason.as_bytes());
+            payload.extend_from_slice(reason.as_bytes());
         }
 
         Self {
             opcode: OpCode::Close,
-            data: data.freeze(),
+            payload: payload.freeze(),
         }
     }
 
     /// Create a new ping message.
     #[must_use]
-    pub fn ping<D: Into<Bytes>>(data: D) -> Self {
+    pub fn ping<D: Into<Bytes>>(payload: D) -> Self {
         Self {
             opcode: OpCode::Ping,
-            data: data.into(),
+            payload: payload.into(),
         }
     }
 
     /// Create a new pong message.
     #[must_use]
-    pub fn pong<D: Into<Bytes>>(data: D) -> Self {
+    pub fn pong<D: Into<Bytes>>(payload: D) -> Self {
         Self {
             opcode: OpCode::Pong,
-            data: data.into(),
+            payload: payload.into(),
         }
     }
 
@@ -494,13 +494,13 @@ impl Message {
     /// Returns the message payload and consumes the message, regardless of
     /// type.
     #[must_use]
-    pub fn into_data(self) -> Bytes {
-        self.data
+    pub fn into_payload(self) -> Bytes {
+        self.payload
     }
 
     /// Returns a reference to the message payload, regardless of message type.
-    pub fn as_data(&self) -> &Bytes {
-        &self.data
+    pub fn as_payload(&self) -> &Bytes {
+        &self.payload
     }
 
     /// Returns a reference to the message payload as a string if it is a text
@@ -517,8 +517,8 @@ impl Message {
         match self.opcode {
             // SAFETY: UTF-8 is validated by the Decoder and/or when the message is assembled from
             // frames in the case of text messages.
-            OpCode::Text => Ok(unsafe { std::str::from_utf8_unchecked(&self.data) }),
-            OpCode::Binary => Ok(utf8::parse_str(&self.data)?),
+            OpCode::Text => Ok(unsafe { std::str::from_utf8_unchecked(&self.payload) }),
+            OpCode::Binary => Ok(utf8::parse_str(&self.payload)?),
             _ => Err(ProtocolError::MessageHasWrongOpcode),
         }
     }
@@ -531,19 +531,22 @@ impl Message {
     /// This method returns an [`Error`] if the message is not a close message.
     pub fn as_close(&self) -> Result<(CloseCode, &str), ProtocolError> {
         if self.opcode == OpCode::Close {
-            let close_code = if self.data.len() >= 2 {
+            let close_code = if self.payload.len() >= 2 {
                 // SAFETY: self.data.len() is greater or equal to 2
                 let close_code_value = u16::from_be_bytes(unsafe {
-                    self.data.get_unchecked(0..2).try_into().unwrap_unchecked()
+                    self.payload
+                        .get_unchecked(0..2)
+                        .try_into()
+                        .unwrap_unchecked()
                 });
                 CloseCode::try_from(close_code_value)?
             } else {
                 CloseCode::NoStatusReceived
             };
 
-            let reason = if self.data.len() > 2 {
+            let reason = if self.payload.len() > 2 {
                 // SAFETY: self.data.len() is greater or equal to 2
-                unsafe { std::str::from_utf8_unchecked(self.data.get_unchecked(2..)) }
+                unsafe { std::str::from_utf8_unchecked(self.payload.get_unchecked(2..)) }
             } else {
                 ""
             };
@@ -824,7 +827,7 @@ where
                 StreamState::Active => {
                     self.inner.codec_mut().state = StreamState::ClosedByPeer;
                     let mut msg = message.clone();
-                    msg.data.truncate(2);
+                    msg.payload.truncate(2);
 
                     self.pending_message = Some(msg);
                 }
