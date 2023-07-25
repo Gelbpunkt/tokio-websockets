@@ -1044,8 +1044,7 @@ impl Decoder for WebsocketProtocol {
         }
 
         // Bits 4-7
-        let opcode_value = fin_and_rsv & 0xF;
-        let opcode = OpCode::try_from(opcode_value)?;
+        let opcode = OpCode::try_from(fin_and_rsv & 0xF)?;
 
         if !fin && opcode.is_control() {
             return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
@@ -1056,9 +1055,7 @@ impl Decoder for WebsocketProtocol {
 
         if mask && self.role == Role::Client {
             return Err(Error::Protocol(ProtocolError::ServerMaskedData));
-        }
-
-        if !mask && self.role == Role::Server {
+        } else if !mask && self.role == Role::Server {
             return Err(Error::Protocol(ProtocolError::UnmaskedData));
         }
 
@@ -1189,12 +1186,10 @@ impl Decoder for WebsocketProtocol {
         self.payload_unmasked = 0;
         self.payload_data_validated = 0;
 
-        let frame = Frame {
+        Ok(Some(Frame {
             opcode,
             payload,
             is_final: fin,
-        };
-
-        Ok(Some(frame))
+        }))
     }
 }
