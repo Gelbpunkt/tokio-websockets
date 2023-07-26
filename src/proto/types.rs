@@ -1,5 +1,5 @@
 //! Types required for the websocket protocol implementation.
-use std::{mem::replace, slice::Chunks};
+use std::{hint::unreachable_unchecked, mem::replace, num::NonZeroU16, slice::Chunks};
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -63,88 +63,70 @@ impl From<OpCode> for u8 {
     }
 }
 
-/// A close status code as defined by section [7.4 of the RFC](https://datatracker.ietf.org/doc/html/rfc6455#section-7.4).
-///
-/// Enum variants are provided for codes and ranges defined in the
-/// RFC and commonly used ones. All others are invalid.
-///
-/// This is intended to be used via the `TryFrom<u16>` and `Into<u16>` trait
-/// implementations.
-///
-/// Enum variant descriptions are taken from the RFC.
-#[derive(Debug, Clone)]
-pub enum CloseCode {
-    /// 1000 indicates a normal closure, meaning that the purpose for which the
-    /// connection was established has been fulfilled.
-    NormalClosure,
-    /// 1001 indicates that an endpoint is "going away", such as a server going
-    /// down or a browser having navigated away from a page.
-    GoingAway,
-    /// 1002 indicates that an endpoint is terminating the connection due to a
-    /// protocol error.
-    ProtocolError,
-    /// 1003 indicates that an endpoint is terminating the connection because it
-    /// has received a type of data it cannot accept (e.g., an endpoint that
-    /// understands only text data MAY send this if it receives a binary
-    /// message).
-    UnsupportedData,
-    /// Reserved. The specific meaning might be defined in the future.
-    Reserved,
-    /// 1005 is a reserved value and MUST NOT be set as a status code in a Close
-    /// control frame by an endpoint. It is designated for use in applications
-    /// expecting a status code to indicate that no status code was actually
-    /// present.
-    NoStatusReceived,
-    /// 1006 is a reserved value and MUST NOT be set as a status code in a Close
-    /// control frame by an endpoint. It is designated for use in applications
-    /// expecting a status code to indicate that the connection was closed
-    /// abnormally, e.g., without sending or receiving a Close control frame.
-    AbnormalClosure,
-    /// 1007 indicates that an endpoint is terminating the connection because it
-    /// has received data within a message that was not consistent with the type
-    /// of the message (e.g., non-UTF-8 data within a text message).
-    InvalidFramePayloadData,
-    /// 1008 indicates that an endpoint is terminating the connection because it
-    /// has received a message that violates its policy. This is a generic
-    /// status code that can be returned when there is no other more suitable
-    /// status code (e.g., 1003 or 1009) or if there is a need to hide specific
-    /// details about the policy.
-    PolicyViolation,
-    /// 1009 indicates that an endpoint is terminating the connection because it
-    /// has received a message that is too big for it to process.
-    MessageTooBig,
-    /// 1010 indicates that an endpoint (client) is terminating the connection
-    /// because it has expected the server to negotiate one or more extension,
-    /// but the server didn't return them in the response message of the
-    /// WebSocket handshake. The list of extensions that are needed SHOULD
-    /// appear in the /reason/ part of the Close frame. Note that this status
-    /// code is not used by the server, because it can fail the WebSocket
-    /// handshake instead.
-    MandatoryExtension,
-    /// 1011 indicates that a server is terminating the connection because it
-    /// encountered an unexpected condition that prevented it from fulfilling
-    /// the request.
-    InternalServerError,
-    /// 1015 is a reserved value and MUST NOT be set as a status code in a Close
-    /// control frame by an endpoint. It is designated for use in applications
-    /// expecting a status code to indicate that the connection was closed due
-    /// to a failure to perform a TLS handshake (e.g., the server certificate
-    /// can't be verified).
-    TlsHandshake,
-    /// Status codes in the range 1000-2999 are reserved for definition by this
-    /// protocol, its future revisions, and extensions specified in a permanent
-    /// and readily available public specification.
-    ReservedForStandards(u16),
-    /// Status codes in the range 3000-3999 are reserved for use by libraries,
-    /// frameworks, and applications. These status codes are registered
-    /// directly with IANA. The interpretation of these codes is undefined by
-    /// this protocol.
-    Libraries(u16),
-    /// Status codes in the range 4000-4999 are reserved for private use and
-    /// thus can't be registered. Such codes can be used by prior agreements
-    /// between WebSocket applications. The interpretation of these codes is
-    /// undefined by this protocol.
-    Private(u16),
+/// Close status code.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CloseCode(NonZeroU16);
+
+// rustfmt reorders these alphabetically
+#[rustfmt::skip]
+impl CloseCode {
+    /// Normal closure, meaning that the purpose for which the connection was
+    /// established has been fulfilled.
+    pub const NORMAL_CLOSURE: Self = Self(unsafe { NonZeroU16::new_unchecked(1000) });
+    /// Endpoint is "going away", such as a server going down or a browser
+    /// having navigated away from a page.
+    pub const GOING_AWAY: Self = Self(unsafe { NonZeroU16::new_unchecked(1001) });
+    /// Endpoint is terminating the connection due to a protocol error.
+    pub const PROTOCOL_ERROR: Self = Self(unsafe { NonZeroU16::new_unchecked(1002) });
+    /// Endpoint is terminating the connection because it has received a type of
+    /// data it cannot accept.
+    pub const UNSUPPORTED_DATA: Self = Self(unsafe { NonZeroU16::new_unchecked(1003) });
+    /// No status code was actually present.
+    pub const NO_STATUS_RECEIVED: Self = Self(unsafe { NonZeroU16::new_unchecked(1005) });
+    /// Endpoint is terminating the connection because it has received data
+    /// within a message that was not consistent with the type of the message.
+    pub const INVALID_FRAME_PAYLOAD_DATA: Self = Self(unsafe { NonZeroU16::new_unchecked(1007) });
+    /// Endpoint is terminating the connection because it has received a message
+    /// that violates its policy.
+    pub const POLICY_VIOLATION: Self = Self(unsafe { NonZeroU16::new_unchecked(1008) });
+    /// Endpoint is terminating the connection because it has received a message
+    /// that is too big for it to process.
+    pub const MESSAGE_TOO_BIG: Self = Self(unsafe { NonZeroU16::new_unchecked(1009) });
+    /// Client is terminating the connection because it has expected the server
+    /// to negotiate one or more extension, but the server didn't return them in
+    /// the response message of the Websocket handshake.
+    pub const MANDATORY_EXTENSION: Self = Self(unsafe { NonZeroU16::new_unchecked(1010) });
+    /// Server is terminating the connection because it encountered an
+    /// unexpected condition that prevented it from fulfilling the request.
+    pub const INTERNAL_SERVER_ERROR: Self = Self(unsafe { NonZeroU16::new_unchecked(1011) });
+}
+
+impl CloseCode {
+    /// Whether the close code is allowed to be sent over the wire.
+    pub(super) fn is_sendable(self) -> bool {
+        match self.0.get() {
+            1004 | 1005 | 1006 | 1015 => false,
+            1000..=4999 => true,
+            // SAFETY: `TryFrom` is the only way to accquire self and it errors for these values
+            0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
+        }
+    }
+
+    /// Whether the close code is known to the library.
+    pub(super) fn is_known(self) -> bool {
+        match self.0.get() {
+            1000..=1011 | 1015 | 3000..=4999 => true,
+            1000..=2999 => false,
+            // SAFETY: `TryFrom` is the only way to accquire self and it errors for these values
+            0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
+        }
+    }
+}
+
+impl From<CloseCode> for u16 {
+    fn from(value: CloseCode) -> Self {
+        value.0.get()
+    }
 }
 
 impl TryFrom<u16> for CloseCode {
@@ -152,62 +134,10 @@ impl TryFrom<u16> for CloseCode {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            1000 => Ok(Self::NormalClosure),
-            1001 => Ok(Self::GoingAway),
-            1002 => Ok(Self::ProtocolError),
-            1003 => Ok(Self::UnsupportedData),
-            1004 => Ok(Self::Reserved),
-            1005 => Ok(Self::NoStatusReceived),
-            1006 => Ok(Self::AbnormalClosure),
-            1007 => Ok(Self::InvalidFramePayloadData),
-            1008 => Ok(Self::PolicyViolation),
-            1009 => Ok(Self::MessageTooBig),
-            1010 => Ok(Self::MandatoryExtension),
-            1011 => Ok(Self::InternalServerError),
-            1015 => Ok(Self::TlsHandshake),
-            1012..=1014 | 1016..=2999 => Ok(Self::ReservedForStandards(value)),
-            3000..=3999 => Ok(Self::Libraries(value)),
-            4000..=4999 => Ok(Self::Private(value)),
-            _ => Err(ProtocolError::InvalidCloseCode),
+            // SAFETY: We just checked that the value is non-zero
+            1000..=4999 => Ok(Self(unsafe { NonZeroU16::new_unchecked(value) })),
+            0..=999 | 5000..=u16::MAX => Err(ProtocolError::InvalidCloseCode),
         }
-    }
-}
-
-impl From<CloseCode> for u16 {
-    fn from(value: CloseCode) -> Self {
-        match value {
-            CloseCode::NormalClosure => 1000,
-            CloseCode::GoingAway => 1001,
-            CloseCode::ProtocolError => 1002,
-            CloseCode::UnsupportedData => 1003,
-            CloseCode::Reserved => 1004,
-            CloseCode::NoStatusReceived => 1005,
-            CloseCode::AbnormalClosure => 1006,
-            CloseCode::InvalidFramePayloadData => 1007,
-            CloseCode::PolicyViolation => 1008,
-            CloseCode::MessageTooBig => 1009,
-            CloseCode::MandatoryExtension => 1010,
-            CloseCode::InternalServerError => 1011,
-            CloseCode::TlsHandshake => 1015,
-            CloseCode::ReservedForStandards(value)
-            | CloseCode::Libraries(value)
-            | CloseCode::Private(value) => value,
-        }
-    }
-}
-
-impl CloseCode {
-    /// Whether the close code is allowed to be used, i.e. not in the reserved
-    /// ranges specified [by the RFC](https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.2).
-    pub(super) fn is_allowed(&self) -> bool {
-        !matches!(
-            self,
-            Self::Reserved
-                | Self::NoStatusReceived
-                | Self::AbnormalClosure
-                | Self::TlsHandshake
-                | Self::ReservedForStandards(_)
-        )
     }
 }
 
@@ -229,7 +159,7 @@ impl Message {
     #[allow(clippy::declare_interior_mutable_const)]
     pub(super) const DEFAULT_CLOSE: Self = Self {
         opcode: OpCode::Close,
-        payload: Bytes::from_static(&1000_u16.to_be_bytes()),
+        payload: Bytes::from_static(&CloseCode::NORMAL_CLOSURE.0.get().to_be_bytes()),
     };
 
     /// Create a new text message.
@@ -367,7 +297,7 @@ impl Message {
                 });
                 CloseCode::try_from(close_code_value)?
             } else {
-                CloseCode::NoStatusReceived
+                CloseCode::NO_STATUS_RECEIVED
             };
 
             let reason = if self.payload.len() > 2 {
@@ -427,9 +357,9 @@ impl From<&ProtocolError> for Message {
     fn from(val: &ProtocolError) -> Self {
         match val {
             ProtocolError::InvalidUtf8 => {
-                Message::close(Some(CloseCode::InvalidFramePayloadData), "invalid utf8")
+                Message::close(Some(CloseCode::INVALID_FRAME_PAYLOAD_DATA), "invalid utf8")
             }
-            _ => Message::close(Some(CloseCode::ProtocolError), "protocol violation"),
+            _ => Message::close(Some(CloseCode::PROTOCOL_ERROR), "protocol violation"),
         }
     }
 }
