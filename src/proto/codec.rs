@@ -270,7 +270,7 @@ impl Decoder for WebsocketProtocol {
                         .try_into()
                         .unwrap_unchecked()
                 }))?;
-                if !code.is_allowed() {
+                if !code.is_known() || !code.is_sendable() {
                     return Err(Error::Protocol(ProtocolError::DisallowedCloseCode));
                 }
 
