@@ -520,3 +520,13 @@ pub(super) struct Frame {
     /// The payload bytes of the frame.
     pub payload: Bytes,
 }
+
+impl From<Message> for Frame {
+    fn from(value: Message) -> Self {
+        Self {
+            opcode: value.opcode,
+            is_final: true,
+            payload: value.payload,
+        }
+    }
+}

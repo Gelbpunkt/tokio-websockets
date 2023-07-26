@@ -183,10 +183,8 @@ where
             StreamState::ClosedByPeer => {
                 ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
                 // SAFETY: arm is only taken until the pending close message is encoded
-                let item = unsafe { self.pending_message.take().unwrap_unchecked() };
-                for frame in item.as_frames(FRAME_SIZE) {
-                    Pin::new(&mut self.inner).start_send(frame)?;
-                }
+                let message = unsafe { self.pending_message.take().unwrap_unchecked() };
+                Pin::new(&mut self.inner).start_send(message.into())?;
                 if self.inner.codec().role == Role::Server {
                     ready!(Pin::new(&mut self.inner).poll_close(cx))?;
                 } else {
@@ -296,9 +294,13 @@ where
             }
         }
 
-        // Chunk the message into frames
-        for frame in item.as_frames(FRAME_SIZE) {
-            Pin::new(&mut self.inner).start_send(frame)?;
+        if item.opcode.is_control() {
+            Pin::new(&mut self.inner).start_send(item.into())?;
+        } else {
+            // Chunk the message into frames
+            for frame in item.as_frames(FRAME_SIZE) {
+                Pin::new(&mut self.inner).start_send(frame)?;
+            }
         }
 
         self.needs_flush = true;
