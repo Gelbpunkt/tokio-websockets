@@ -1,5 +1,5 @@
 //! Websocket protocol error type.
-use std::{fmt, string::FromUtf8Error};
+use std::fmt;
 
 /// Error encountered on protocol violations by the other end of the connection.
 #[allow(clippy::module_name_repetitions)]
@@ -48,15 +48,3 @@ impl fmt::Display for ProtocolError {
 }
 
 impl std::error::Error for ProtocolError {}
-
-impl From<FromUtf8Error> for ProtocolError {
-    fn from(_: FromUtf8Error) -> Self {
-        Self::InvalidUtf8
-    }
-}
-
-impl From<std::str::Utf8Error> for ProtocolError {
-    fn from(_: std::str::Utf8Error) -> Self {
-        Self::InvalidUtf8
-    }
-}
