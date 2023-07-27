@@ -360,7 +360,7 @@ impl From<&ProtocolError> for Message {
             ProtocolError::InvalidUtf8 => {
                 Message::close(Some(CloseCode::INVALID_FRAME_PAYLOAD_DATA), "invalid utf8")
             }
-            _ => Message::close(Some(CloseCode::PROTOCOL_ERROR), "protocol violation"),
+            _ => Message::close(Some(CloseCode::PROTOCOL_ERROR), val.as_str()),
         }
     }
 }

@@ -31,21 +31,28 @@ pub enum ProtocolError {
     UnexpectedUnmaskedFrame,
 }
 
+impl ProtocolError {
+    /// Stringify this variant.
+    pub(super) const fn as_str(&self) -> &'static str {
+        match self {
+            ProtocolError::FragmentedControlFrame => "fragmented control frame",
+            ProtocolError::InvalidCloseCode => "invalid close code",
+            ProtocolError::InvalidOpcode => "invalid opcode",
+            ProtocolError::InvalidPayloadLength => "invalid payload length",
+            ProtocolError::InvalidRsv => "invalid extension",
+            ProtocolError::InvalidUtf8 => "invalid utf-8",
+            ProtocolError::MessageHasWrongOpcode => {
+                "attempted to treat message data in invalid way"
+            }
+            ProtocolError::UnexpectedMaskedFrame => "unexpected masked frame",
+            ProtocolError::UnexpectedUnmaskedFrame => "unexpected unmasked frame",
+        }
+    }
+}
+
 impl fmt::Display for ProtocolError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ProtocolError::FragmentedControlFrame => f.write_str("fragmented control frame"),
-            ProtocolError::InvalidCloseCode => f.write_str("invalid close code"),
-            ProtocolError::InvalidOpcode => f.write_str("invalid opcode"),
-            ProtocolError::InvalidPayloadLength => f.write_str("invalid payload length"),
-            ProtocolError::InvalidRsv => f.write_str("invalid extension"),
-            ProtocolError::InvalidUtf8 => f.write_str("invalid utf-8"),
-            ProtocolError::MessageHasWrongOpcode => {
-                f.write_str("attempted to treat message data in invalid way")
-            }
-            ProtocolError::UnexpectedMaskedFrame => f.write_str("unexpected masked frame"),
-            ProtocolError::UnexpectedUnmaskedFrame => f.write_str("unexpected unmasked frame"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
