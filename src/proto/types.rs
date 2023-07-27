@@ -99,6 +99,17 @@ impl CloseCode {
     /// Server is terminating the connection because it encountered an
     /// unexpected condition that prevented it from fulfilling the request.
     pub const INTERNAL_SERVER_ERROR: Self = Self(unsafe { NonZeroU16::new_unchecked(1011) });
+    /// Service is restarted. A client may reconnect, and if it choses to do,
+    /// should reconnect using a randomized delay of 5--30s.
+    pub const SERVICE_RESTART: Self = Self(unsafe { NonZeroU16::new_unchecked(1012) });
+    /// Service is experiencing overload. A client should only connect to a
+    /// different IP (when there are multiple for the target) or reconnect to
+    /// the same IP upon user action.
+    pub const SERVICE_OVERLOAD: Self = Self(unsafe { NonZeroU16::new_unchecked(1013) });
+    /// The server was acting as a gateway or proxy and received an invalid
+    /// response from the upstream server. This is similar to the HTTP 502
+    /// status code.
+    pub const BAD_GATEWAY: Self = Self(unsafe { NonZeroU16::new_unchecked(1014) });
 }
 
 impl CloseCode {
@@ -115,7 +126,7 @@ impl CloseCode {
     /// Whether the close code is known to the library.
     pub(super) fn is_known(self) -> bool {
         match self.0.get() {
-            1000..=1011 | 1015 | 3000..=4999 => true,
+            1000..=1015 | 3000..=4999 => true,
             1000..=2999 => false,
             // SAFETY: `TryFrom` is the only way to accquire self and it errors for these values
             0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
