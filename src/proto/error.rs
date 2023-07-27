@@ -19,12 +19,6 @@ pub enum ProtocolError {
     InvalidRsv,
     /// An invalid UTF-8 segment was received when valid UTF-8 was expected.
     InvalidUtf8,
-    /// A message has an opcode that did not match the attempted interpretation
-    /// of the data. Encountered for example when attempting to use
-    /// [`Message::as_close`] on a text message.
-    ///
-    /// [`Message::as_close`]: `super::Message::as_close`
-    MessageHasWrongOpcode,
     // A masked frame was unexpectedly received.
     UnexpectedMaskedFrame,
     /// An unmasked frame was unexpectedly received.
@@ -41,9 +35,6 @@ impl ProtocolError {
             ProtocolError::InvalidPayloadLength => "invalid payload length",
             ProtocolError::InvalidRsv => "invalid extension",
             ProtocolError::InvalidUtf8 => "invalid utf-8",
-            ProtocolError::MessageHasWrongOpcode => {
-                "attempted to treat message data in invalid way"
-            }
             ProtocolError::UnexpectedMaskedFrame => "unexpected masked frame",
             ProtocolError::UnexpectedUnmaskedFrame => "unexpected unmasked frame",
         }
