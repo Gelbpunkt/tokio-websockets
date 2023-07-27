@@ -6,70 +6,45 @@ use std::{fmt, string::FromUtf8Error};
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ProtocolError {
-    /// An invalid close code (smaller than 1000 or greater or equal than 5000)
-    /// has been received.
+    /// A fragmented control frame was received.
+    FragmentedControlFrame,
+    /// An invalid close code has been received.
     InvalidCloseCode,
-    /// A close frame with payload length of one byte has been received.
-    InvalidCloseSequence,
     /// An invalid opcode was received.
     InvalidOpcode,
-    /// An invalid RSV (not equal to 0) was received. This is used for
-    /// extensions, which are currently not supported.
-    InvalidRsv,
-    /// An invalid payload length byte was received, i.e. payload length is not
-    /// in 8-, 16- or 64-bit range.
+    /// An invalid payload length was received.
     InvalidPayloadLength,
-    /// Invalid UTF-8 was received when valid UTF-8 was expected, for example in
-    /// text messages.
+    /// An invalid RSV was received. This is used by extensions, which are
+    /// currently unsupported.
+    InvalidRsv,
+    /// An invalid UTF-8 segment was received when valid UTF-8 was expected.
     InvalidUtf8,
-    /// A message was received with a continuation opcode. This error should
-    /// never be encountered due to the nature of the library.
-    DisallowedOpcode,
-    /// A close message with reserved close code was received.
-    DisallowedCloseCode,
     /// A message has an opcode that did not match the attempted interpretation
     /// of the data. Encountered for example when attempting to use
     /// [`Message::as_close`] on a text message.
     ///
     /// [`Message::as_close`]: `super::Message::as_close`
     MessageHasWrongOpcode,
-    /// The server on the other end masked the payload.
-    ServerMaskedData,
-    /// A control frame with a payload length greater than 255 bytes was
-    /// received.
-    InvalidControlFrameLength,
-    /// A fragemented control frame was received.
-    FragmentedControlFrame,
-    /// A continuation frame was received when a message start frame with
-    /// non-continuation opcode was expected.
-    UnexpectedContinuation,
-    /// A non-continuation and non-control frame was received when the previous
-    /// message was not fully received yet.
-    UnfinishedMessage,
-    /// The client on the other end did not mask the payload.
-    UnmaskedData,
+    // A masked frame was unexpectedly received.
+    UnexpectedMaskedFrame,
+    /// An unmasked frame was unexpectedly received.
+    UnexpectedUnmaskedFrame,
 }
 
 impl fmt::Display for ProtocolError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ProtocolError::FragmentedControlFrame => f.write_str("fragmented control frame"),
             ProtocolError::InvalidCloseCode => f.write_str("invalid close code"),
-            ProtocolError::InvalidCloseSequence => f.write_str("invalid close sequence"),
             ProtocolError::InvalidOpcode => f.write_str("invalid opcode"),
-            ProtocolError::InvalidRsv => f.write_str("invalid or unsupported RSV"),
             ProtocolError::InvalidPayloadLength => f.write_str("invalid payload length"),
+            ProtocolError::InvalidRsv => f.write_str("invalid extension"),
             ProtocolError::InvalidUtf8 => f.write_str("invalid utf-8"),
-            ProtocolError::DisallowedOpcode => f.write_str("disallowed opcode"),
-            ProtocolError::DisallowedCloseCode => f.write_str("disallowed close code"),
             ProtocolError::MessageHasWrongOpcode => {
                 f.write_str("attempted to treat message data in invalid way")
             }
-            ProtocolError::ServerMaskedData => f.write_str("server masked frame"),
-            ProtocolError::InvalidControlFrameLength => f.write_str("invalid control frame length"),
-            ProtocolError::FragmentedControlFrame => f.write_str("fragmented control frame"),
-            ProtocolError::UnexpectedContinuation => f.write_str("unexpected continuation"),
-            ProtocolError::UnfinishedMessage => f.write_str("unfinished message"),
-            ProtocolError::UnmaskedData => f.write_str("client did not mask frame"),
+            ProtocolError::UnexpectedMaskedFrame => f.write_str("unexpected masked frame"),
+            ProtocolError::UnexpectedUnmaskedFrame => f.write_str("unexpected unmasked frame"),
         }
     }
 }

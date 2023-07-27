@@ -122,16 +122,6 @@ impl CloseCode {
             0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
         }
     }
-
-    /// Whether the close code is known to the library.
-    pub(super) fn is_known(self) -> bool {
-        match self.0.get() {
-            1000..=1015 | 3000..=4999 => true,
-            1000..=2999 => false,
-            // SAFETY: `TryFrom` is the only way to accquire self and it errors for these values
-            0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
-        }
-    }
 }
 
 impl From<CloseCode> for u16 {
@@ -146,8 +136,8 @@ impl TryFrom<u16> for CloseCode {
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: We just checked that the value is non-zero
-            1000..=4999 => Ok(Self(unsafe { NonZeroU16::new_unchecked(value) })),
-            0..=999 | 5000..=u16::MAX => Err(ProtocolError::InvalidCloseCode),
+            1000..=1015 | 3000..=4999 => Ok(Self(unsafe { NonZeroU16::new_unchecked(value) })),
+            0..=999 | 1016..=2999 | 5000..=u16::MAX => Err(ProtocolError::InvalidCloseCode),
         }
     }
 }

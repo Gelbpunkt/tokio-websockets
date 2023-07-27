@@ -140,9 +140,9 @@ impl Decoder for WebsocketProtocol {
         let mask = payload_len_1 >> 7 != 0;
 
         if mask && self.role == Role::Client {
-            return Err(Error::Protocol(ProtocolError::ServerMaskedData));
+            return Err(Error::Protocol(ProtocolError::UnexpectedMaskedFrame));
         } else if !mask && self.role == Role::Server {
-            return Err(Error::Protocol(ProtocolError::UnmaskedData));
+            return Err(Error::Protocol(ProtocolError::UnexpectedUnmaskedFrame));
         }
 
         // Bits 1-7
@@ -152,10 +152,10 @@ impl Decoder for WebsocketProtocol {
 
         // Close frames must be at least 2 bytes in length
         if opcode == OpCode::Close && payload_length == 1 {
-            return Err(Error::Protocol(ProtocolError::InvalidCloseSequence));
+            return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
         } else if payload_length > 125 {
             if opcode.is_control() {
-                return Err(Error::Protocol(ProtocolError::InvalidControlFrameLength));
+                return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
             }
 
             if payload_length == 126 {
@@ -270,8 +270,8 @@ impl Decoder for WebsocketProtocol {
                         .try_into()
                         .unwrap_unchecked()
                 }))?;
-                if !code.is_known() || !code.is_sendable() {
-                    return Err(Error::Protocol(ProtocolError::DisallowedCloseCode));
+                if !code.is_sendable() {
+                    return Err(Error::Protocol(ProtocolError::InvalidCloseCode));
                 }
 
                 // SAFETY: payload_length <= src.len()

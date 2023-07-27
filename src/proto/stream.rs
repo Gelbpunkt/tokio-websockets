@@ -123,16 +123,14 @@ where
 
             if self.partial_opcode == OpCode::Continuation {
                 if opcode == OpCode::Continuation {
-                    return Poll::Ready(Some(Err(Error::Protocol(
-                        ProtocolError::UnexpectedContinuation,
-                    ))));
+                    return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::InvalidOpcode))));
                 } else if fin {
                     return Poll::Ready(Some(Ok(Message { opcode, payload })));
                 }
 
                 self.partial_opcode = opcode;
             } else if opcode != OpCode::Continuation {
-                return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::UnfinishedMessage))));
+                return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::InvalidOpcode))));
             }
 
             if let Some(max_message_size) = self.inner.codec().limits.max_message_size {
