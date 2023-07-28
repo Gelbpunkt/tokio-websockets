@@ -20,7 +20,7 @@ use super::{
     types::{Frame, Limits, Message, OpCode, Role, StreamState},
     ProtocolError,
 };
-use crate::{utf8, Error};
+use crate::Error;
 
 /// Outgoing messages are split into frames of this size.
 const FRAME_SIZE: usize = 4096;
@@ -52,10 +52,6 @@ pub struct WebsocketStream<T> {
     /// Opcode of the full message that is being assembled.
     partial_opcode: OpCode,
 
-    /// Index up to which the full message payload was validated to be valid
-    /// UTF-8.
-    utf8_valid_up_to: usize,
-
     /// Whether the sink needs to be flushed.
     needs_flush: bool,
 
@@ -77,7 +73,6 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            utf8_valid_up_to: 0,
             needs_flush: false,
             pending_frame: None,
         }
@@ -92,7 +87,6 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            utf8_valid_up_to: 0,
             needs_flush: false,
             pending_frame: None,
         }
@@ -206,9 +200,7 @@ where
             }
 
             if self.partial_opcode == OpCode::Continuation {
-                if opcode == OpCode::Continuation {
-                    return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::InvalidOpcode))));
-                } else if fin {
+                if fin {
                     return Poll::Ready(Some(Ok(Message { opcode, payload })));
                 }
 
@@ -230,15 +222,6 @@ where
 
             self.partial_payload.extend_from_slice(&payload);
 
-            if self.partial_opcode == OpCode::Text {
-                // SAFETY: self.utf8_valid_up_to is an index in self.partial_payload and cannot
-                // exceed its length
-                self.utf8_valid_up_to += utf8::should_fail_fast(
-                    unsafe { self.partial_payload.get_unchecked(self.utf8_valid_up_to..) },
-                    fin,
-                )?;
-            }
-
             if fin {
                 break;
             }
@@ -246,8 +229,6 @@ where
 
         let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
         let payload = take(&mut self.partial_payload).freeze();
-
-        self.utf8_valid_up_to = 0;
 
         Poll::Ready(Some(Ok(Message { opcode, payload })))
     }
