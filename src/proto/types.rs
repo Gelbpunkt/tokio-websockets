@@ -155,13 +155,6 @@ pub struct Message {
 }
 
 impl Message {
-    /// Default close message.
-    #[allow(clippy::declare_interior_mutable_const)]
-    pub(super) const DEFAULT_CLOSE: Self = Self {
-        opcode: OpCode::Close,
-        payload: Bytes::from_static(&CloseCode::NORMAL_CLOSURE.0.get().to_be_bytes()),
-    };
-
     /// Create a new text message.
     #[must_use]
     pub fn text(payload: String) -> Self {
@@ -420,7 +413,7 @@ pub(super) enum StreamState {
 }
 
 /// A frame of a websocket [`Message`].
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Frame {
     /// The [`OpCode`] of the frame.
     pub opcode: OpCode,
@@ -428,6 +421,21 @@ pub(super) struct Frame {
     pub is_final: bool,
     /// The payload bytes of the frame.
     pub payload: Bytes,
+}
+
+impl Frame {
+    /// Default close frame.
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const DEFAULT_CLOSE: Self = Self {
+        opcode: OpCode::Close,
+        is_final: true,
+        payload: Bytes::from_static(&CloseCode::NORMAL_CLOSURE.0.get().to_be_bytes()),
+    };
+
+    /// Whether the frame is a close frame.
+    pub fn is_close(&self) -> bool {
+        self.opcode == OpCode::Close
+    }
 }
 
 impl From<Message> for Frame {

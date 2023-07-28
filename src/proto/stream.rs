@@ -17,7 +17,7 @@ use tokio_util::codec::Framed;
 
 use super::{
     codec::WebsocketProtocol,
-    types::{Limits, Message, OpCode, Role, StreamState},
+    types::{Frame, Limits, Message, OpCode, Role, StreamState},
     ProtocolError,
 };
 use crate::{utf8, Error};
@@ -59,8 +59,8 @@ pub struct WebsocketStream<T> {
     /// Whether the sink needs to be flushed.
     needs_flush: bool,
 
-    /// Pending message to be encoded once the sink is ready.
-    pending_message: Option<Message>,
+    /// Pending frame to be encoded once the sink is ready.
+    pending_frame: Option<Frame>,
 }
 
 impl<T> WebsocketStream<T>
@@ -79,7 +79,7 @@ where
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
             needs_flush: false,
-            pending_message: None,
+            pending_frame: None,
         }
     }
 
@@ -94,23 +94,107 @@ where
             partial_opcode: OpCode::Continuation,
             utf8_valid_up_to: 0,
             needs_flush: false,
-            pending_message: None,
+            pending_frame: None,
         }
     }
 
-    /// Assemble the next raw [`Message`] parts from the websocket stream from
-    /// intermediate frames from the codec.
+    /// Attempt to pull out the next frame from the [`Framed`] this stream and
+    /// from that update the stream's internal state.
     ///
     /// # Errors
     ///
     /// This method returns an [`Error`] if reading from the stream fails or a
     /// protocol violation is encountered.
-    fn poll_read_next_message(
+    fn poll_next_frame(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Message, Error>>> {
+    ) -> Poll<Option<Result<Frame, Error>>> {
+        match self.state {
+            StreamState::Active | StreamState::ClosedByUs => {}
+            StreamState::ClosedByPeer => {
+                ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
+                // SAFETY: arm is only taken until the pending close frame is encoded
+                let frame = unsafe { self.pending_frame.take().unwrap_unchecked() };
+                Pin::new(&mut self.inner).start_send(frame)?;
+                if self.inner.codec().role == Role::Server {
+                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
+                } else {
+                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
+                }
+                return Poll::Ready(None);
+            }
+            StreamState::CloseAcknowledged => {
+                if self.inner.codec().role == Role::Server {
+                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
+                } else {
+                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
+                }
+                return Poll::Ready(None);
+            }
+        }
+
+        if self.pending_frame.is_some() && Pin::new(&mut self.inner).poll_ready(cx).is_ready() {
+            // SAFETY: We just ensured that the pending frame is some
+            let frame = unsafe { self.pending_frame.take().unwrap_unchecked() };
+            self.as_mut().start_send(Message {
+                opcode: frame.opcode,
+                payload: frame.payload,
+            })?;
+        }
+
+        if self.needs_flush {
+            _ = self.as_mut().poll_flush(cx)?;
+        }
+
+        let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
+            Some(Ok(frame)) => frame,
+            Some(Err(e)) => return Poll::Ready(Some(Err(e))),
+            None => return Poll::Ready(None),
+        };
+
+        match frame.opcode {
+            OpCode::Close => match self.state {
+                StreamState::Active => {
+                    self.state = StreamState::ClosedByPeer;
+                    let mut frame = frame.clone();
+                    frame.payload.truncate(2);
+
+                    self.pending_frame = Some(frame);
+                }
+                // SAFETY: match statement at the start of the method ensures that this is not the
+                // case
+                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => unsafe {
+                    unreachable_unchecked()
+                },
+                StreamState::ClosedByUs => {
+                    self.state = StreamState::CloseAcknowledged;
+                }
+            },
+            OpCode::Ping
+                if self.state == StreamState::Active
+                    && !self.pending_frame.as_ref().map_or(false, Frame::is_close) =>
+            {
+                let mut frame = frame.clone();
+                frame.opcode = OpCode::Pong;
+
+                self.pending_frame = Some(frame);
+            }
+            _ => {}
+        }
+
+        Poll::Ready(Some(Ok(frame)))
+    }
+}
+
+impl<T> Stream for WebsocketStream<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    type Item = Result<Message, Error>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
-            let (opcode, payload, fin) = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
+            let (opcode, payload, fin) = match ready!(self.as_mut().poll_next_frame(cx)) {
                 Some(Ok(frame)) => (frame.opcode, frame.payload, frame.is_final),
                 Some(Err(e)) => return Poll::Ready(Some(Err(e))),
                 None => return Poll::Ready(None),
@@ -169,98 +253,6 @@ where
     }
 }
 
-impl<T> Stream for WebsocketStream<T>
-where
-    T: AsyncRead + AsyncWrite + Unpin,
-{
-    type Item = Result<Message, Error>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.state {
-            StreamState::Active | StreamState::ClosedByUs => {}
-            StreamState::ClosedByPeer => {
-                ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
-                // SAFETY: arm is only taken until the pending close message is encoded
-                let message = unsafe { self.pending_message.take().unwrap_unchecked() };
-                Pin::new(&mut self.inner).start_send(message.into())?;
-                if self.inner.codec().role == Role::Server {
-                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
-                } else {
-                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
-                }
-                return Poll::Ready(None);
-            }
-            StreamState::CloseAcknowledged => {
-                if self.inner.codec().role == Role::Server {
-                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
-                } else {
-                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
-                }
-                return Poll::Ready(None);
-            }
-        }
-
-        if self.pending_message.is_some() && Pin::new(&mut self.inner).poll_ready(cx).is_ready() {
-            // SAFETY: We just ensured that the pending message is some
-            let item = unsafe { self.pending_message.take().unwrap_unchecked() };
-            self.as_mut().start_send(item)?;
-        }
-
-        if self.needs_flush {
-            _ = self.as_mut().poll_flush(cx)?;
-        }
-
-        let message = match ready!(self.as_mut().poll_read_next_message(cx)) {
-            Some(Ok(msg)) => msg,
-            Some(Err(e)) => {
-                if self.state == StreamState::Active {
-                    if let Error::Protocol(protocol) = &e {
-                        self.pending_message = Some(protocol.into());
-                    }
-                }
-
-                return Poll::Ready(Some(Err(e)));
-            }
-            None => return Poll::Ready(None),
-        };
-
-        match &message.opcode {
-            OpCode::Close => match self.state {
-                StreamState::Active => {
-                    self.state = StreamState::ClosedByPeer;
-                    let mut msg = message.clone();
-                    msg.payload.truncate(2);
-
-                    self.pending_message = Some(msg);
-                }
-                // SAFETY: match statement at the start of the method ensures that this is not the
-                // case
-                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => unsafe {
-                    unreachable_unchecked()
-                },
-                StreamState::ClosedByUs => {
-                    self.state = StreamState::CloseAcknowledged;
-                }
-            },
-            OpCode::Ping
-                if self.state == StreamState::Active
-                    && !self
-                        .pending_message
-                        .as_ref()
-                        .map_or(false, Message::is_close) =>
-            {
-                let mut msg = message.clone();
-                msg.opcode = OpCode::Pong;
-
-                self.pending_message = Some(msg);
-            }
-            _ => {}
-        }
-
-        Poll::Ready(Some(Ok(message)))
-    }
-}
-
 impl<T> Sink<Message> for WebsocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
@@ -269,8 +261,11 @@ where
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
-        if let Some(item) = self.pending_message.take() {
-            self.as_mut().start_send(item)?;
+        if let Some(frame) = self.pending_frame.take() {
+            self.as_mut().start_send(Message {
+                opcode: frame.opcode,
+                payload: frame.payload,
+            })?;
             Pin::new(&mut self.inner).poll_ready(cx)
         } else {
             Poll::Ready(Ok(()))
@@ -317,12 +312,9 @@ where
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.state == StreamState::Active
-            && !self
-                .pending_message
-                .as_ref()
-                .map_or(false, Message::is_close)
+            && !self.pending_frame.as_ref().map_or(false, Frame::is_close)
         {
-            self.pending_message = Some(Message::DEFAULT_CLOSE);
+            self.pending_frame = Some(Frame::DEFAULT_CLOSE);
         }
         while ready!(self.as_mut().poll_next(cx)).is_some() {}
         Poll::Ready(Ok(()))
