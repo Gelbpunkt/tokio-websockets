@@ -6,7 +6,12 @@ use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
 use super::types::{Frame, Limits, OpCode, Role};
-use crate::{mask, proto::ProtocolError, utf8, CloseCode, Error};
+use crate::{
+    mask,
+    proto::ProtocolError,
+    utf8::{self, Validator},
+    CloseCode, Error,
+};
 
 /// The actual implementation of the websocket byte-level protocol.
 /// It provides an [`Encoder`] for entire [`Message`]s and a [`Decoder`] for
@@ -18,10 +23,12 @@ pub(super) struct WebsocketProtocol {
     pub(super) role: Role,
     /// The [`Limits`] imposed on this stream.
     pub(super) limits: Limits,
-    /// Index up to which the payload was unmasked.
-    payload_unmasked: usize,
-    /// Index up to which the payload data was validated.
-    payload_data_validated: usize,
+    /// Opcode of the full message.
+    fragmented_message_opcode: OpCode,
+    /// Index up to which the payload was processed (unmasked and validated).
+    payload_processed: usize,
+    /// UTF-8 validator.
+    validator: Validator,
 }
 
 impl WebsocketProtocol {
@@ -30,8 +37,9 @@ impl WebsocketProtocol {
         Self {
             role,
             limits,
-            payload_unmasked: 0,
-            payload_data_validated: 0,
+            fragmented_message_opcode: OpCode::Continuation,
+            payload_processed: 0,
+            validator: Validator::new(),
         }
     }
 }
@@ -132,8 +140,16 @@ impl Decoder for WebsocketProtocol {
         // Bits 4-7
         let opcode = OpCode::try_from(fin_and_rsv & 0xF)?;
 
-        if !fin && opcode.is_control() {
-            return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
+        if opcode.is_control() {
+            if !fin {
+                return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
+            }
+        } else if self.fragmented_message_opcode == OpCode::Continuation {
+            if opcode == OpCode::Continuation {
+                return Err(Error::Protocol(ProtocolError::InvalidOpcode));
+            }
+        } else if opcode != OpCode::Continuation {
+            return Err(Error::Protocol(ProtocolError::InvalidOpcode));
         }
 
         // Bit 0
@@ -207,7 +223,10 @@ impl Decoder for WebsocketProtocol {
 
             if payload_length != payload_available {
                 // Validate partial frame payload data
-                if opcode == OpCode::Text {
+                if opcode == OpCode::Text
+                    || (opcode == OpCode::Continuation
+                        && self.fragmented_message_opcode == OpCode::Text)
+                {
                     if mask {
                         // SAFETY: The masking key and the payload do not overlap in src
                         // TODO: Replace with split_at_mut_unchecked when stable
@@ -215,25 +234,26 @@ impl Decoder for WebsocketProtocol {
                             let masking_key_ptr =
                                 src.get_unchecked(offset - 4..offset) as *const [u8];
                             let payload_masked_ptr = src.get_unchecked_mut(
-                                offset + self.payload_unmasked..offset + payload_available,
+                                offset + self.payload_processed..offset + payload_available,
                             ) as *mut [u8];
 
                             (&*masking_key_ptr, &mut *payload_masked_ptr)
                         };
 
-                        mask::frame(masking_key, payload_masked, self.payload_unmasked & 3);
-                        self.payload_unmasked = payload_available;
+                        mask::frame(masking_key, payload_masked, self.payload_processed & 3);
                     }
 
                     // SAFETY: self.payload_data_validated <= payload_available
-                    self.payload_data_validated += utf8::should_fail_fast(
+                    self.validator.feed(
                         unsafe {
                             src.get_unchecked(
-                                offset + self.payload_data_validated..offset + payload_available,
+                                offset + self.payload_processed..offset + payload_available,
                             )
                         },
                         false,
                     )?;
+
+                    self.payload_processed = payload_available;
                 }
 
                 src.reserve((payload_length - payload_available).saturating_sub(src.capacity()));
@@ -247,20 +267,26 @@ impl Decoder for WebsocketProtocol {
                 let (masking_key, payload_masked) = unsafe {
                     let masking_key_ptr = src.get_unchecked(offset - 4..offset) as *const [u8];
                     let payload_masked_ptr = src
-                        .get_unchecked_mut(offset + self.payload_unmasked..offset + payload_length)
+                        .get_unchecked_mut(offset + self.payload_processed..offset + payload_length)
                         as *mut [u8];
 
                     (&*masking_key_ptr, &mut *payload_masked_ptr)
                 };
 
-                mask::frame(masking_key, payload_masked, self.payload_unmasked & 3);
+                mask::frame(masking_key, payload_masked, self.payload_processed & 3);
             }
 
-            if fin && opcode == OpCode::Text {
+            if opcode == OpCode::Text
+                || (opcode == OpCode::Continuation
+                    && self.fragmented_message_opcode == OpCode::Text)
+            {
                 // SAFETY: self.payload_data_validated <= payload_length
-                utf8::parse_str(unsafe {
-                    src.get_unchecked(offset + self.payload_data_validated..offset + payload_length)
-                })?;
+                self.validator.feed(
+                    unsafe {
+                        src.get_unchecked(offset + self.payload_processed..offset + payload_length)
+                    },
+                    fin,
+                )?;
             } else if opcode == OpCode::Close {
                 // SAFETY: Close frames with a non-zero payload length are validated to not have
                 // a length of 1
@@ -286,8 +312,13 @@ impl Decoder for WebsocketProtocol {
         // Take the payload
         let payload = src.split_to(payload_length).freeze();
 
-        self.payload_unmasked = 0;
-        self.payload_data_validated = 0;
+        if fin && !opcode.is_control() {
+            self.fragmented_message_opcode = OpCode::Continuation;
+        } else if opcode != OpCode::Continuation {
+            self.fragmented_message_opcode = opcode;
+        }
+
+        self.payload_processed = 0;
 
         Ok(Some(Frame {
             opcode,
