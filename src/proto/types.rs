@@ -4,7 +4,6 @@ use std::{hint::unreachable_unchecked, mem::replace, num::NonZeroU16, slice::Chu
 use bytes::{BufMut, Bytes, BytesMut};
 
 use super::error::ProtocolError;
-use crate::utf8;
 
 /// The opcode of a websocket frame. It denotes the type of the frame or an
 /// assembled message.
@@ -122,16 +121,6 @@ impl CloseCode {
             0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
         }
     }
-
-    /// Whether the close code is known to the library.
-    pub(super) fn is_known(self) -> bool {
-        match self.0.get() {
-            1000..=1015 | 3000..=4999 => true,
-            1000..=2999 => false,
-            // SAFETY: `TryFrom` is the only way to accquire self and it errors for these values
-            0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
-        }
-    }
 }
 
 impl From<CloseCode> for u16 {
@@ -146,8 +135,8 @@ impl TryFrom<u16> for CloseCode {
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: We just checked that the value is non-zero
-            1000..=4999 => Ok(Self(unsafe { NonZeroU16::new_unchecked(value) })),
-            0..=999 | 5000..=u16::MAX => Err(ProtocolError::InvalidCloseCode),
+            1000..=1015 | 3000..=4999 => Ok(Self(unsafe { NonZeroU16::new_unchecked(value) })),
+            0..=999 | 1016..=2999 | 5000..=u16::MAX => Err(ProtocolError::InvalidCloseCode),
         }
     }
 }
@@ -270,58 +259,37 @@ impl Message {
     }
 
     /// Returns a reference to the message payload as a string if it is a text
-    /// message or a binary message and valid UTF-8.
-    ///
-    /// For text messages, this is just a free transmutation because UTF-8 is
-    /// already validated previously.
-    ///
-    /// # Errors
-    ///
-    /// This method returns a [`ProtocolError`] if the message is neither text
-    /// or binary or binary and invalid UTF-8.
-    pub fn as_text(&self) -> Result<&str, ProtocolError> {
-        match self.opcode {
-            // SAFETY: UTF-8 is validated by the Decoder and/or when the message is assembled from
-            // frames in the case of text messages.
-            OpCode::Text => Ok(unsafe { std::str::from_utf8_unchecked(&self.payload) }),
-            OpCode::Binary => Ok(utf8::parse_str(&self.payload)?),
-            _ => Err(ProtocolError::MessageHasWrongOpcode),
-        }
+    /// message.
+    pub fn as_text(&self) -> Option<&str> {
+        // SAFETY: Opcode is Text so the payload is valid UTF-8
+        (self.opcode == OpCode::Text)
+            .then(|| unsafe { std::str::from_utf8_unchecked(&self.payload) })
     }
 
     /// Returns the [`CloseCode`] and close reason if the message is a close
     /// message.
-    ///
-    /// # Errors
-    ///
-    /// This method returns a [`ProtocolError`] if the message is not a close
-    /// message.
-    pub fn as_close(&self) -> Result<(CloseCode, &str), ProtocolError> {
-        if self.opcode == OpCode::Close {
-            let close_code = if self.payload.len() >= 2 {
-                // SAFETY: self.data.len() is greater or equal to 2
-                let close_code_value = u16::from_be_bytes(unsafe {
-                    self.payload
-                        .get_unchecked(0..2)
-                        .try_into()
-                        .unwrap_unchecked()
-                });
-                CloseCode::try_from(close_code_value)?
-            } else {
+    pub fn as_close(&self) -> Option<(CloseCode, &str)> {
+        (self.opcode == OpCode::Close).then(|| {
+            let code = if self.payload.is_empty() {
                 CloseCode::NO_STATUS_RECEIVED
-            };
-
-            let reason = if self.payload.len() > 2 {
-                // SAFETY: self.data.len() is greater or equal to 2
-                unsafe { std::str::from_utf8_unchecked(self.payload.get_unchecked(2..)) }
             } else {
-                ""
+                // SAFETY: Opcode is Close with a non-empty payload so it's atleast 2 bytes long
+                unsafe {
+                    CloseCode::try_from(u16::from_be_bytes(
+                        self.payload
+                            .get_unchecked(0..2)
+                            .try_into()
+                            .unwrap_unchecked(),
+                    ))
+                    .unwrap_unchecked()
+                }
             };
 
-            Ok((close_code, reason))
-        } else {
-            Err(ProtocolError::MessageHasWrongOpcode)
-        }
+            // SAFETY: Opcode is Close so the rest of the payload is valid UTF-8
+            let reason = unsafe { std::str::from_utf8_unchecked(self.payload.get_unchecked(2..)) };
+
+            (code, reason)
+        })
     }
 
     /// Returns an iterator over frames of `frame_size` length to split this
@@ -370,7 +338,7 @@ impl From<&ProtocolError> for Message {
             ProtocolError::InvalidUtf8 => {
                 Message::close(Some(CloseCode::INVALID_FRAME_PAYLOAD_DATA), "invalid utf8")
             }
-            _ => Message::close(Some(CloseCode::PROTOCOL_ERROR), "protocol violation"),
+            _ => Message::close(Some(CloseCode::PROTOCOL_ERROR), val.as_str()),
         }
     }
 }
