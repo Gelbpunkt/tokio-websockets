@@ -108,22 +108,34 @@ impl Validator {
                     .copy_from_slice(input.get_unchecked(..bytes_to_copy));
             }
 
-            match FROM_UTF8_COMPAT(unsafe {
-                self.partial_codepoint
-                    .get_unchecked(..codepoint_len_after_copy)
-            }) {
-                Ok(_) => {}
-                Err(utf8_error) if utf8_error.error_len().is_some() => {
+            // If we know that the codepoint is complete, we can use the basic variant
+            if available_bytes == missing_bytes {
+                if FROM_UTF8_BASIC(unsafe {
+                    self.partial_codepoint
+                        .get_unchecked(..codepoint_len_after_copy)
+                })
+                .is_err()
+                {
                     return Err(ProtocolError::InvalidUtf8);
                 }
-                Err(_) => {
-                    self.partial_codepoint_len = codepoint_len_after_copy;
-
-                    if is_complete {
+            } else {
+                match FROM_UTF8_COMPAT(unsafe {
+                    self.partial_codepoint
+                        .get_unchecked(..codepoint_len_after_copy)
+                }) {
+                    Ok(_) => {}
+                    Err(utf8_error) if utf8_error.error_len().is_some() => {
                         return Err(ProtocolError::InvalidUtf8);
                     }
+                    Err(_) => {
+                        self.partial_codepoint_len = codepoint_len_after_copy;
 
-                    return Ok(());
+                        if is_complete {
+                            return Err(ProtocolError::InvalidUtf8);
+                        }
+
+                        return Ok(());
+                    }
                 }
             }
 
