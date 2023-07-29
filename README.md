@@ -96,7 +96,7 @@ async fn main() -> Result<(), Error> {
   client.send(Message::text(String::from("Hello world!"))).await?;
 
   while let Some(Ok(msg)) = client.next().await {
-    if let Ok(text) = msg.as_text() {
+    if let Some(text) = msg.as_text() {
       assert_eq!(text, "Hello world!");
       // We got one message, just stop now
       client.close().await?;
