@@ -18,7 +18,6 @@ use tokio_util::codec::Framed;
 use super::{
     codec::WebsocketProtocol,
     types::{Frame, Limits, Message, OpCode, Role, StreamState},
-    ProtocolError,
 };
 use crate::Error;
 
@@ -194,19 +193,11 @@ where
                 None => return Poll::Ready(None),
             };
 
-            // Control frames are allowed in between other frames
-            if opcode.is_control() {
-                return Poll::Ready(Some(Ok(Message { opcode, payload })));
-            }
-
-            if self.partial_opcode == OpCode::Continuation {
+            if opcode != OpCode::Continuation {
                 if fin {
                     return Poll::Ready(Some(Ok(Message { opcode, payload })));
                 }
-
                 self.partial_opcode = opcode;
-            } else if opcode != OpCode::Continuation {
-                return Poll::Ready(Some(Err(Error::Protocol(ProtocolError::InvalidOpcode))));
             }
 
             if let Some(max_message_size) = self.inner.codec().limits.max_message_size {
