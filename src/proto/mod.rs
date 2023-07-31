@@ -5,7 +5,7 @@ pub(crate) use self::types::Role;
 pub use self::{
     error::ProtocolError,
     stream::WebsocketStream,
-    types::{CloseCode, Limits, Message},
+    types::{CloseCode, Config, Limits, Message},
 };
 
 mod codec;

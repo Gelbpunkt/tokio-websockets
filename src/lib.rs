@@ -36,7 +36,7 @@ mod utf8;
 #[cfg(feature = "client")]
 pub use client::Builder as ClientBuilder;
 pub use error::Error;
-pub use proto::{CloseCode, Limits, Message, WebsocketStream};
+pub use proto::{CloseCode, Config, Limits, Message, WebsocketStream};
 #[cfg(feature = "server")]
 pub use server::Builder as ServerBuilder;
 pub use tls::{Connector, MaybeTlsStream};

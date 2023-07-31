@@ -24,7 +24,7 @@ use tokio::{
 use tokio_util::codec::Decoder;
 
 use crate::{
-    proto::{Limits, Role},
+    proto::{Config, Limits, Role},
     upgrade::{self, server_response},
     Connector, Error, MaybeTlsStream, WebsocketStream,
 };
@@ -125,6 +125,8 @@ pub struct Builder<'a> {
     /// A TLS connector to use for the connection. If not set and required, a
     /// new one will be created.
     connector: Option<&'a Connector>,
+    /// Configuration for the websocket stream.
+    config: Config,
     /// Limits to impose on the websocket stream.
     limits: Limits,
     /// Headers to be sent with the upgrade request.
@@ -139,6 +141,7 @@ impl<'a> Builder<'a> {
         Self {
             uri: None,
             connector: None,
+            config: Config::default(),
             limits: Limits::default(),
             headers: HeaderMap::new(),
         }
@@ -164,6 +167,7 @@ impl<'a> Builder<'a> {
         Self {
             uri: Some(uri),
             connector: None,
+            config: Config::default(),
             limits: Limits::default(),
             headers: HeaderMap::new(),
         }
@@ -176,6 +180,14 @@ impl<'a> Builder<'a> {
     #[must_use]
     pub fn connector(mut self, connector: &'a Connector) -> Self {
         self.connector = Some(connector);
+
+        self
+    }
+
+    /// Sets the configuration for the websocket stream.
+    #[must_use]
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = config;
 
         self
     }
@@ -262,7 +274,7 @@ impl<'a> Builder<'a> {
             .ok_or(Error::NoUpgradeResponse)??;
 
         Ok((
-            WebsocketStream::from_framed(framed, Role::Client, self.limits),
+            WebsocketStream::from_framed(framed, Role::Client, self.config, self.limits),
             res,
         ))
     }
@@ -275,7 +287,7 @@ impl<'a> Builder<'a> {
     /// handshake, it assumes the stream is ready to use for writing and
     /// reading the websocket protocol.
     pub fn take_over<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(stream, Role::Client, self.limits)
+        WebsocketStream::from_raw_stream(stream, Role::Client, self.config, self.limits)
     }
 }
 

@@ -12,7 +12,7 @@ use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Framed};
 
 use crate::{
-    proto::{Limits, Role},
+    proto::{Config, Limits, Role},
     upgrade::client_request,
     Error, WebsocketStream,
 };
@@ -22,6 +22,8 @@ const BAD_REQUEST: &[u8] = b"HTTP/1.1 400 Bad Request\r\n\r\n";
 
 /// Builder for websocket server connections.
 pub struct Builder {
+    /// Configuration for the websocket stream.
+    config: Config,
     /// Limits to impose on the websocket stream.
     limits: Limits,
 }
@@ -38,8 +40,17 @@ impl Builder {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            config: Config::default(),
             limits: Limits::default(),
         }
+    }
+
+    /// Sets the configuration for the websocket stream.
+    #[must_use]
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = config;
+
+        self
     }
 
     /// Sets the limits for the websocket stream.
@@ -71,6 +82,7 @@ impl Builder {
                 Ok(WebsocketStream::from_framed(
                     framed,
                     Role::Server,
+                    self.config,
                     self.limits,
                 ))
             }
@@ -88,6 +100,6 @@ impl Builder {
     ///
     /// This does not perform a HTTP upgrade handshake.
     pub fn serve<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(stream, Role::Server, self.limits)
+        WebsocketStream::from_raw_stream(stream, Role::Server, self.config, self.limits)
     }
 }

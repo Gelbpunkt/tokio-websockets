@@ -18,11 +18,9 @@ use tokio_util::codec::Framed;
 use super::{
     codec::WebsocketProtocol,
     types::{Frame, Limits, Message, OpCode, Role, StreamState},
+    Config,
 };
 use crate::Error;
-
-/// Outgoing messages are split into frames of this size.
-const FRAME_SIZE: usize = 4096;
 
 /// A websocket stream that full messages can be read from and written to.
 ///
@@ -42,6 +40,9 @@ pub struct WebsocketStream<T> {
     /// The underlying stream using the [`WebsocketProtocol`] to read and write
     /// full frames.
     inner: Framed<T, WebsocketProtocol>,
+
+    /// Configuration for the stream.
+    config: Config,
 
     /// The [`StreamState`] of the current stream.
     state: StreamState,
@@ -64,11 +65,12 @@ where
 {
     /// Create a new [`WebsocketStream`] from a raw stream.
     #[cfg(any(feature = "client", feature = "server"))]
-    pub(crate) fn from_raw_stream(stream: T, role: Role, limits: Limits) -> Self {
+    pub(crate) fn from_raw_stream(stream: T, role: Role, config: Config, limits: Limits) -> Self {
         use tokio_util::codec::Decoder;
 
         Self {
             inner: WebsocketProtocol::new(role, limits).framed(stream),
+            config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
@@ -80,9 +82,15 @@ where
     /// Create a new [`WebsocketStream`] from an existing [`Framed`]. This
     /// allows for reusing the internal buffer of the [`Framed`] object.
     #[cfg(any(feature = "client", feature = "server"))]
-    pub(crate) fn from_framed<U>(framed: Framed<T, U>, role: Role, limits: Limits) -> Self {
+    pub(crate) fn from_framed<U>(
+        framed: Framed<T, U>,
+        role: Role,
+        config: Config,
+        limits: Limits,
+    ) -> Self {
         Self {
             inner: framed.map_codec(|_| WebsocketProtocol::new(role, limits)),
+            config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
@@ -263,7 +271,7 @@ where
             Pin::new(&mut self.inner).start_send(item.into())?;
         } else {
             // Chunk the message into frames
-            for frame in item.as_frames(FRAME_SIZE) {
+            for frame in item.as_frames(self.config.frame_size) {
                 Pin::new(&mut self.inner).start_send(frame)?;
             }
         }

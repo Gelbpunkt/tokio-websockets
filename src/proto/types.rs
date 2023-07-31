@@ -388,6 +388,40 @@ impl Default for Limits {
     }
 }
 
+/// Low-level configuration for a [`WebsocketStream`] that allows configuring
+/// behavior for sending and receiving messages.
+///
+/// [`WebsocketStream`]: super::WebsocketStream
+#[derive(Debug, Clone, Copy)]
+pub struct Config {
+    /// Frame size to split outgoing messages into.
+    ///
+    /// Consider decreasing this if the remote imposes a limit on the frame
+    /// size. The default is 4MiB.
+    pub(super) frame_size: usize,
+}
+
+impl Config {
+    /// Set the frame size to split outgoing messages into.
+    ///
+    /// Consider decreasing this if the remote imposes a limit on the frame
+    /// size. The default is 4MiB.
+    #[must_use]
+    pub fn frame_size(mut self, frame_size: usize) -> Self {
+        self.frame_size = frame_size;
+
+        self
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            frame_size: 4 * 1024 * 1024,
+        }
+    }
+}
+
 /// Role assumed by the [`WebsocketStream`] in a connection.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Role {
