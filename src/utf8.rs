@@ -49,6 +49,7 @@ pub(crate) struct Validator {
 
 impl Validator {
     /// Creates a new validator.
+    #[cfg(any(feature = "client", feature = "server"))]
     pub fn new() -> Self {
         Self {
             partial_codepoint: [0; 4],

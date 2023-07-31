@@ -15,9 +15,11 @@ use futures_sink::Sink;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
 
+#[cfg(any(feature = "client", feature = "server"))]
+use super::types::Limits;
 use super::{
     codec::WebsocketProtocol,
-    types::{Frame, Limits, Message, OpCode, Role, StreamState},
+    types::{Frame, Message, OpCode, Role, StreamState},
     Config,
 };
 use crate::Error;

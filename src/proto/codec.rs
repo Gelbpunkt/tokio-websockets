@@ -33,6 +33,7 @@ pub(super) struct WebsocketProtocol {
 
 impl WebsocketProtocol {
     /// Creates a new websocket codec.
+    #[cfg(any(feature = "client", feature = "server"))]
     pub(super) fn new(role: Role, limits: Limits) -> Self {
         Self {
             role,
