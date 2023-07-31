@@ -14,8 +14,8 @@ jobs:
       - name: Run codespell
         uses: codespell-project/actions-codespell@v1
 
-  build-examples:
-    name: Build examples
+  run-tests:
+    name: Run tests
     runs-on: ubuntu-latest
 
     steps:
@@ -28,12 +28,16 @@ jobs:
           toolchain: nightly
           components: rust-src
 
+      - name: Use MSRV-specific .cargo/config.toml
+        run: |
+          mv .cargo/config.toml.msrv .cargo/config.toml
+
       - name: Add problem matchers
         run: echo "::add-matcher::.github/rust.json"
 
-      - name: Build examples
+      - name: Run tests
         run: |
-          cargo check --examples --all-features
+          cargo test --all-targets --all-features
 
   build-docs:
     name: Build docs
