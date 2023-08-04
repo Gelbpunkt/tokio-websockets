@@ -21,10 +21,8 @@ pub enum Error {
     NoUriConfigured,
     /// Websocket protocol violation.
     Protocol(ProtocolError),
-    /// Frame size limit was exceeded.
-    FrameTooLong { size: usize, max_size: usize },
-    /// Message size limit was exceeded.
-    MessageTooLong { size: usize, max_size: usize },
+    /// Payload length limit was exceeded.
+    PayloadTooLong { len: usize, max_len: usize },
     /// I/O error.
     Io(io::Error),
     /// TLS error originating in [`native_tls`].
@@ -93,17 +91,11 @@ impl fmt::Display for Error {
             #[cfg(feature = "client")]
             Error::NoUriConfigured => f.write_str("client has no URI configured"),
             Error::Protocol(e) => e.fmt(f),
-            Error::FrameTooLong { size, max_size } => {
-                f.write_str("frame size of ")?;
-                size.fmt(f)?;
-                f.write_str(" exceeds frame size limit of ")?;
-                max_size.fmt(f)
-            }
-            Error::MessageTooLong { size, max_size } => {
-                f.write_str("message size of ")?;
-                size.fmt(f)?;
-                f.write_str(" exceeds message size limit of ")?;
-                max_size.fmt(f)
+            Error::PayloadTooLong { len, max_len } => {
+                f.write_str("payload length of ")?;
+                len.fmt(f)?;
+                f.write_str(" exceeds the limit of ")?;
+                max_len.fmt(f)
             }
             Error::Io(e) => e.fmt(f),
             #[cfg(feature = "native-tls")]
@@ -125,8 +117,7 @@ impl std::error::Error for Error {
             Error::AlreadyClosed
             | Error::CannotResolveHost
             | Error::NoUpgradeResponse
-            | Error::FrameTooLong { .. }
-            | Error::MessageTooLong { .. } => None,
+            | Error::PayloadTooLong { .. } => None,
             #[cfg(feature = "client")]
             Error::NoUriConfigured => None,
             Error::Protocol(e) => Some(e),

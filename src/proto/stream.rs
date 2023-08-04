@@ -196,6 +196,8 @@ where
     type Item = Result<Message, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let max_len = self.inner.codec().limits.max_payload_len;
+
         loop {
             let (opcode, payload, fin) = match ready!(self.as_mut().poll_next_frame(cx)) {
                 Some(Ok(frame)) => (frame.opcode, frame.payload, frame.is_final),
@@ -208,17 +210,11 @@ where
                     return Poll::Ready(Some(Ok(Message { opcode, payload })));
                 }
                 self.partial_opcode = opcode;
-            }
-
-            if let Some(max_message_size) = self.inner.codec().limits.max_message_size {
-                let message_size = self.partial_payload.len() + payload.len();
-
-                if message_size > max_message_size {
-                    return Poll::Ready(Some(Err(Error::MessageTooLong {
-                        size: message_size,
-                        max_size: max_message_size,
-                    })));
-                }
+            } else if self.partial_payload.len() + payload.len() > max_len.unwrap_or(usize::MAX) {
+                return Poll::Ready(Some(Err(Error::PayloadTooLong {
+                    len: self.partial_payload.len() + payload.len(),
+                    max_len: max_len.unwrap_or(usize::MAX),
+                })));
             }
 
             self.partial_payload.extend_from_slice(&payload);
