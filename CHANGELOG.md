@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **[breaking]** `WebsocketStream` is now fully cancellation safe and implements `Stream`, therefore using `WebsocketStream::next` now requires having `StreamExt` in scope
 - **[breaking]** `CloseCode` is now a wrapper around a `NonZeroU16` instead of an enum. Enum variants have been moved to associated constants. This fixes possible creation of disallowed close codes by the user
 - **[breaking]** All error types are now marked as `non_exhaustive` to prevent consumer build breakage when new variants are added
+- **[breaking]** Emptied default features
 
 ### Removed
 

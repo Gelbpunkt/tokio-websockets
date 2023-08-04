@@ -1,3 +1,4 @@
+#![cfg(feature = "server")]
 use std::{
     io,
     pin::Pin,

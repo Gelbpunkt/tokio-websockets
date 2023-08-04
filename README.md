@@ -40,18 +40,9 @@ One SHA1 implementation is required, usually provided by the TLS implementation:
 
 The `client` feature requires enabling one random number generator:
 
-- [`fastrand`](https://docs.rs/fastrand/latest/fastrand) is the default used and a `PRNG`
+- [`fastrand`](https://docs.rs/fastrand/latest/fastrand) can be used as a `PRNG`
 - [`getrandom`](https://docs.rs/getrandom/latest/getrandom) can be used as a cryptographically secure RNG
 - [`rand`](https://docs.rs/rand/latest/rand) can be used as an alternative to `fastrand` and should be preferred if it is already in the dependency tree
-
-For these reasons, I recommend disabling default features and using a configuration that makes sense for you, for example:
-
-```toml
-# Tiny client
-tokio-websockets = { version = "*", default-features = false, features = ["client", "fastrand", "sha1_smol"] }
-# Client with SIMD, cryptographically secure RNG and rustls
-tokio-websockets = { version = "*", default-features = false, features = ["client", "getrandom", "simd", "rustls-webpki-roots"] }
-```
 
 ## Example
 
