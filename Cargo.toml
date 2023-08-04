@@ -47,7 +47,6 @@ webpki = { package = "rustls-webpki", version = "0.101", optional = true }
 openssl = { version = "0.10", default-features = false, optional = true }
 
 [features]
-default = ["client", "fastrand", "server", "sha1_smol"]
 client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util", "tokio/rt"]
 http-integration = ["dep:http-body"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
@@ -65,8 +64,36 @@ tokio = { version = "1", default-features = false, features = ["net", "macros", 
 tokio-rustls = "0.24"
 
 [[example]]
+name = "autobahn_client"
+required-features = ["client"]
+
+[[example]]
+name = "autobahn_server"
+required-features = ["server"]
+
+[[example]]
+name = "client"
+required-features = ["client"]
+
+[[example]]
 name = "native_tls_self_signed_client"
-required-features = ["native-tls"]
+required-features = ["client", "native-tls"]
+
+[[example]]
+name = "rustls_server"
+required-features = ["server"]
+
+[[example]]
+name = "server"
+required-features = ["server"]
+
+[[example]]
+name = "utf8_benchmark_client"
+required-features = ["client"]
+
+[[example]]
+name = "utf8_benchmark_server"
+required-features = ["server"]
 
 [package.metadata.docs.rs]
 all-features = true

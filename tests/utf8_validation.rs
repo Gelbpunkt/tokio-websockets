@@ -2,6 +2,7 @@
 // When a text message is split into multiple frames and the invalid UTF-8 is
 // part of a continuation frame, it only expects clients to fail fast after the
 // entire frame has been received. We should, however, fail immediately.
+#![cfg(feature = "server")]
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures_util::StreamExt;
