@@ -9,6 +9,7 @@
 //!     [`Builder::take_over`] to let it take over a websocket stream
 use std::{
     future::poll_fn,
+    io,
     net::{SocketAddr, ToSocketAddrs},
     pin::Pin,
     str::FromStr,
@@ -271,7 +272,7 @@ impl<'a> Builder<'a> {
         let mut framed = upgrade_codec.framed(stream);
         let res = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx))
             .await
-            .ok_or(Error::NoUpgradeResponse)??;
+            .ok_or(Error::Io(io::ErrorKind::UnexpectedEof.into()))??;
 
         Ok((
             WebsocketStream::from_framed(framed, Role::Client, self.config, self.limits),

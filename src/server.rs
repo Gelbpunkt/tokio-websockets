@@ -5,7 +5,7 @@
 //!     established stream, via [`Builder::accept`]
 //!   - By performing the handshake yourself and then using [`Builder::serve`]
 //!     to let it take over a websocket stream
-use std::{future::poll_fn, pin::Pin};
+use std::{future::poll_fn, io, pin::Pin};
 
 use futures_core::Stream;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -91,7 +91,7 @@ impl Builder {
 
                 Err(e)
             }
-            None => Err(Error::NoUpgradeResponse),
+            None => Err(Error::Io(io::ErrorKind::UnexpectedEof.into())),
         }
     }
 

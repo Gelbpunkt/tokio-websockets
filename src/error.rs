@@ -28,8 +28,6 @@ pub enum Error {
     /// TLS error originating in [`native_tls`].
     #[cfg(feature = "native-tls")]
     NativeTls(native_tls::Error),
-    /// No response to the HTTP/1.1 Upgrade was received.
-    NoUpgradeResponse,
     /// Attempted to connect to an invalid DNS name.
     #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
     InvalidDNSName(InvalidDnsNameError),
@@ -100,7 +98,6 @@ impl fmt::Display for Error {
             Error::Io(e) => e.fmt(f),
             #[cfg(feature = "native-tls")]
             Error::NativeTls(e) => e.fmt(f),
-            Error::NoUpgradeResponse => f.write_str("upgrade handshake aborted by other end"),
             #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Error::InvalidDNSName(_) => f.write_str("invalid DNS name"),
             #[cfg(feature = "rustls-native-roots")]
@@ -114,10 +111,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::AlreadyClosed
-            | Error::CannotResolveHost
-            | Error::NoUpgradeResponse
-            | Error::PayloadTooLong { .. } => None,
+            Error::AlreadyClosed | Error::CannotResolveHost | Error::PayloadTooLong { .. } => None,
             #[cfg(feature = "client")]
             Error::NoUriConfigured => None,
             Error::Protocol(e) => Some(e),
