@@ -342,12 +342,9 @@ impl From<&ProtocolError> for Message {
 /// [`WebsocketStream`]: super::WebsocketStream
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
-    /// The maximum allowed frame size. `None` equals no limit. The default is
-    /// 16 MiB.
-    pub(super) max_frame_size: Option<usize>,
-    /// The maximum allowed message size. `None` equals no limit. The default is
-    /// 64 MiB.
-    pub(super) max_message_size: Option<usize>,
+    /// The maximum allowed payload length. `None` equals no limit. The default
+    /// is 64 MiB.
+    pub(super) max_payload_len: Option<usize>,
 }
 
 impl Limits {
@@ -355,25 +352,15 @@ impl Limits {
     #[must_use]
     pub fn unlimited() -> Self {
         Self {
-            max_frame_size: None,
-            max_message_size: None,
+            max_payload_len: None,
         }
     }
 
-    /// Sets the maximum allowed frame size. `None` equals no limit. The default
-    /// is 16 MiB.
-    #[must_use]
-    pub fn max_frame_size(mut self, size: Option<usize>) -> Self {
-        self.max_frame_size = size;
-
-        self
-    }
-
-    /// Sets the maximum allowed message size. `None` equals no limit. The
+    /// Sets the maximum allowed payload length. `None` equals no limit. The
     /// default is 64 MiB.
     #[must_use]
-    pub fn max_message_size(mut self, size: Option<usize>) -> Self {
-        self.max_message_size = size;
+    pub fn max_payload_len(mut self, size: Option<usize>) -> Self {
+        self.max_payload_len = size;
 
         self
     }
@@ -382,8 +369,7 @@ impl Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            max_frame_size: Some(16 * 1024 * 1024),
-            max_message_size: Some(64 * 1024 * 1024),
+            max_payload_len: Some(64 * 1024 * 1024),
         }
     }
 }

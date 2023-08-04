@@ -203,13 +203,11 @@ impl Decoder for WebsocketProtocol {
             }
         }
 
-        if let Some(max_frame_size) = self.limits.max_frame_size {
-            if payload_length > max_frame_size {
-                return Err(Error::FrameTooLong {
-                    size: payload_length,
-                    max_size: max_frame_size,
-                });
-            }
+        if payload_length > self.limits.max_payload_len.unwrap_or(usize::MAX) {
+            return Err(Error::PayloadTooLong {
+                len: payload_length,
+                max_len: self.limits.max_payload_len.unwrap_or(usize::MAX),
+            });
         }
 
         // There could be a mask here, but we only load it later,

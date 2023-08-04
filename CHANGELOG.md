@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added support for NEON-accelerated frame (un)masking (currently only on aarch64)
-- Limits for frame and message size can be applied via `{ClientBuilder, ServerBuilder}::limits` to protect against malicious peers
+- Limits for payload length can be applied via `{ClientBuilder, ServerBuilder}::limits` to protect against malicious peers
 - The websocket stream can now be configured via `{ClientBuilder, ServerBuilder}::config`. This currently only supports changing the frame payload size that outgoing messages are chunked into
 
 ### Changed
