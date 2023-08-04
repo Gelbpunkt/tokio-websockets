@@ -19,7 +19,7 @@ pub enum ProtocolError {
     InvalidRsv,
     /// An invalid UTF-8 segment was received when valid UTF-8 was expected.
     InvalidUtf8,
-    // A masked frame was unexpectedly received.
+    /// A masked frame was unexpectedly received.
     UnexpectedMaskedFrame,
     /// An unmasked frame was unexpectedly received.
     UnexpectedUnmaskedFrame,
