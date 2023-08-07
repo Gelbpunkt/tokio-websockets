@@ -119,6 +119,30 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             Self::Rustls(s) => Pin::new(s).poll_shutdown(cx),
         }
     }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        match self.get_mut() {
+            Self::Plain(ref mut s) => Pin::new(s).poll_write_vectored(cx, bufs),
+            #[cfg(feature = "native-tls")]
+            Self::NativeTls(s) => Pin::new(s).poll_write_vectored(cx, bufs),
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            Self::Rustls(s) => Pin::new(s).poll_write_vectored(cx, bufs),
+        }
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        match self {
+            Self::Plain(s) => s.is_write_vectored(),
+            #[cfg(feature = "native-tls")]
+            Self::NativeTls(s) => s.is_write_vectored(),
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            Self::Rustls(s) => s.is_write_vectored(),
+        }
+    }
 }
 
 impl Connector {
