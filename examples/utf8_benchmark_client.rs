@@ -75,7 +75,7 @@ fn main() -> io::Result<()> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(1024);
 
-    let mut payload: String = std::iter::repeat_with(|| fastrand::alphanumeric())
+    let mut payload: String = std::iter::repeat_with(fastrand::alphanumeric)
         .take(message_size - 1)
         .collect();
     payload.push(DELIMITER);
@@ -98,7 +98,7 @@ fn main() -> io::Result<()> {
     loop {
         // Now just write the message in chops
         for chop in encoded_message.chunks(chop_size) {
-            stream.write(chop)?;
+            stream.write_all(chop)?;
         }
 
         loop {

@@ -1,5 +1,7 @@
 //! Types required for the websocket protocol implementation.
-use std::{hint::unreachable_unchecked, mem::replace, num::NonZeroU16, slice::Chunks};
+use std::{
+    cell::UnsafeCell, fmt, hint::unreachable_unchecked, mem::replace, num::NonZeroU16, ops::Deref,
+};
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -141,6 +143,120 @@ impl TryFrom<u16> for CloseCode {
     }
 }
 
+/// Smart wrapper around [`Bytes`] and [`BytesMut`].
+///
+/// [`Bytes`] offers no API for acquiring mutable access to *unique* slices.
+/// By defering calling `freeze` on [`BytesMut`], this type retains mutable
+/// access to the underlying bytes until access is shared.
+pub(super) struct Payload(UnsafeCell<PayloadStorage>);
+
+impl Payload {
+    /// Creates a new shared `Payload` from a static slice.
+    const fn from_static(bytes: &'static [u8]) -> Self {
+        Self(UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(
+            bytes,
+        ))))
+    }
+
+    /// Shortens the buffer, keeping the first `len` bytes and dropping the
+    /// rest.
+    pub(super) fn truncate(&mut self, len: usize) {
+        match self.0.get_mut() {
+            PayloadStorage::Unique(b) => b.truncate(len),
+            PayloadStorage::Shared(b) => b.truncate(len),
+        }
+    }
+
+    /// Splits the buffer into two at the given index.
+    fn split_to(&mut self, at: usize) -> Self {
+        Self(UnsafeCell::new(match self.0.get_mut() {
+            PayloadStorage::Unique(b) => PayloadStorage::Unique(b.split_to(at)),
+            PayloadStorage::Shared(b) => PayloadStorage::Shared(b.split_to(at)),
+        }))
+    }
+}
+
+impl AsRef<PayloadStorage> for Payload {
+    fn as_ref(&self) -> &PayloadStorage {
+        // SAFETY: No outstanding mutable references exists.
+        unsafe { &*self.0.get() }
+    }
+}
+
+impl Clone for Payload {
+    fn clone(&self) -> Self {
+        let bytes: &Bytes = self.into();
+        Self(UnsafeCell::new(PayloadStorage::Shared(bytes.clone())))
+    }
+}
+
+impl Deref for Payload {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        match self.as_ref() {
+            PayloadStorage::Unique(b) => b,
+            PayloadStorage::Shared(b) => b,
+        }
+    }
+}
+
+impl fmt::Debug for Payload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Payload").field(self.as_ref()).finish()
+    }
+}
+
+impl<'a> From<&'a Payload> for &'a Bytes {
+    fn from(value: &'a Payload) -> Self {
+        if let PayloadStorage::Shared(bytes) = value.as_ref() {
+            bytes
+        } else {
+            // SAFETY: No concurrent access is possible as Payload is !Sync and
+            // `0` is not read again before it's overwritten.
+            unsafe {
+                let payload = value.0.get().read();
+                let bytes = match payload {
+                    PayloadStorage::Unique(p) => p.freeze(),
+                    PayloadStorage::Shared(_) => unreachable_unchecked(),
+                };
+                value.0.get().write(PayloadStorage::Shared(bytes));
+            }
+            match value.as_ref() {
+                // SAFETY: We just wrote `Shared` into `value`
+                PayloadStorage::Unique(_) => unsafe { unreachable_unchecked() },
+                PayloadStorage::Shared(p) => p,
+            }
+        }
+    }
+}
+
+impl From<BytesMut> for Payload {
+    fn from(value: BytesMut) -> Self {
+        Self(UnsafeCell::new(PayloadStorage::Unique(value)))
+    }
+}
+
+impl TryFrom<Payload> for BytesMut {
+    type Error = Bytes;
+
+    fn try_from(value: Payload) -> Result<Self, Self::Error> {
+        match value.0.into_inner() {
+            PayloadStorage::Unique(s) => Ok(s),
+            PayloadStorage::Shared(e) => Err(e),
+        }
+    }
+}
+
+/// [`Payload`] backend.
+#[derive(Debug)]
+enum PayloadStorage {
+    /// Unique data.
+    Unique(BytesMut),
+    /// Shared data.
+    Shared(Bytes),
+}
+
 /// A websocket message. This is cheaply clonable and uses [`Bytes`] as the
 /// payload storage underneath.
 ///
@@ -151,7 +267,7 @@ pub struct Message {
     /// The [`OpCode`] of the message.
     pub(super) opcode: OpCode,
     /// The payload of the message.
-    pub(super) payload: Bytes,
+    pub(super) payload: Payload,
 }
 
 impl Message {
@@ -160,16 +276,16 @@ impl Message {
     pub fn text(payload: String) -> Self {
         Self {
             opcode: OpCode::Text,
-            payload: payload.into(),
+            payload: BytesMut::from(payload.into_bytes().as_slice()).into(),
         }
     }
 
     /// Create a new binary message.
     #[must_use]
-    pub fn binary<D: Into<Bytes>>(payload: D) -> Self {
+    pub fn binary<P: Into<BytesMut>>(payload: P) -> Self {
         Self {
             opcode: OpCode::Binary,
-            payload: payload.into(),
+            payload: Payload::from(payload.into()),
         }
     }
 
@@ -187,25 +303,25 @@ impl Message {
 
         Self {
             opcode: OpCode::Close,
-            payload: payload.freeze(),
+            payload: payload.into(),
         }
     }
 
     /// Create a new ping message.
     #[must_use]
-    pub fn ping<D: Into<Bytes>>(payload: D) -> Self {
+    pub fn ping<P: Into<BytesMut>>(payload: P) -> Self {
         Self {
             opcode: OpCode::Ping,
-            payload: payload.into(),
+            payload: Payload::from(payload.into()),
         }
     }
 
     /// Create a new pong message.
     #[must_use]
-    pub fn pong<D: Into<Bytes>>(payload: D) -> Self {
+    pub fn pong<P: Into<BytesMut>>(payload: P) -> Self {
         Self {
             opcode: OpCode::Pong,
-            payload: payload.into(),
+            payload: Payload::from(payload.into()),
         }
     }
 
@@ -243,12 +359,15 @@ impl Message {
     /// type.
     #[must_use]
     pub fn into_payload(self) -> Bytes {
-        self.payload
+        match BytesMut::try_from(self.payload) {
+            Ok(b) => b.freeze(),
+            Err(b) => b,
+        }
     }
 
     /// Returns a reference to the message payload, regardless of message type.
     pub fn as_payload(&self) -> &Bytes {
-        &self.payload
+        (&self.payload).into()
     }
 
     /// Returns a reference to the message payload as a string if it is a text
@@ -287,40 +406,41 @@ impl Message {
 
     /// Returns an iterator over frames of `frame_size` length to split this
     /// message into.
-    pub(super) fn as_frames(&self, frame_size: usize) -> MessageFrames<'_> {
+    pub(super) fn into_frames(self, frame_size: usize) -> MessageFrames {
         MessageFrames {
-            inner: self.payload.chunks(frame_size),
-            payload: &self.payload,
+            frame_size,
+            payload: self.payload,
             opcode: self.opcode,
         }
     }
 }
 
 /// Iterator over frames of a chunked message.
-pub(super) struct MessageFrames<'a> {
+pub(super) struct MessageFrames {
     /// Iterator over payload chunks.
-    inner: Chunks<'a, u8>,
+    frame_size: usize,
     /// The full message payload this iterates over.
-    payload: &'a Bytes,
+    payload: Payload,
     /// Opcode for the next frame.
     opcode: OpCode,
 }
 
-impl Iterator for MessageFrames<'_> {
+impl Iterator for MessageFrames {
     type Item = Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let chunk = if self.opcode == OpCode::Continuation {
-            self.inner.next()?
-        } else {
-            self.inner.next().unwrap_or_default()
-        };
+        let is_empty = self.payload.is_empty() && self.opcode == OpCode::Continuation;
 
-        Some(Frame {
-            opcode: replace(&mut self.opcode, OpCode::Continuation),
-            // TODO: Use ExactSizeIterator::is_empty when stable
-            is_final: self.inner.len() == 0,
-            payload: self.payload.slice_ref(chunk),
+        (!is_empty).then(|| {
+            let payload = self
+                .payload
+                .split_to(self.frame_size.min(self.payload.len()));
+
+            Frame {
+                opcode: replace(&mut self.opcode, OpCode::Continuation),
+                is_final: self.payload.is_empty(),
+                payload,
+            }
         })
     }
 }
@@ -429,7 +549,7 @@ pub(super) struct Frame {
     /// Whether this is the last frame of a message.
     pub is_final: bool,
     /// The payload bytes of the frame.
-    pub payload: Bytes,
+    pub payload: Payload,
 }
 
 impl Frame {
@@ -438,12 +558,26 @@ impl Frame {
     pub const DEFAULT_CLOSE: Self = Self {
         opcode: OpCode::Close,
         is_final: true,
-        payload: Bytes::from_static(&CloseCode::NORMAL_CLOSURE.0.get().to_be_bytes()),
+        payload: Payload::from_static(&CloseCode::NORMAL_CLOSURE.0.get().to_be_bytes()),
     };
 
-    /// Whether the frame is a close frame.
-    pub fn is_close(&self) -> bool {
-        self.opcode == OpCode::Close
+    /// Encode the frame head into `out`, returning how many bytes were written.
+    pub fn encode(&self, out: &mut [u8; 10]) -> u8 {
+        out[0] = u8::from(self.is_final) << 7 | u8::from(self.opcode);
+        if u16::try_from(self.payload.len()).is_err() {
+            out[1] = 127;
+            let len = u64::try_from(self.payload.len()).unwrap();
+            out[2..10].copy_from_slice(&len.to_be_bytes());
+            10
+        } else if self.payload.len() > 125 {
+            out[1] = 126;
+            let len = u16::try_from(self.payload.len()).expect("checked by previous branch");
+            out[2..4].copy_from_slice(&len.to_be_bytes());
+            4
+        } else {
+            out[1] = u8::try_from(self.payload.len()).expect("checked by previous branch");
+            2
+        }
     }
 }
 

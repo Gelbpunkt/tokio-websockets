@@ -3,26 +3,48 @@
 //! [`futures_core::Stream`] implementations that take [`Message`] as a
 //! parameter.
 use std::{
+    collections::VecDeque,
     hint::unreachable_unchecked,
+    io,
     mem::{replace, take},
     pin::Pin,
     task::{ready, Context, Poll},
 };
 
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use futures_core::Stream;
 use futures_sink::Sink;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::codec::Framed;
+use tokio_util::{codec::Framed, io::poll_write_buf};
 
 #[cfg(any(feature = "client", feature = "server"))]
-use super::types::{Limits, Role};
+use super::types::Limits;
 use super::{
     codec::WebsocketProtocol,
-    types::{Frame, Message, OpCode, StreamState},
+    types::{Frame, Message, OpCode, Payload, Role, StreamState},
     Config,
 };
 use crate::{CloseCode, Error};
+
+/// Helper struct for storing a frame header, the header size and payload.
+#[derive(Debug)]
+struct EncodedFrame {
+    /// Encoded frame header.
+    header: [u8; 10],
+    /// Length of the header.
+    header_len: u8,
+    /// Mask that the payload was masked with.
+    mask: Option<[u8; 4]>,
+    /// Potentially masked message payload, ready for writing to the I/O.
+    payload: Payload,
+}
+
+impl EncodedFrame {
+    /// Whether this frame is a close frame.
+    fn is_close(&self) -> bool {
+        self.header[0] & 0xF == 8
+    }
+}
 
 /// A websocket stream that full messages can be read from and written to.
 ///
@@ -54,11 +76,13 @@ pub struct WebsocketStream<T> {
     /// Opcode of the full message that is being assembled.
     partial_opcode: OpCode,
 
-    /// Whether the sink needs to be flushed.
-    needs_flush: bool,
+    /// Buffer that outgoing frame headers are formatted into.
+    header_buf: [u8; 10],
 
-    /// Pending frame to be encoded once the sink is ready.
-    pending_frame: Option<Frame>,
+    /// Queue of outgoing frames to send.
+    frame_queue: VecDeque<EncodedFrame>,
+    /// Amount of partial bytes written of the first frame in the queue.
+    bytes_written: usize,
 }
 
 impl<T> WebsocketStream<T>
@@ -76,8 +100,9 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            needs_flush: false,
-            pending_frame: None,
+            header_buf: [0; 10],
+            frame_queue: VecDeque::with_capacity(1),
+            bytes_written: 0,
         }
     }
 
@@ -96,8 +121,9 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            needs_flush: false,
-            pending_frame: None,
+            header_buf: [0; 10],
+            frame_queue: VecDeque::with_capacity(1),
+            bytes_written: 0,
         }
     }
 
@@ -116,18 +142,9 @@ where
             return Poll::Ready(None);
         }
 
-        if self.pending_frame.is_some() && Pin::new(&mut self.inner).poll_ready(cx)?.is_ready() {
-            // SAFETY: We just ensured that the pending frame is some
-            let frame = unsafe { self.pending_frame.take().unwrap_unchecked() };
-            self.as_mut().start_send(Message {
-                opcode: frame.opcode,
-                payload: frame.payload,
-            })?;
-        }
-
-        if self.needs_flush {
-            _ = Pin::new(&mut self.inner).poll_flush(cx)?;
-            self.needs_flush = false;
+        // If there are pending items, try to flush the sink
+        if !self.frame_queue.is_empty() && self.as_mut().poll_ready(cx)?.is_ready() {
+            _ = self.as_mut().poll_flush(cx)?;
         }
 
         let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
@@ -137,18 +154,19 @@ where
                     self.state = StreamState::CloseAcknowledged;
                 } else {
                     self.state = StreamState::ClosedByPeer;
-                    if !self.pending_frame.as_ref().map_or(false, Frame::is_close) {
-                        self.pending_frame = match &e {
-                            Error::Protocol(e) => Some(Frame::from(e)),
-                            Error::PayloadTooLong { max_len, .. } => Some(
+
+                    if !self.frame_queue.iter().any(EncodedFrame::is_close) {
+                        match &e {
+                            Error::Protocol(e) => self.queue_frame(Frame::from(e)),
+                            Error::PayloadTooLong { max_len, .. } => self.queue_frame(
                                 Message::close(
                                     Some(CloseCode::MESSAGE_TOO_BIG),
                                     &format!("max length: {max_len}"),
                                 )
                                 .into(),
                             ),
-                            _ => None,
-                        };
+                            _ => {}
+                        }
                     }
                 }
                 return Poll::Ready(Some(Err(e)));
@@ -160,11 +178,12 @@ where
             OpCode::Close => match self.state {
                 StreamState::Active => {
                     self.state = StreamState::ClosedByPeer;
-                    if !self.pending_frame.as_ref().map_or(false, Frame::is_close) {
+
+                    if !self.frame_queue.iter().any(EncodedFrame::is_close) {
                         let mut frame = frame.clone();
                         frame.payload.truncate(2);
 
-                        self.pending_frame = Some(frame);
+                        self.queue_frame(frame);
                     }
                 }
                 // SAFETY: match statement at the start of the method ensures that this is not the
@@ -178,17 +197,58 @@ where
             },
             OpCode::Ping
                 if self.state == StreamState::Active
-                    && !self.pending_frame.as_ref().map_or(false, Frame::is_close) =>
+                    && !self.frame_queue.iter().any(EncodedFrame::is_close) =>
             {
                 let mut frame = frame.clone();
                 frame.opcode = OpCode::Pong;
 
-                self.pending_frame = Some(frame);
+                self.queue_frame(frame);
             }
             _ => {}
         }
 
         Poll::Ready(Some(Ok(frame)))
+    }
+
+    /// Masks and queues a frame for sending when [`poll_flush`] gets called.
+    fn queue_frame(&mut self, frame: Frame) {
+        let (frame, mask): (Frame, Option<[u8; 4]>) = if self.inner.codec().role == Role::Client {
+            #[cfg(feature = "client")]
+            {
+                let mut frame = frame;
+                let mut payload = match BytesMut::try_from(frame.payload) {
+                    Ok(b) => b,
+                    Err(b) => BytesMut::from(&*b),
+                };
+                let mask = crate::rand::get_mask();
+                crate::mask::frame(&mask, &mut payload, 0);
+                frame.payload = Payload::from(payload);
+
+                (frame, Some(mask))
+            }
+            #[cfg(not(feature = "client"))]
+            {
+                // SAFETY: This allows for making the dependency on random generators
+                // only required for clients, servers can avoid it entirely.
+                // Since it is not possible to create a stream with client role
+                // without the client builder (and that is locked behind the client feature),
+                // this branch is impossible to reach.
+                unsafe { std::hint::unreachable_unchecked() }
+            }
+        } else {
+            (frame, None)
+        };
+
+        let header_len = frame.encode(&mut self.header_buf);
+        if mask.is_some() {
+            self.header_buf[1] |= 1 << 7;
+        }
+        self.frame_queue.push_back(EncodedFrame {
+            header: self.header_buf,
+            header_len,
+            mask,
+            payload: frame.payload,
+        });
     }
 }
 
@@ -228,12 +288,17 @@ where
         }
 
         let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
-        let payload = take(&mut self.partial_payload).freeze();
+        let payload = take(&mut self.partial_payload).into();
 
         Poll::Ready(Some(Ok(Message { opcode, payload })))
     }
 }
 
+// The tokio-util implementation of a sink uses a buffer which start_send
+// appends to and poll_flush tries to write from. This makes sense, but comes
+// with a hefty performance penalty when sending large payloads, since this adds
+// a memmove from the payload to the buffer. We completely avoid that overhead
+// by storing messages in a deque.
 impl<T> Sink<Message> for WebsocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
@@ -241,13 +306,18 @@ where
     type Error = Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
-        if let Some(frame) = self.pending_frame.take() {
-            self.as_mut().start_send(Message {
-                opcode: frame.opcode,
-                payload: frame.payload,
-            })?;
-            Pin::new(&mut self.inner).poll_ready(cx)
+        // tokio-util calls poll_flush when more than 8096 bytes are pending, otherwise
+        // it returns Ready. We will just replicate that behavior
+        let pending_bytes = self
+            .frame_queue
+            .iter()
+            .map(|f| {
+                f.header_len as usize + (u8::from(f.mask.is_some()) * 4) as usize + f.payload.len()
+            })
+            .sum::<usize>();
+
+        if pending_bytes >= 8096 {
+            self.as_mut().poll_flush(cx)
         } else {
             Poll::Ready(Ok(()))
         }
@@ -269,41 +339,63 @@ where
         }
 
         if item.opcode.is_control() {
-            Pin::new(&mut self.inner).start_send(item.into())?;
+            let frame: Frame = item.into();
+            self.queue_frame(frame);
         } else {
             // Chunk the message into frames
-            for frame in item.as_frames(self.config.frame_size) {
-                Pin::new(&mut self.inner).start_send(frame)?;
+            for frame in item.into_frames(self.config.frame_size) {
+                self.queue_frame(frame);
             }
         }
-
-        self.needs_flush = true;
 
         Ok(())
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.pending_frame.is_some() {
-            ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
-            // SAFETY: We just ensured that the pending frame is some
-            let frame = unsafe { self.pending_frame.take().unwrap_unchecked() };
-            self.as_mut().start_send(Message {
-                opcode: frame.opcode,
-                payload: frame.payload,
-            })?;
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Borrow checker hacks... It needs this to understand that we can seperately
+        // borrow the fields of the struct mutably
+        let this = self.get_mut();
+        let frame_queue = &mut this.frame_queue;
+        let io = this.inner.get_mut();
+        let bytes_written = &mut this.bytes_written;
+
+        while !frame_queue.is_empty() {
+            let frame = { unsafe { frame_queue.get(0).unwrap_unchecked() } };
+            let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len as usize) };
+            let mut buf = frame_header
+                .chain(
+                    frame
+                        .mask
+                        .as_ref()
+                        .map(<[u8; 4]>::as_slice)
+                        .unwrap_or_default(),
+                )
+                .chain(&*frame.payload);
+            buf.advance(*bytes_written);
+
+            while buf.has_remaining() {
+                let n = ready!(poll_write_buf(Pin::new(io), cx, &mut buf))?;
+
+                if n == 0 {
+                    return Poll::Ready(Err(Error::Io(io::ErrorKind::WriteZero.into())));
+                }
+
+                *bytes_written += n;
+            }
+
+            frame_queue.pop_front();
+            *bytes_written = 0;
         }
 
-        ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
-        self.needs_flush = false;
+        ready!(Pin::new(io).poll_flush(cx))?;
 
         Poll::Ready(Ok(()))
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.state == StreamState::Active
-            && !self.pending_frame.as_ref().map_or(false, Frame::is_close)
+        if self.state == StreamState::Active && !self.frame_queue.iter().any(EncodedFrame::is_close)
         {
-            self.pending_frame = Some(Frame::DEFAULT_CLOSE);
+            self.queue_frame(Frame::DEFAULT_CLOSE);
         }
         while ready!(self.as_mut().poll_next(cx)).is_some() {}
 
