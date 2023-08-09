@@ -13,34 +13,12 @@ mod imp {
 
     /// Generate a random 16-byte websocket key.
     pub fn get_key() -> [u8; 16] {
-        [
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-        ]
+        fastrand::u128(..).to_ne_bytes()
     }
 
     /// Generate a random 4-byte websocket mask.
     pub fn get_mask() -> [u8; 4] {
-        [
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-            fastrand::u8(0..=255),
-        ]
+        fastrand::u32(..).to_ne_bytes()
     }
 }
 
