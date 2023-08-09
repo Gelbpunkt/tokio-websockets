@@ -50,9 +50,12 @@ impl Encoder<Frame> for WebsocketProtocol {
 
     #[allow(clippy::cast_possible_truncation)]
     fn encode(&mut self, item: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let mut header_buf = [0; 10];
+        let len = item.encode(&mut header_buf);
         let mask: Option<[u8; 4]> = if self.role == Role::Client {
             #[cfg(feature = "client")]
             {
+                header_buf[1] |= 1 << 7;
                 Some(crate::rand::get_mask())
             }
             #[cfg(not(feature = "client"))]
@@ -67,33 +70,13 @@ impl Encoder<Frame> for WebsocketProtocol {
         } else {
             None
         };
-        let mask_bit = 128 * u8::from(mask.is_some());
-        let opcode_value: u8 = item.opcode.into();
 
-        let initial_byte = (u8::from(item.is_final) << 7) + opcode_value;
-
-        dst.put_u8(initial_byte);
-
-        let payload_len = item.payload.len();
-
-        if u16::try_from(payload_len).is_err() {
-            dst.put_u8(127 + mask_bit);
-            dst.put_u64(payload_len as u64);
-        } else if payload_len > 125 {
-            dst.put_u8(126 + mask_bit);
-            dst.put_u16(payload_len as u16);
-        } else {
-            dst.put_u8(payload_len as u8 + mask_bit);
-        }
-
-        if let Some(mask) = &mask {
-            dst.extend_from_slice(mask);
-        }
-
-        dst.extend_from_slice(&item.payload);
+        dst.put_slice(&header_buf[..len.into()]);
+        dst.put_slice(mask.as_ref().map(<[u8; 4]>::as_slice).unwrap_or_default());
+        dst.put_slice(&item.payload);
 
         if let Some(mask) = mask {
-            let start_of_data = dst.len() - payload_len;
+            let start_of_data = dst.len() - item.payload.len();
             // SAFETY: We called dst.extend_from_slice(chunk), so start_of_data is an index
             // in dst, to be exact, the length of dst before the extend_from_slice call
             mask::frame(&mask, unsafe { dst.get_unchecked_mut(start_of_data..) }, 0);
@@ -309,7 +292,7 @@ impl Decoder for WebsocketProtocol {
         // Advance the offset into the payload body
         src.advance(offset);
         // Take the payload
-        let payload = src.split_to(payload_length).freeze();
+        let payload = src.split_to(payload_length).into();
 
         if fin && !opcode.is_control() {
             self.fragmented_message_opcode = OpCode::Continuation;

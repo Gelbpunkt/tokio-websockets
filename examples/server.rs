@@ -1,4 +1,4 @@
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use tokio::net::TcpListener;
 use tokio_websockets::{Error, ServerBuilder};
 

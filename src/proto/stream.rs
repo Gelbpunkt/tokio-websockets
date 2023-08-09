@@ -3,23 +3,25 @@
 //! [`futures_core::Stream`] implementations that take [`Message`] as a
 //! parameter.
 use std::{
+    future::poll_fn,
     hint::unreachable_unchecked,
+    io,
     mem::{replace, take},
     pin::Pin,
     task::{ready, Context, Poll},
 };
 
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use futures_core::Stream;
 use futures_sink::Sink;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::codec::Framed;
+use tokio_util::{codec::Framed, io::poll_write_buf};
 
 #[cfg(any(feature = "client", feature = "server"))]
-use super::types::{Limits, Role};
+use super::types::Limits;
 use super::{
     codec::WebsocketProtocol,
-    types::{Frame, Message, OpCode, StreamState},
+    types::{Frame, Message, OpCode, Role, StreamState},
     Config,
 };
 use crate::{CloseCode, Error};
@@ -99,6 +101,91 @@ where
             needs_flush: false,
             pending_frame: None,
         }
+    }
+
+    /// Zero-copy `SinkExt::send` specialization.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] if the stream is already closed or
+    /// writing to the stream fails.
+    pub async fn send(&mut self, msg: Message) -> Result<(), Error> {
+        if !(self.state == StreamState::Active
+            || matches!(self.state, StreamState::ClosedByPeer if msg.is_close()))
+        {
+            return Err(Error::AlreadyClosed);
+        }
+
+        poll_fn(|cx| Pin::new(&mut self.inner).poll_flush(cx)).await?;
+
+        if msg.opcode.is_control() {
+            let is_close = msg.is_close();
+            self.send_frame(msg.into()).await?;
+            if is_close {
+                if self.state == StreamState::ClosedByPeer {
+                    self.state = StreamState::CloseAcknowledged;
+                } else {
+                    self.state = StreamState::ClosedByUs;
+                }
+            }
+        } else {
+            for frame in msg.into_frames(self.config.frame_size) {
+                self.send_frame(frame).await?;
+            }
+        }
+
+        poll_fn(|cx| Pin::new(&mut self.inner.get_mut()).poll_flush(cx)).await?;
+
+        Ok(())
+    }
+
+    /// Zero-copy `SinkExt::send` specialization.
+    async fn send_frame(&mut self, frame: Frame) -> Result<(), Error> {
+        #[cfg(feature = "client")]
+        let mut frame = frame;
+
+        let mut header_buf = [0; 10];
+        let len = frame.encode(&mut header_buf);
+        let mask: Option<[u8; 4]> = if self.inner.codec().role == Role::Client {
+            #[cfg(feature = "client")]
+            {
+                header_buf[1] |= 1 << 7;
+                let mut payload = match BytesMut::try_from(frame.payload) {
+                    Ok(b) => b,
+                    Err(b) => BytesMut::from(&*b),
+                };
+                let mask = crate::rand::get_mask();
+                crate::mask::frame(&mask, &mut payload, 0);
+                frame.payload = payload.into();
+                Some(mask)
+            }
+            #[cfg(not(feature = "client"))]
+            {
+                // SAFETY: This allows for making the dependency on random generators
+                // only required for clients, servers can avoid it entirely.
+                // Since it is not possible to create a stream with client role
+                // without the client builder (and that is locked behind the client feature),
+                // this branch is impossible to reach.
+                unsafe { std::hint::unreachable_unchecked() }
+            }
+        } else {
+            None
+        };
+
+        let mut buf = header_buf[..len.into()]
+            .chain(mask.as_ref().map(<[u8; 4]>::as_slice).unwrap_or_default())
+            .chain(&*frame.payload);
+
+        while buf.has_remaining() {
+            let n =
+                poll_fn(|cx| poll_write_buf(Pin::new(self.inner.get_mut()), cx, &mut buf)).await?;
+
+            if n == 0 {
+                return Err(Error::Io(io::ErrorKind::WriteZero.into()));
+            }
+        }
+
+        Ok(())
     }
 
     /// Attempt to pull out the next frame from the [`Framed`] this stream and
@@ -228,7 +315,7 @@ where
         }
 
         let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
-        let payload = take(&mut self.partial_payload).freeze();
+        let payload = take(&mut self.partial_payload).into();
 
         Poll::Ready(Some(Ok(Message { opcode, payload })))
     }
@@ -272,7 +359,7 @@ where
             Pin::new(&mut self.inner).start_send(item.into())?;
         } else {
             // Chunk the message into frames
-            for frame in item.as_frames(self.config.frame_size) {
+            for frame in item.into_frames(self.config.frame_size) {
                 Pin::new(&mut self.inner).start_send(frame)?;
             }
         }

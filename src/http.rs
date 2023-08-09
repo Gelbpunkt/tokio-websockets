@@ -19,7 +19,6 @@ use crate::client::make_key;
 /// use hyper::{self, client::HttpConnector, Client, StatusCode, Uri};
 /// use tokio_websockets::{upgrade_request, ClientBuilder};
 ///
-/// # use futures_util::SinkExt;
 /// # use tokio_websockets::ServerBuilder;
 /// # use tokio::net::TcpListener;
 /// # #[tokio::main]

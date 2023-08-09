@@ -1,6 +1,6 @@
 use std::fs::remove_file;
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use tokio::net::UnixListener;
 use tokio_websockets::{Error, Limits, ServerBuilder};
 

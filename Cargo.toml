@@ -14,7 +14,7 @@ bytes = "1"
 futures-core = "0.3"
 futures-sink = "0.3"
 tokio = "1"
-tokio-util = { version = "0.7.1", features = ["codec"] }
+tokio-util = { version = "0.7.1", features = ["codec", "io"] }
 
 # SHA-1 fallback when no TLS is enabled
 sha1_smol = { version = "1.0", optional = true }
