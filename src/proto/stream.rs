@@ -159,10 +159,12 @@ where
             OpCode::Close => match self.state {
                 StreamState::Active => {
                     self.state = StreamState::ClosedByPeer;
-                    let mut frame = frame.clone();
-                    frame.payload.truncate(2);
+                    if !self.pending_frame.as_ref().map_or(false, Frame::is_close) {
+                        let mut frame = frame.clone();
+                        frame.payload.truncate(2);
 
-                    self.pending_frame = Some(frame);
+                        self.pending_frame = Some(frame);
+                    }
                 }
                 // SAFETY: match statement at the start of the method ensures that this is not the
                 // case
