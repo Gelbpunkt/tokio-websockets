@@ -22,7 +22,7 @@ use super::{
     types::{Frame, Message, OpCode, StreamState},
     Config,
 };
-use crate::Error;
+use crate::{CloseCode, Error};
 
 /// A websocket stream that full messages can be read from and written to.
 ///
@@ -132,7 +132,27 @@ where
 
         let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
             Some(Ok(frame)) => frame,
-            Some(Err(e)) => return Poll::Ready(Some(Err(e))),
+            Some(Err(e)) => {
+                if self.state == StreamState::ClosedByUs {
+                    self.state = StreamState::CloseAcknowledged;
+                } else {
+                    self.state = StreamState::ClosedByPeer;
+                    if !self.pending_frame.as_ref().map_or(false, Frame::is_close) {
+                        self.pending_frame = match &e {
+                            Error::Protocol(e) => Some(Frame::from(e)),
+                            Error::PayloadTooLong { max_len, .. } => Some(
+                                Message::close(
+                                    Some(CloseCode::MESSAGE_TOO_BIG),
+                                    &format!("max length: {max_len}"),
+                                )
+                                .into(),
+                            ),
+                            _ => None,
+                        };
+                    }
+                }
+                return Poll::Ready(Some(Err(e)));
+            }
             None => return Poll::Ready(None),
         };
 

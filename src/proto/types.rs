@@ -325,17 +325,6 @@ impl Iterator for MessageFrames<'_> {
     }
 }
 
-impl From<&ProtocolError> for Message {
-    fn from(val: &ProtocolError) -> Self {
-        match val {
-            ProtocolError::InvalidUtf8 => {
-                Message::close(Some(CloseCode::INVALID_FRAME_PAYLOAD_DATA), "invalid utf8")
-            }
-            _ => Message::close(Some(CloseCode::PROTOCOL_ERROR), val.as_str()),
-        }
-    }
-}
-
 /// Configuration for limitations on reading of [`Message`]s from a
 /// [`WebsocketStream`] to prevent high memory usage caused by malicious actors.
 ///
@@ -465,5 +454,17 @@ impl From<Message> for Frame {
             is_final: true,
             payload: value.payload,
         }
+    }
+}
+
+impl From<&ProtocolError> for Frame {
+    fn from(val: &ProtocolError) -> Self {
+        match val {
+            ProtocolError::InvalidUtf8 => {
+                Message::close(Some(CloseCode::INVALID_FRAME_PAYLOAD_DATA), "invalid utf8")
+            }
+            _ => Message::close(Some(CloseCode::PROTOCOL_ERROR), val.as_str()),
+        }
+        .into()
     }
 }
