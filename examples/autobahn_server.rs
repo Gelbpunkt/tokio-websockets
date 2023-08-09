@@ -32,6 +32,8 @@ async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
         }
     }
 
+    ws_stream.close().await?;
+
     Ok(())
 }
 

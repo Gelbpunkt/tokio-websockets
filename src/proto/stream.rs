@@ -16,10 +16,10 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
 
 #[cfg(any(feature = "client", feature = "server"))]
-use super::types::Limits;
+use super::types::{Limits, Role};
 use super::{
     codec::WebsocketProtocol,
-    types::{Frame, Message, OpCode, Role, StreamState},
+    types::{Frame, Message, OpCode, StreamState},
     Config,
 };
 use crate::Error;
@@ -112,31 +112,11 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame, Error>>> {
-        match self.state {
-            StreamState::Active | StreamState::ClosedByUs => {}
-            StreamState::ClosedByPeer => {
-                ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
-                // SAFETY: arm is only taken until the pending close frame is encoded
-                let frame = unsafe { self.pending_frame.take().unwrap_unchecked() };
-                Pin::new(&mut self.inner).start_send(frame)?;
-                if self.inner.codec().role == Role::Server {
-                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
-                } else {
-                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
-                }
-                return Poll::Ready(None);
-            }
-            StreamState::CloseAcknowledged => {
-                if self.inner.codec().role == Role::Server {
-                    ready!(Pin::new(&mut self.inner).poll_close(cx))?;
-                } else {
-                    ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
-                }
-                return Poll::Ready(None);
-            }
+        if !matches!(self.state, StreamState::Active | StreamState::ClosedByUs) {
+            return Poll::Ready(None);
         }
 
-        if self.pending_frame.is_some() && Pin::new(&mut self.inner).poll_ready(cx).is_ready() {
+        if self.pending_frame.is_some() && Pin::new(&mut self.inner).poll_ready(cx)?.is_ready() {
             // SAFETY: We just ensured that the pending frame is some
             let frame = unsafe { self.pending_frame.take().unwrap_unchecked() };
             self.as_mut().start_send(Message {
@@ -146,7 +126,8 @@ where
         }
 
         if self.needs_flush {
-            _ = self.as_mut().poll_flush(cx)?;
+            _ = Pin::new(&mut self.inner).poll_flush(cx)?;
+            self.needs_flush = false;
         }
 
         let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
@@ -282,12 +263,20 @@ where
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let res = Pin::new(&mut self.inner).poll_flush(cx);
-        if matches!(res, Poll::Ready(Ok(()))) {
-            self.needs_flush = false;
+        if self.pending_frame.is_some() {
+            ready!(Pin::new(&mut self.inner).poll_ready(cx))?;
+            // SAFETY: We just ensured that the pending frame is some
+            let frame = unsafe { self.pending_frame.take().unwrap_unchecked() };
+            self.as_mut().start_send(Message {
+                opcode: frame.opcode,
+                payload: frame.payload,
+            })?;
         }
 
-        res
+        ready!(Pin::new(&mut self.inner).poll_flush(cx))?;
+        self.needs_flush = false;
+
+        Poll::Ready(Ok(()))
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -297,6 +286,10 @@ where
             self.pending_frame = Some(Frame::DEFAULT_CLOSE);
         }
         while ready!(self.as_mut().poll_next(cx)).is_some() {}
-        Poll::Ready(Ok(()))
+
+        ready!(self.as_mut().poll_flush(cx))?;
+        Pin::new(self.inner.get_mut())
+            .poll_shutdown(cx)
+            .map_err(Error::Io)
     }
 }

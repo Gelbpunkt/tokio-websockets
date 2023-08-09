@@ -68,6 +68,8 @@ async fn run_test(case: u32) -> Result<(), Error> {
         }
     }
 
+    stream.close().await?;
+
     Ok(())
 }
 
