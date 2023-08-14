@@ -1,5 +1,7 @@
 //! This module contains three implementations of websocket frame masking and
 //! unmasking, both ways use the same algorithm and methods:
+//!   - One AVX512-based implementation that masks 64 bytes per cycle (requires
+//!     nightly rust)
 //!   - One AVX2-based implementation that masks 32 bytes per cycle
 //!   - One SSE2-based implementation that masks 16 bytes per cycle
 //!   - One NEON-based implementation that masks 16 bytes per cycle
@@ -10,17 +12,25 @@
 use std::arch::aarch64::{uint8x16_t, veorq_u8, vld1q_u8};
 #[cfg(all(
     feature = "simd",
+    not(all(feature = "nightly", target_feature = "avx512f")),
     not(target_feature = "avx2"),
     target_feature = "sse2"
 ))]
 use std::arch::x86_64::{__m128i, _mm_load_si128, _mm_xor_si128};
-#[cfg(all(feature = "simd", target_feature = "avx2"))]
+#[cfg(all(
+    feature = "simd",
+    not(all(feature = "nightly", target_feature = "avx512f")),
+    target_feature = "avx2"
+))]
 use std::arch::x86_64::{__m256i, _mm256_load_si256, _mm256_xor_si256};
+#[cfg(all(feature = "simd", feature = "nightly", target_feature = "avx512f"))]
+use std::arch::x86_64::{__m512i, _mm512_load_si512, _mm512_xor_si512};
 #[cfg(all(
     feature = "simd",
     any(
         target_feature = "avx2",
         target_feature = "sse2",
+        all(feature = "nightly", target_feature = "avx512f"),
         all(target_arch = "aarch64", target_feature = "neon")
     )
 ))]
@@ -29,13 +39,22 @@ use std::{
     ptr,
 };
 
+/// AVX512 can operate on 512-bit input data.
+#[cfg(all(feature = "simd", feature = "nightly", target_feature = "avx512f"))]
+const AVX512_ALIGNMENT: usize = 64;
+
 /// AVX2 can operate on 256-bit input data.
-#[cfg(all(feature = "simd", target_feature = "avx2"))]
+#[cfg(all(
+    feature = "simd",
+    not(all(feature = "nightly", target_feature = "avx512f")),
+    target_feature = "avx2"
+))]
 const AVX2_ALIGNMENT: usize = 32;
 
 /// SSE2 can operate on 128-bit input data.
 #[cfg(all(
     feature = "simd",
+    not(all(feature = "nightly", target_feature = "avx512f")),
     not(target_feature = "avx2"),
     target_feature = "sse2"
 ))]
@@ -45,6 +64,52 @@ const SSE2_ALIGNMENT: usize = 16;
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 const NEON_ALIGNMENT: usize = 16;
 
+/// (Un-)masks input bytes with the framing key using AVX512.
+///
+/// The input bytes may be further in the payload and therefore the offset into
+/// the payload must be specified.
+///
+/// This will use a fallback implementation for less than 64 bytes. For
+/// sufficiently large inputs, it masks in chunks of 64 bytes per instruction,
+/// applying the fallback method on all remaining data.
+#[cfg(all(feature = "simd", feature = "nightly", target_feature = "avx512f"))]
+#[inline]
+pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
+    unsafe {
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<__m512i>();
+
+        // Run fallback implementation on unaligned prefix data
+        fallback_frame(key, prefix, offset);
+        offset = (offset + prefix.len()) & 3;
+
+        // Align the key so we can do an aligned load for the mask
+        let layout = Layout::from_size_align_unchecked(AVX512_ALIGNMENT, AVX512_ALIGNMENT);
+        let mem_ptr = alloc(layout);
+
+        ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
+
+        for j in (4 - offset..AVX512_ALIGNMENT).step_by(4) {
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+        }
+
+        if offset > 0 {
+            ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(AVX512_ALIGNMENT - offset), offset);
+        }
+
+        let mask = _mm512_load_si512(mem_ptr.cast());
+
+        for block in &mut *aligned_data {
+            *block = _mm512_xor_si512(*block, mask);
+        }
+
+        dealloc(mem_ptr, layout);
+
+        // Run fallback implementation on unaligned suffix data
+        offset = (offset + aligned_data.len() * AVX512_ALIGNMENT) & 3;
+        fallback_frame(key, suffix, offset);
+    }
+}
+
 /// (Un-)masks input bytes with the framing key using AVX2.
 ///
 /// The input bytes may be further in the payload and therefore the offset into
@@ -53,7 +118,11 @@ const NEON_ALIGNMENT: usize = 16;
 /// This will use a fallback implementation for less than 32 bytes. For
 /// sufficiently large inputs, it masks in chunks of 32 bytes per instruction,
 /// applying the fallback method on all remaining data.
-#[cfg(all(feature = "simd", target_feature = "avx2"))]
+#[cfg(all(
+    feature = "simd",
+    not(all(feature = "nightly", target_feature = "avx512f")),
+    target_feature = "avx2"
+))]
 #[inline]
 pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
     unsafe {
@@ -101,6 +170,7 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
 /// applying the fallback method on all remaining data.
 #[cfg(all(
     feature = "simd",
+    not(all(feature = "nightly", target_feature = "avx512f")),
     not(target_feature = "avx2"),
     target_feature = "sse2"
 ))]

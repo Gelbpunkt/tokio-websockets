@@ -54,6 +54,7 @@ simd = ["dep:simdutf8"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:tokio-rustls", "ring", "dep:webpki", "dep:webpki-roots"]
 rustls-native-roots = ["dep:tokio-rustls", "ring", "dep:rustls-native-certs"]
+nightly = []
 
 [dev-dependencies]
 futures-util = { version = "0.3.14", default-features = false, features = ["sink"] }
