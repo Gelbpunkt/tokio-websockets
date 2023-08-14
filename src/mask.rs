@@ -7,17 +7,15 @@
 //!
 //! The SIMD implementations will only be used if the `simd` feature is active.
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
-use std::arch::aarch64::{veorq_u8, vld1q_u8, vst1q_u8};
-#[cfg(all(feature = "simd", target_feature = "avx2"))]
-use std::arch::x86_64::{
-    _mm256_load_si256, _mm256_loadu_si256, _mm256_storeu_si256, _mm256_xor_si256,
-};
+use std::arch::aarch64::{uint8x16_t, veorq_u8, vld1q_u8};
 #[cfg(all(
     feature = "simd",
     not(target_feature = "avx2"),
     target_feature = "sse2"
 ))]
-use std::arch::x86_64::{_mm_load_si128, _mm_loadu_si128, _mm_storeu_si128, _mm_xor_si128};
+use std::arch::x86_64::{__m128i, _mm_load_si128, _mm_xor_si128};
+#[cfg(all(feature = "simd", target_feature = "avx2"))]
+use std::arch::x86_64::{__m256i, _mm256_load_si256, _mm256_xor_si256};
 #[cfg(all(
     feature = "simd",
     any(
@@ -57,19 +55,13 @@ const NEON_ALIGNMENT: usize = 16;
 /// applying the fallback method on all remaining data.
 #[cfg(all(feature = "simd", target_feature = "avx2"))]
 #[inline]
-pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
+pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
     unsafe {
-        let payload_len = input.len();
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<__m256i>();
 
-        // We might be done already
-        if payload_len < AVX2_ALIGNMENT {
-            // Run fallback implementation on small data
-            fallback_frame(key, input, offset);
-
-            return;
-        }
-
-        let postamble_start = payload_len - payload_len % AVX2_ALIGNMENT;
+        // Run fallback implementation on unaligned prefix data
+        fallback_frame(key, prefix, offset);
+        offset = (offset + prefix.len()) & 3;
 
         // Align the key so we can do an aligned load for the mask
         let layout = Layout::from_size_align_unchecked(AVX2_ALIGNMENT, AVX2_ALIGNMENT);
@@ -87,20 +79,15 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
 
         let mask = _mm256_load_si256(mem_ptr.cast());
 
-        for index in (0..postamble_start).step_by(AVX2_ALIGNMENT) {
-            let memory_addr = input.as_mut_ptr().add(index).cast();
-            // Input data is not aligned on any particular boundary
-            let mut v = _mm256_loadu_si256(memory_addr);
-            v = _mm256_xor_si256(v, mask);
-            _mm256_storeu_si256(memory_addr, v);
+        for block in &mut *aligned_data {
+            *block = _mm256_xor_si256(*block, mask);
         }
 
         dealloc(mem_ptr, layout);
 
-        if postamble_start != payload_len {
-            // Run fallback implementation on postamble data
-            fallback_frame(key, input.get_unchecked_mut(postamble_start..), offset);
-        }
+        // Run fallback implementation on unaligned suffix data
+        offset = (offset + aligned_data.len() * AVX2_ALIGNMENT) & 3;
+        fallback_frame(key, suffix, offset);
     }
 }
 
@@ -118,19 +105,13 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
     target_feature = "sse2"
 ))]
 #[inline]
-pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
+pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
     unsafe {
-        let payload_len = input.len();
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<__m128i>();
 
-        // We might be done already
-        if payload_len < SSE2_ALIGNMENT {
-            // Run fallback implementation on small data
-            fallback_frame(key, input, offset);
-
-            return;
-        }
-
-        let postamble_start = payload_len - payload_len % SSE2_ALIGNMENT;
+        // Run fallback implementation on unaligned prefix data
+        fallback_frame(key, prefix, offset);
+        offset = (offset + prefix.len()) & 3;
 
         // Align the key so we can do an aligned load for the mask
         let layout = Layout::from_size_align_unchecked(SSE2_ALIGNMENT, SSE2_ALIGNMENT);
@@ -148,37 +129,27 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
 
         let mask = _mm_load_si128(mem_ptr.cast());
 
-        for index in (0..postamble_start).step_by(SSE2_ALIGNMENT) {
-            let memory_addr = input.as_mut_ptr().add(index).cast();
-            // Input data is not aligned on any particular boundary
-            let mut v = _mm_loadu_si128(memory_addr);
-            v = _mm_xor_si128(v, mask);
-            _mm_storeu_si128(memory_addr, v);
+        for block in &mut *aligned_data {
+            *block = _mm_xor_si128(*block, mask);
         }
 
         dealloc(mem_ptr, layout);
 
-        if postamble_start != payload_len {
-            // Run fallback implementation on postamble data
-            fallback_frame(key, input.get_unchecked_mut(postamble_start..), offset);
-        }
+        // Run fallback implementation on unaligned suffix data
+        offset = (offset + aligned_data.len() * SSE2_ALIGNMENT) & 3;
+        fallback_frame(key, suffix, offset);
     }
 }
 
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 #[inline]
-pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
+pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
     unsafe {
-        let payload_len = input.len();
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<uint8x16_t>();
 
-        // We might be done already
-        if payload_len < NEON_ALIGNMENT {
-            // Run fallback implementation on small data
-            fallback_frame(key, input, offset);
-            return;
-        }
-
-        let postamble_start = payload_len - payload_len % NEON_ALIGNMENT;
+        // Run fallback implementation on unaligned prefix data
+        fallback_frame(key, prefix, offset);
+        offset = (offset + prefix.len()) & 3;
 
         // vld1q_u8 has no alignment requirements whatsoever, ARM accepts unaligned
         // pointers. However, it seems that on 32-bit ARM, alignment is an optional
@@ -200,20 +171,15 @@ pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
 
         let mask = vld1q_u8(mem_ptr);
 
-        for index in (0..postamble_start).step_by(NEON_ALIGNMENT) {
-            let memory_addr = input.as_mut_ptr().add(index).cast();
-            // Input data is not aligned on any particular boundary
-            let mut v = vld1q_u8(memory_addr);
-            v = veorq_u8(v, mask);
-            vst1q_u8(memory_addr, v);
+        for block in &mut *aligned_data {
+            *block = veorq_u8(*block, mask);
         }
 
         dealloc(mem_ptr, layout);
 
-        if postamble_start != payload_len {
-            // Run fallback implementation on postamble data
-            fallback_frame(key, input.get_unchecked_mut(postamble_start..), offset);
-        }
+        // Run fallback implementation on unaligned suffix data
+        offset = (offset + aligned_data.len() * NEON_ALIGNMENT) & 3;
+        fallback_frame(key, suffix, offset);
     }
 }
 
@@ -238,4 +204,21 @@ pub fn fallback_frame(key: &[u8], input: &mut [u8], offset: usize) {
     for (index, byte) in input.iter_mut().enumerate() {
         *byte ^= key[(index + offset) & 3];
     }
+}
+
+#[test]
+fn test_mask() {
+    use crate::rand::get_mask;
+
+    let data: Vec<u8> = std::iter::repeat_with(|| fastrand::u8(..))
+        .take(1024)
+        .collect();
+    // Mess around with the data to ensure we have unaligned input
+    let mut data = data[2..998].to_vec();
+    let mut data_clone = data.clone();
+    let key = get_mask();
+    frame(&key, &mut data, 0);
+    fallback_frame(&key, &mut data_clone, 0);
+
+    assert_eq!(&data, &data_clone);
 }
