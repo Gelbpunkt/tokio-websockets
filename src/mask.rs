@@ -10,6 +10,8 @@
 //! The SIMD implementations will only be used if the `simd` feature is active.
 #[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
 use std::arch::aarch64::{uint8x16_t, veorq_u8, vld1q_u8};
+#[cfg(all(feature = "simd", target_arch = "arm", target_feature = "neon"))]
+use std::arch::arm::{uint8x16_t, veorq_u8, vld1q_u8};
 #[cfg(all(
     feature = "simd",
     not(all(feature = "nightly", target_feature = "avx512f")),
@@ -31,7 +33,7 @@ use std::arch::x86_64::{__m512i, _mm512_load_si512, _mm512_xor_si512};
         target_feature = "avx2",
         target_feature = "sse2",
         all(feature = "nightly", target_feature = "avx512f"),
-        all(target_arch = "aarch64", target_feature = "neon")
+        target_feature = "neon"
     )
 ))]
 use std::{
@@ -61,7 +63,7 @@ const AVX2_ALIGNMENT: usize = 32;
 const SSE2_ALIGNMENT: usize = 16;
 
 /// NEON can operate on 128-bit input data.
-#[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(feature = "simd", target_feature = "neon"))]
 const NEON_ALIGNMENT: usize = 16;
 
 /// (Un-)masks input bytes with the framing key using AVX512.
@@ -211,7 +213,7 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
     }
 }
 
-#[cfg(all(feature = "simd", target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(feature = "simd", target_feature = "neon"))]
 #[inline]
 pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
     unsafe {
