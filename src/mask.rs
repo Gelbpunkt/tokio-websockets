@@ -90,11 +90,11 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
 
         ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
 
-        for j in (4 - offset..AVX512_ALIGNMENT).step_by(4) {
+        for j in (4 - offset..AVX512_ALIGNMENT - offset).step_by(4) {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
         }
 
-        if offset > 0 {
+        if offset != 0 {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(AVX512_ALIGNMENT - offset), offset);
         }
 
@@ -140,11 +140,11 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
 
         ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
 
-        for j in (4 - offset..AVX2_ALIGNMENT).step_by(4) {
+        for j in (4 - offset..AVX2_ALIGNMENT - offset).step_by(4) {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
         }
 
-        if offset > 0 {
+        if offset != 0 {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(AVX2_ALIGNMENT - offset), offset);
         }
 
@@ -191,11 +191,11 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
 
         ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
 
-        for j in (4 - offset..SSE2_ALIGNMENT).step_by(4) {
+        for j in (4 - offset..SSE2_ALIGNMENT - offset).step_by(4) {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
         }
 
-        if offset > 0 {
+        if offset != 0 {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(SSE2_ALIGNMENT - offset), offset);
         }
 
@@ -233,11 +233,11 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
 
         ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
 
-        for j in (4 - offset..NEON_ALIGNMENT).step_by(4) {
+        for j in (4 - offset..NEON_ALIGNMENT - offset).step_by(4) {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
         }
 
-        if offset > 0 {
+        if offset != 0 {
             ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(NEON_ALIGNMENT - offset), offset);
         }
 
