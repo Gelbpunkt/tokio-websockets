@@ -278,6 +278,7 @@ pub fn fallback_frame(key: &[u8], input: &mut [u8], offset: usize) {
     }
 }
 
+#[cfg(all(test, feature = "client", feature = "fastrand"))]
 #[test]
 fn test_mask() {
     use crate::rand::get_mask;
