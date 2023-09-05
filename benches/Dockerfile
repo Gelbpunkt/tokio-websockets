@@ -28,6 +28,7 @@ RUN source $HOME/.cargo/env && \
     git clone https://github.com/snapview/tokio-tungstenite.git && \
     cd tokio-tungstenite && \
     cargo update && \
+    sed -i 's/tokio::main/tokio::main(flavor = "current_thread")/g' examples/echo-server.rs && \
     cargo build --release --example echo-server && \
     cp target/release/examples/echo-server /usr/bin/tokio-tungstenite && \
     cd ..
@@ -37,6 +38,9 @@ RUN source $HOME/.cargo/env && \
     git clone https://github.com/websockets-rs/rust-websocket.git && \
     cd rust-websocket && \
     cargo update && \
+    sed -i "s/tokio::runtime::Builder/tokio::runtime::current_thread::Builder/g" examples/async-autobahn-server.rs && \
+    sed -i '13d' examples/async-autobahn-server.rs && \
+    sed -i "s/executor.spawn/tokio::spawn/g" examples/async-autobahn-server.rs && \
     cargo build --release --no-default-features --features async --example async-autobahn-server && \
     cp target/release/examples/async-autobahn-server /usr/bin/rust-websocket && \
     cd ..
