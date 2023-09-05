@@ -5,3 +5,4 @@ Cargo.lock
 flamegraph.svg
 perf.data*
 /benches/*.svg
+/benches/*.png
