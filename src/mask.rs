@@ -259,7 +259,14 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
 ///
 /// The input bytes may be further in the payload and therefore the offset into
 /// the payload must be specified.
-#[cfg(not(feature = "simd"))]
+#[cfg(any(
+    not(feature = "simd"),
+    all(
+        feature = "simd",
+        any(target_arch = "aarch64", target_arch = "arm"),
+        not(target_feature = "neon")
+    )
+))]
 #[inline]
 pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
     fallback_frame(key, input, offset);
