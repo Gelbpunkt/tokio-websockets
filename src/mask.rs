@@ -265,7 +265,8 @@ pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
         feature = "simd",
         any(target_arch = "aarch64", target_arch = "arm"),
         not(target_feature = "neon")
-    )
+    ),
+    not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "arm"))
 ))]
 #[inline]
 pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
