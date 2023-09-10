@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0 (unreleased)] - 2023-??-??
+## [0.4.0] - 2023-09-10
 
 ### Dependencies
 
 ### Added
 
-- Added support for NEON-accelerated frame (un)masking (currently only on aarch64)
+- Added support for NEON-accelerated frame (un)masking
+- Added support for AVX512-accelerated frame (un)masking, gated behind the `nightly` feature flag and requires a nightly compiler
 - Limits for payload length can be applied via `{ClientBuilder, ServerBuilder}::limits` to protect against malicious peers
 - The websocket stream can now be configured via `{ClientBuilder, ServerBuilder}::config`. This currently only supports changing the frame payload size that outgoing messages are chunked into
 
@@ -22,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The library now validates UTF-8 in partial continuation frames to a text message
 - Several types now implement `Debug`
 - The performance of the decoder has been improved
+- The encoder is now usually zero-copy and operates in-place when possible
+- Reduced the amount of calls to `fastrand`
 - `upgrade::Error` is now publicly accessible and can thus be matched on
 - **[breaking]** `ClientBuilder` methods which perform a handshake now return a tuple of `(WebsocketStream, Response)` to retrieve e.g. response headers
 - **[breaking]** `WebsocketStream` is now fully cancellation safe and implements `Stream`, therefore using `WebsocketStream::next` now requires having `StreamExt` in scope
