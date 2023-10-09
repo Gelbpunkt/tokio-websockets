@@ -222,7 +222,7 @@ where
             #[cfg(feature = "client")]
             {
                 let mut frame = frame;
-                let mut payload = match BytesMut::try_from(frame.payload) {
+                let mut payload = match frame.payload.try_into_bytesmut() {
                     Ok(b) => b,
                     Err(b) => BytesMut::from(&*b),
                 };
@@ -291,7 +291,7 @@ where
             if self.partial_payload.is_empty() {
                 // First frame of a multi-frame message
                 // SAFETY: Received payloads are always internally represented as BytesMut
-                self.partial_payload = unsafe { payload.try_into().unwrap_unchecked() };
+                self.partial_payload = unsafe { payload.try_into_bytesmut().unwrap_unchecked() };
             } else {
                 self.partial_payload.extend_from_slice(&payload);
             }

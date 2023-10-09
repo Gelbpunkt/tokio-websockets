@@ -86,7 +86,7 @@ async fn test_cancellation_safety() {
         // if they were created once and then polled a few times
         if let Poll::Ready(val) = server.next().poll_unpin(&mut cx) {
             let msg = val.expect("eof").expect("err");
-            assert_eq!(msg.as_payload(), TO_SEND);
+            assert_eq!(&*msg.into_payload(), TO_SEND);
             break;
         }
     }
