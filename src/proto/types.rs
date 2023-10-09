@@ -143,12 +143,19 @@ impl TryFrom<u16> for CloseCode {
     }
 }
 
-/// Smart wrapper around [`Bytes`] and [`BytesMut`].
+/// The websocket message payload storage. Internally implemented as a smart
+/// wrapper around [`Bytes`] and [`BytesMut`].
 ///
-/// [`Bytes`] offers no API for acquiring mutable access to *unique* slices.
-/// By deferring calling `freeze` on [`BytesMut`], this type retains mutable
-/// access to the underlying bytes until access is shared.
-pub(super) struct Payload(UnsafeCell<PayloadStorage>);
+/// Payloads can be created by using the [`From<Bytes>`] and [`From<BytesMut>`]
+/// implementations.
+///
+/// Sending the payloads is zero-copy, except when sending a payload backed by
+/// [`Bytes`] as a client to a server. The use of [`BytesMut`] as the backing
+/// storage where cheaply possible is recommended to ensure zero-copy sending.
+///
+/// [`From<Bytes>`]: #impl-From<Bytes>-for-Payload
+/// [`From<BytesMut>`]: #impl-From<BytesMut>-for-Payload
+pub struct Payload(UnsafeCell<PayloadStorage>);
 
 impl Payload {
     /// Creates a new shared `Payload` from a static slice.
@@ -174,6 +181,38 @@ impl Payload {
             PayloadStorage::Shared(b) => PayloadStorage::Shared(b.split_to(at)),
         }))
     }
+
+    /// Converts the payloads internal representation to [`Bytes`].
+    fn as_bytes(&self) -> &Bytes {
+        if let PayloadStorage::Shared(bytes) = self.as_ref() {
+            bytes
+        } else {
+            // SAFETY: No concurrent access is possible as Payload is !Sync and
+            // `0` is not read again before it's overwritten.
+            unsafe {
+                let payload = self.0.get().read();
+                let bytes = match payload {
+                    PayloadStorage::Unique(p) => p.freeze(),
+                    PayloadStorage::Shared(_) => unreachable_unchecked(),
+                };
+                self.0.get().write(PayloadStorage::Shared(bytes));
+            }
+            match self.as_ref() {
+                // SAFETY: We just wrote `Shared` into `value`
+                PayloadStorage::Unique(_) => unsafe { unreachable_unchecked() },
+                PayloadStorage::Shared(p) => p,
+            }
+        }
+    }
+
+    /// Convert the payload to [`BytesMut`] if it is currently represented as
+    /// such, otherwise returns it as [`Bytes`].
+    pub(super) fn try_into_bytesmut(self) -> Result<BytesMut, Bytes> {
+        match self.0.into_inner() {
+            PayloadStorage::Unique(s) => Ok(s),
+            PayloadStorage::Shared(e) => Err(e),
+        }
+    }
 }
 
 impl AsRef<PayloadStorage> for Payload {
@@ -185,7 +224,7 @@ impl AsRef<PayloadStorage> for Payload {
 
 impl Clone for Payload {
     fn clone(&self) -> Self {
-        let bytes: &Bytes = self.into();
+        let bytes = self.as_bytes();
         Self(UnsafeCell::new(PayloadStorage::Shared(bytes.clone())))
     }
 }
@@ -207,44 +246,15 @@ impl fmt::Debug for Payload {
     }
 }
 
-impl<'a> From<&'a Payload> for &'a Bytes {
-    fn from(value: &'a Payload) -> Self {
-        if let PayloadStorage::Shared(bytes) = value.as_ref() {
-            bytes
-        } else {
-            // SAFETY: No concurrent access is possible as Payload is !Sync and
-            // `0` is not read again before it's overwritten.
-            unsafe {
-                let payload = value.0.get().read();
-                let bytes = match payload {
-                    PayloadStorage::Unique(p) => p.freeze(),
-                    PayloadStorage::Shared(_) => unreachable_unchecked(),
-                };
-                value.0.get().write(PayloadStorage::Shared(bytes));
-            }
-            match value.as_ref() {
-                // SAFETY: We just wrote `Shared` into `value`
-                PayloadStorage::Unique(_) => unsafe { unreachable_unchecked() },
-                PayloadStorage::Shared(p) => p,
-            }
-        }
+impl From<Bytes> for Payload {
+    fn from(value: Bytes) -> Self {
+        Self(UnsafeCell::new(PayloadStorage::Shared(value)))
     }
 }
 
 impl From<BytesMut> for Payload {
     fn from(value: BytesMut) -> Self {
         Self(UnsafeCell::new(PayloadStorage::Unique(value)))
-    }
-}
-
-impl TryFrom<Payload> for BytesMut {
-    type Error = Bytes;
-
-    fn try_from(value: Payload) -> Result<Self, Self::Error> {
-        match value.0.into_inner() {
-            PayloadStorage::Unique(s) => Ok(s),
-            PayloadStorage::Shared(e) => Err(e),
-        }
     }
 }
 
@@ -257,7 +267,7 @@ enum PayloadStorage {
     Shared(Bytes),
 }
 
-/// A WebSocket message. This is cheaply clonable and uses [`Bytes`] as the
+/// A WebSocket message. This is cheaply clonable and uses [`Payload`] as the
 /// payload storage underneath.
 ///
 /// Received messages are always validated prior to dealing with them, so all
@@ -276,16 +286,21 @@ impl Message {
     pub fn text(payload: String) -> Self {
         Self {
             opcode: OpCode::Text,
-            payload: BytesMut::from(payload.into_bytes().as_slice()).into(),
+            // Possible options:
+            // * BytesMut::from(&[u8]) will copy the slice - generally bad. BytesMut does not expose
+            //   from_vec.
+            // * Bytes::from(Vec<u8>) - will not allocate. Worst case we allocate due to copying
+            //   when sending, but at least this is only conditionally
+            payload: Bytes::from(payload.into_bytes()).into(),
         }
     }
 
     /// Create a new binary message.
     #[must_use]
-    pub fn binary<P: Into<BytesMut>>(payload: P) -> Self {
+    pub fn binary<P: Into<Payload>>(payload: P) -> Self {
         Self {
             opcode: OpCode::Binary,
-            payload: Payload::from(payload.into()),
+            payload: payload.into(),
         }
     }
 
@@ -309,19 +324,19 @@ impl Message {
 
     /// Create a new ping message.
     #[must_use]
-    pub fn ping<P: Into<BytesMut>>(payload: P) -> Self {
+    pub fn ping<P: Into<Payload>>(payload: P) -> Self {
         Self {
             opcode: OpCode::Ping,
-            payload: Payload::from(payload.into()),
+            payload: payload.into(),
         }
     }
 
     /// Create a new pong message.
     #[must_use]
-    pub fn pong<P: Into<BytesMut>>(payload: P) -> Self {
+    pub fn pong<P: Into<Payload>>(payload: P) -> Self {
         Self {
             opcode: OpCode::Pong,
-            payload: Payload::from(payload.into()),
+            payload: payload.into(),
         }
     }
 
@@ -358,16 +373,13 @@ impl Message {
     /// Returns the message payload and consumes the message, regardless of
     /// type.
     #[must_use]
-    pub fn into_payload(self) -> Bytes {
-        match BytesMut::try_from(self.payload) {
-            Ok(b) => b.freeze(),
-            Err(b) => b,
-        }
+    pub fn into_payload(self) -> Payload {
+        self.payload
     }
 
     /// Returns a reference to the message payload, regardless of message type.
-    pub fn as_payload(&self) -> &Bytes {
-        (&self.payload).into()
+    pub fn as_payload(&self) -> &Payload {
+        &self.payload
     }
 
     /// Returns a reference to the message payload as a string if it is a text
