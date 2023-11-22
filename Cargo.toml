@@ -29,8 +29,8 @@ simdutf8 = { version = "0.1", default-features = false, features = ["std"], opti
 
 # Client
 base64 = { version = "0.21", optional = true }
-http = { version = "0.2", default-features = false, optional = true }
-http-body = { version = "0.4", default-features = false, optional = true }
+http = { version = "1", default-features = false, features = ["std"], optional = true }
+http-body-util = { version = "0.1", default-features = false, optional = true }
 httparse = { version = "1.6", optional = true }
 
 # Native TLS
@@ -48,7 +48,7 @@ openssl = { version = "0.10", default-features = false, optional = true }
 
 [features]
 client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util", "tokio/rt"]
-http-integration = ["dep:http-body"]
+http-integration = ["dep:http-body-util"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
 simd = ["dep:simdutf8"]
 native-tls = ["dep:tokio-native-tls"]
@@ -59,7 +59,8 @@ nightly = []
 [dev-dependencies]
 futures-util = { version = "0.3.14", default-features = false, features = ["sink"] }
 # For tests
-hyper = { version = "0.14", default-features = false, features = ["client", "http1", "tcp"] }
+hyper = { version = "1", default-features = false }
+hyper-util = { version = "0.1", default-features = false, features = ["client-legacy", "http1", "tokio"] }
 rustls-pemfile = "1"
 tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread"] }
 tokio-rustls = "0.24"
