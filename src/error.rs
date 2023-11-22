@@ -1,10 +1,10 @@
 //! General error type used in the crate.
 use std::{fmt, io};
 
+#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+use rustls_pki_types::InvalidDnsNameError;
 #[cfg(feature = "native-tls")]
 use tokio_native_tls::native_tls;
-#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
-use tokio_rustls::rustls::client::InvalidDnsNameError;
 
 use crate::proto::ProtocolError;
 
@@ -31,12 +31,19 @@ pub enum Error {
     /// Attempted to connect to an invalid DNS name.
     #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
     InvalidDNSName(InvalidDnsNameError),
-    /// Adding a native certificate to the storage for the TLS connector failed.
-    #[cfg(feature = "rustls-native-roots")]
+    /// A general rustls error.
+    #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
     Rustls(tokio_rustls::rustls::Error),
     /// The HTTP/1.1 Upgrade failed.
     #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(crate::upgrade::Error),
+    /// Rustls was enabled via crate features, but no crypto provider was
+    /// configured prior to connecting.
+    #[cfg(all(
+        any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+        not(feature = "ring")
+    ))]
+    NoTlsConnectorConfigured,
 }
 
 #[cfg(feature = "native-tls")]
@@ -65,7 +72,7 @@ impl From<InvalidDnsNameError> for Error {
     }
 }
 
-#[cfg(feature = "rustls-native-roots")]
+#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
 impl From<tokio_rustls::rustls::Error> for Error {
     fn from(err: tokio_rustls::rustls::Error) -> Self {
         Self::Rustls(err)
@@ -100,10 +107,17 @@ impl fmt::Display for Error {
             Error::NativeTls(e) => e.fmt(f),
             #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Error::InvalidDNSName(_) => f.write_str("invalid DNS name"),
-            #[cfg(feature = "rustls-native-roots")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Error::Rustls(e) => e.fmt(f),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => e.fmt(f),
+            #[cfg(all(
+                any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                not(feature = "ring")
+            ))]
+            Error::NoTlsConnectorConfigured => {
+                f.write_str("wss uri set but no tls connector was configured")
+            }
         }
     }
 }
@@ -114,13 +128,18 @@ impl std::error::Error for Error {
             Error::AlreadyClosed | Error::CannotResolveHost | Error::PayloadTooLong { .. } => None,
             #[cfg(feature = "client")]
             Error::NoUriConfigured => None,
+            #[cfg(all(
+                any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                not(feature = "ring")
+            ))]
+            Error::NoTlsConnectorConfigured => None,
             Error::Protocol(e) => Some(e),
             Error::Io(e) => Some(e),
             #[cfg(feature = "native-tls")]
             Error::NativeTls(e) => Some(e),
             #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Error::InvalidDNSName(e) => Some(e),
-            #[cfg(feature = "rustls-native-roots")]
+            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Error::Rustls(e) => Some(e),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => Some(e),

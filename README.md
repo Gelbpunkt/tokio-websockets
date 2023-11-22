@@ -36,9 +36,11 @@ TLS support is supported via any of the following feature flags:
 - `rustls-webpki-roots` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`webpki-roots`](https://docs.rs/webpki-roots/latest/webpki_roots/)
 - `rustls-native-roots` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`rustls-native-certs`](https://docs.rs/rustls-native-certs/latest/rustls_native_certs/)
 
+The `rustls-*-roots` features require a crypto provider for `rustls`. You can either enable the `ring` feature to use it as the provider and use `TlsConnector::new()`, or bring your own with `TlsConnector::new_rustls_with_crypto_provider()`.
+
 One SHA1 implementation is required, usually provided by the TLS implementation:
 
-- [`ring`](https://docs.rs/ring/latest/ring/) is used if `rustls` is the TLS library
+- [`ring`](https://docs.rs/ring/latest/ring/) is recommended if the `ring` feature is enabled (usually when `rustls` is used)
 - The `openssl` feature will use [`openssl`](https://docs.rs/openssl/latest/openssl/), usually preferred on most Linux/BSD systems with `native-tls`
 - The [`sha1_smol`](https://docs.rs/sha1_smol/latest/sha1_smol/) feature can be used as a fallback if no TLS is needed
 

@@ -7,38 +7,34 @@ use std::{
 
 use futures_util::SinkExt;
 use rustls_pemfile::{certs, pkcs8_private_keys};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::net::TcpListener;
-use tokio_rustls::{
-    rustls::{self, Certificate, PrivateKey},
-    TlsAcceptor,
-};
+use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_websockets::Message;
 
 const PATH_TO_CERT: &str = "certs/localhost.crt";
 const PATH_TO_KEY: &str = "certs/localhost.key";
 
-fn load_certs(path: &str) -> io::Result<Vec<Certificate>> {
-    certs(&mut BufReader::new(File::open(path)?))
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))
-        .map(|mut certs| certs.drain(..).map(Certificate).collect())
+fn load_certs(path: &str) -> io::Result<Vec<CertificateDer<'static>>> {
+    certs(&mut BufReader::new(File::open(path)?)).collect()
 }
 
-fn load_keys(path: &str) -> io::Result<Vec<PrivateKey>> {
+fn load_key(path: &str) -> io::Result<PrivateKeyDer<'static>> {
     pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
-        .map(|mut keys| keys.drain(..).map(PrivateKey).collect())
+        .next()
+        .unwrap()
+        .map(Into::into)
 }
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     let certs = load_certs(PATH_TO_CERT)?;
-    let mut keys = load_keys(PATH_TO_KEY)?;
+    let key = load_key(PATH_TO_KEY)?;
 
     let config = rustls::ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
-        .with_single_cert(certs, keys.remove(0))
+        .with_single_cert(certs, key)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
 
     let acceptor = TlsAcceptor::from(Arc::new(config));

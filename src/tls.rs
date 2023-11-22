@@ -13,13 +13,18 @@ use std::{
     task::{Context, Poll},
 };
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-#[cfg(feature = "rustls-native-roots")]
-use tokio_rustls::rustls::Certificate;
-#[cfg(feature = "rustls-webpki-roots")]
-use tokio_rustls::rustls::OwnedTrustAnchor;
 #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
-use tokio_rustls::rustls::{ClientConfig, RootCertStore, ServerName};
+use rustls_pki_types::ServerName;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+#[cfg(all(
+    any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+    feature = "ring"
+))]
+use tokio_rustls::rustls::crypto::ring;
+#[cfg(any(feature = "rustls-native-roots", feature = "rustls-webpki-roots"))]
+use tokio_rustls::rustls::crypto::CryptoProvider;
+#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 
 use crate::Error;
 
@@ -153,6 +158,19 @@ impl Connector {
     ///
     /// This method returns an [`Error`] when creating the underlying TLS
     /// connector fails.
+    #[cfg(any(
+        not(any(
+            feature = "native-tls",
+            feature = "rustls-webpki-roots",
+            feature = "rustls-native-roots"
+        )),
+        feature = "native-tls",
+        all(
+            feature = "ring",
+            any(feature = "rustls-webpki-roots", feature = "rustls-native-roots")
+        )
+    ))] // Method is available at any time *except* when a rustls flag is enabled
+        // without ring
     pub fn new() -> Result<Self, Error> {
         #[cfg(not(any(
             feature = "native-tls",
@@ -164,45 +182,58 @@ impl Connector {
         }
         #[cfg(all(
             feature = "native-tls",
-            not(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))
+            not(all(
+                any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                feature = "ring"
+            ))
         ))]
         {
             Ok(Self::NativeTls(
                 tokio_native_tls::native_tls::TlsConnector::new()?.into(),
             ))
         }
-        #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+        #[cfg(all(
+            any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+            feature = "ring"
+        ))]
         {
-            let mut roots = RootCertStore::empty();
-
-            #[cfg(feature = "rustls-native-roots")]
-            {
-                let certs = rustls_native_certs::load_native_certs()?;
-
-                for cert in certs {
-                    roots.add(&Certificate(cert.0))?;
-                }
-            }
-
-            #[cfg(feature = "rustls-webpki-roots")]
-            {
-                roots.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-                    OwnedTrustAnchor::from_subject_spki_name_constraints(
-                        ta.subject,
-                        ta.spki,
-                        ta.name_constraints,
-                    )
-                }));
-            };
-
-            let config = ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-
-            let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
-            Ok(Self::Rustls(connector))
+            Self::new_rustls_with_crypto_provider(ring::default_provider().into())
         }
+    }
+
+    /// Creates a new `Connector` using `rustls` with a custom crypto provider
+    /// as the TLS library and root certificates specified in the feature
+    /// flags.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an [`Error`] when creating the underlying TLS
+    /// connector fails.
+    #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+    pub fn new_rustls_with_crypto_provider(provider: Arc<CryptoProvider>) -> Result<Self, Error> {
+        let mut roots = RootCertStore::empty();
+
+        #[cfg(feature = "rustls-native-roots")]
+        {
+            let certs = rustls_native_certs::load_native_certs()?;
+
+            for cert in certs {
+                roots.add(cert)?;
+            }
+        }
+
+        #[cfg(feature = "rustls-webpki-roots")]
+        {
+            roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        };
+
+        let config = ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()?
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+
+        let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
+        Ok(Self::Rustls(connector))
     }
 
     /// Wraps a given stream with a layer of TLS.
@@ -232,7 +263,7 @@ impl Connector {
             #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Self::Rustls(connector) => Ok(MaybeTlsStream::Rustls(
                 connector
-                    .connect(ServerName::try_from(domain)?, stream)
+                    .connect(ServerName::try_from(domain)?.to_owned(), stream)
                     .await?,
             )),
         }

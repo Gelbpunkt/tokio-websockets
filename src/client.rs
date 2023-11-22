@@ -235,9 +235,21 @@ impl<'a> Builder<'a> {
         let stream = if let Some(connector) = self.connector {
             connector.wrap(host, stream).await?
         } else if uri.scheme_str() == Some("wss") {
-            let connector = Connector::new()?;
+            #[cfg(all(
+                any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                not(feature = "ring")
+            ))]
+            return Err(Error::NoTlsConnectorConfigured);
 
-            connector.wrap(host, stream).await?
+            #[cfg(not(all(
+                any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                not(feature = "ring")
+            )))]
+            {
+                let connector = Connector::new()?;
+
+                connector.wrap(host, stream).await?
+            }
         } else {
             Connector::Plain.wrap(host, stream).await?
         };
