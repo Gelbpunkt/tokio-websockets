@@ -5,7 +5,7 @@ use http::{
     header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE},
     HeaderValue, Request, Uri,
 };
-use http_body::Empty;
+use http_body_util::Empty;
 
 use crate::client::make_key;
 
@@ -16,10 +16,14 @@ use crate::client::make_key;
 /// For example, using [hyper](https://docs.rs/hyper/latest/hyper/):
 ///
 /// ```rust
-/// use hyper::{self, client::HttpConnector, Client, StatusCode, Uri};
+/// use http::{StatusCode, Uri};
+/// use hyper_util::{
+///     client::legacy::{connect::HttpConnector, Client},
+///     rt::tokio::{TokioExecutor, TokioIo},
+/// };
 /// use tokio_websockets::{upgrade_request, ClientBuilder};
 ///
-/// # use futures_util::SinkExt;
+/// # use futures_util::{SinkExt, StreamExt};
 /// # use tokio_websockets::ServerBuilder;
 /// # use tokio::net::TcpListener;
 /// # #[tokio::main]
@@ -46,7 +50,7 @@ use crate::client::make_key;
 /// // The HTTP Connector does not allow ws:// per default
 /// let mut connector = HttpConnector::new();
 /// connector.enforce_http(false);
-/// let client = Client::builder().build(connector);
+/// let client = Client::builder(TokioExecutor::new()).build(connector);
 ///
 /// let uri = Uri::from_static("ws://localhost:3333");
 /// let response = client.request(upgrade_request(uri)?).await?;
@@ -58,7 +62,7 @@ use crate::client::make_key;
 /// );
 ///
 /// let stream = match hyper::upgrade::on(response).await {
-///     Ok(upgraded) => ClientBuilder::new().take_over(upgraded),
+///     Ok(upgraded) => ClientBuilder::new().take_over(TokioIo::new(upgraded)),
 ///     Err(e) => panic!("upgrade error: {}", e),
 /// };
 ///
