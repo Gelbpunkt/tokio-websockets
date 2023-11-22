@@ -366,7 +366,7 @@ where
         let bytes_written = &mut this.bytes_written;
 
         while !frame_queue.is_empty() {
-            let frame = { unsafe { frame_queue.get(0).unwrap_unchecked() } };
+            let frame = { unsafe { frame_queue.front().unwrap_unchecked() } };
             let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len as usize) };
             let mut buf = frame_header
                 .chain(
