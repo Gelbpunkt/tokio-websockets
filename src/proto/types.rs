@@ -119,7 +119,7 @@ impl CloseCode {
         match self.0.get() {
             1004 | 1005 | 1006 | 1015 => false,
             1000..=4999 => true,
-            // SAFETY: `TryFrom` is the only way to accquire self and it errors for these values
+            // SAFETY: `TryFrom` is the only way to acquire self and it errors for these values
             0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
         }
     }
@@ -146,7 +146,7 @@ impl TryFrom<u16> for CloseCode {
 /// Smart wrapper around [`Bytes`] and [`BytesMut`].
 ///
 /// [`Bytes`] offers no API for acquiring mutable access to *unique* slices.
-/// By defering calling `freeze` on [`BytesMut`], this type retains mutable
+/// By deferring calling `freeze` on [`BytesMut`], this type retains mutable
 /// access to the underlying bytes until access is shared.
 pub(super) struct Payload(UnsafeCell<PayloadStorage>);
 
@@ -385,7 +385,8 @@ impl Message {
             let code = if self.payload.is_empty() {
                 CloseCode::NO_STATUS_RECEIVED
             } else {
-                // SAFETY: Opcode is Close with a non-empty payload so it's atleast 2 bytes long
+                // SAFETY: Opcode is Close with a non-empty payload so it's at least 2 bytes
+                // long
                 unsafe {
                     CloseCode::try_from(u16::from_be_bytes(
                         self.payload

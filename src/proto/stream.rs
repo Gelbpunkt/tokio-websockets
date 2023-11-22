@@ -358,7 +358,7 @@ where
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Borrow checker hacks... It needs this to understand that we can seperately
+        // Borrow checker hacks... It needs this to understand that we can separately
         // borrow the fields of the struct mutably
         let this = self.get_mut();
         let frame_queue = &mut this.frame_queue;
