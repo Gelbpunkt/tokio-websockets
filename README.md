@@ -1,5 +1,9 @@
 # tokio-websockets
 
+[![Crates.io](https://img.shields.io/crates/v/tokio-websockets.svg?maxAge=2592000)](https://crates.io/crates/tokio-websockets)
+![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/Gelbpunkt/tokio-websockets/ci.yml)
+[![Documentation](https://img.shields.io/docsrs/tokio-websockets)](https://docs.rs/tokio-websockets)
+
 High performance, strict, tokio-util based websockets implementation.
 
 ## Why use tokio-websockets?
