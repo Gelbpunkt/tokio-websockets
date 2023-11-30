@@ -46,14 +46,20 @@ webpki = { package = "rustls-webpki", version = "0.101", optional = true }
 # Users can manually tune into OpenSSL for SHA-1 when native-tls is enabled
 openssl = { version = "0.10", default-features = false, optional = true }
 
+# permessage-deflate extension
+flate2 = { version = "1", default-features = false, optional = true }
+
 [features]
 client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util", "tokio/rt"]
 http-integration = ["dep:http-body-util"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
-simd = ["dep:simdutf8"]
+simd = ["dep:simdutf8", "flate2?/zlib-ng"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:tokio-rustls", "ring", "dep:webpki", "dep:webpki-roots"]
 rustls-native-roots = ["dep:tokio-rustls", "ring", "dep:rustls-native-certs"]
+permessage-deflate = ["dep:flate2"]
+zlib = ["flate2?/zlib"]
+miniz-oxide = ["flate2?/rust_backend"]
 nightly = []
 
 [dev-dependencies]

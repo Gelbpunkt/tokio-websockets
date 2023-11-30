@@ -4,11 +4,19 @@ use bytes::{Buf, BytesMut};
 use httparse::Request;
 use tokio_util::codec::Decoder;
 
-use crate::{sha::digest, upgrade::Error, utf8::parse_str};
+use crate::{
+    extensions::{ExtensionIterator, Extensions},
+    sha::digest,
+    upgrade::Error,
+    utf8::parse_str,
+    ExtensionConfiguration,
+};
 
 /// A static HTTP/1.1 101 Switching Protocols response up until the
 /// `Sec-WebSocket-Accept` header value.
 const SWITCHING_PROTOCOLS_BODY: &str = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-Websocket-Accept: ";
+/// The `Sec-WebSocket-Extensions` header.
+const SEC_WEBSOCKETS_EXTENSIONS: &str = "\r\nSec-WebSocket-Extensions: ";
 
 /// Returns whether an ASCII byte slice is contained in another one, ignoring
 /// captalization.
@@ -30,19 +38,21 @@ fn contains_ignore_ascii_case(mut haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 /// A client's opening handshake.
-struct ClientRequest {
+struct ClientRequest<'a> {
     /// The SHA-1 digest of the `Sec-WebSocket-Key` header.
     ws_accept: [u8; 20],
+    /// Iterator over extensions proposed by the client.
+    extensions: ExtensionIterator<'a>,
 }
 
-impl ClientRequest {
+impl<'a> ClientRequest<'a> {
     /// Parses the client's opening handshake.
     ///
     /// # Errors
     ///
     /// This method fails when a header required for the websocket protocol is
     /// missing in the handshake.
-    pub fn parse<'a, F>(header: F) -> Result<Self, Error>
+    pub fn parse<F>(header: F) -> Result<Self, Error>
     where
         F: Fn(&'static str) -> Option<&'a str> + 'a,
     {
@@ -76,7 +86,14 @@ impl ClientRequest {
 
         let key = find_header("Sec-WebSocket-Key")?;
         let ws_accept = digest(key.as_bytes());
-        Ok(Self { ws_accept })
+
+        let extensions =
+            ExtensionIterator::new(find_header("Sec-WebSocket-Extensions").unwrap_or_default());
+
+        Ok(Self {
+            ws_accept,
+            extensions,
+        })
     }
 
     /// Returns the value that the client expects to see in the server's
@@ -84,6 +101,12 @@ impl ClientRequest {
     #[must_use]
     pub fn ws_accept(&self) -> String {
         STANDARD.encode(self.ws_accept)
+    }
+
+    /// Returns an iterator over extensions proposed by the client.
+    #[must_use]
+    pub fn into_extensions(self) -> ExtensionIterator<'a> {
+        self.extensions
     }
 }
 
@@ -93,11 +116,21 @@ impl ClientRequest {
 /// It does not implement an [`Encoder`].
 ///
 /// [`Encoder`]: tokio_util::codec::Encoder
-pub struct Codec {}
+pub struct Codec<'a> {
+    extensions: &'a ExtensionConfiguration,
+}
 
-impl Decoder for Codec {
+impl<'a> Codec<'a> {
+    /// Returns a new [`Codec`].
+    #[must_use]
+    pub fn new(extensions: &'a ExtensionConfiguration) -> Self {
+        Self { extensions }
+    }
+}
+
+impl<'a> Decoder for Codec<'a> {
     type Error = crate::Error;
-    type Item = String;
+    type Item = (String, Extensions);
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let mut headers = [httparse::EMPTY_HEADER; 25];
@@ -110,11 +143,16 @@ impl Decoder for Codec {
 
         let request_len = status.unwrap();
 
-        let ws_accept = ClientRequest::parse(|name| {
+        let client_request = ClientRequest::parse(|name| {
             let h = headers.iter().find(|h| h.name.eq_ignore_ascii_case(name))?;
             parse_str(h.value).ok()
-        })?
-        .ws_accept();
+        })?;
+
+        let ws_accept = client_request.ws_accept();
+
+        let (extension_header, extensions) = self
+            .extensions
+            .accept_client_proposals(client_request.into_extensions())?;
 
         src.advance(request_len);
 
@@ -122,8 +160,14 @@ impl Decoder for Codec {
 
         resp.push_str(SWITCHING_PROTOCOLS_BODY);
         resp.push_str(&ws_accept);
+
+        if let Some(header_value) = extension_header {
+            resp.push_str(SEC_WEBSOCKETS_EXTENSIONS);
+            resp.push_str(&header_value);
+        }
+
         resp.push_str("\r\n\r\n");
 
-        Ok(Some(resp))
+        Ok(Some((resp, extensions)))
     }
 }

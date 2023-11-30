@@ -12,6 +12,8 @@ use bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
 use super::types::{Frame, Limits, OpCode, Role};
+#[cfg(any(feature = "client", feature = "server"))]
+use crate::extensions::Extensions;
 use crate::{
     mask,
     proto::ProtocolError,
@@ -32,22 +34,31 @@ pub(super) struct WebsocketProtocol {
     pub(super) limits: Limits,
     /// Opcode of the full message.
     fragmented_message_opcode: OpCode,
+    /// Whether the full message is compressed.
+    #[cfg(feature = "permessage-deflate")]
+    fragmented_message_compressed: bool,
     /// Index up to which the payload was processed (unmasked and validated).
     payload_processed: usize,
     /// UTF-8 validator.
     validator: Validator,
+    /// Configured extensions.
+    #[cfg(any(feature = "client", feature = "server"))]
+    pub(super) extensions: Extensions,
 }
 
 impl WebsocketProtocol {
     /// Creates a new websocket codec.
     #[cfg(any(feature = "client", feature = "server"))]
-    pub(super) fn new(role: Role, limits: Limits) -> Self {
+    pub(super) fn new(role: Role, limits: Limits, extensions: Extensions) -> Self {
         Self {
             role,
             limits,
             fragmented_message_opcode: OpCode::Continuation,
+            #[cfg(feature = "permessage-deflate")]
+            fragmented_message_compressed: false,
             payload_processed: 0,
             validator: Validator::new(),
+            extensions,
         }
     }
 }
@@ -86,20 +97,37 @@ impl Decoder for WebsocketProtocol {
         let payload_len_1 = unsafe { src.get_unchecked(1) };
 
         // Bit 0
-        let fin = fin_and_rsv >> 7 != 0;
+        let is_final = fin_and_rsv >> 7 != 0;
 
         // Bits 1-3
-        let rsv = fin_and_rsv & 0x70;
+        let is_compressed = fin_and_rsv & 0x40 != 0;
+        #[cfg(any(
+            not(feature = "permessage-deflate"),
+            any(feature = "client", feature = "server")
+        ))]
+        let rsv_rest = fin_and_rsv & 0x30;
 
-        if rsv != 0 {
-            return Err(Error::Protocol(ProtocolError::InvalidRsv));
+        #[cfg(not(feature = "permessage-deflate"))]
+        {
+            if is_compressed || rsv_rest != 0 {
+                return Err(Error::Protocol(ProtocolError::InvalidRsv));
+            }
+        }
+        #[cfg(all(
+            feature = "permessage-deflate",
+            any(feature = "client", feature = "server")
+        ))]
+        {
+            if (self.extensions.permessage_deflate.is_none() && is_compressed) || (rsv_rest != 0) {
+                return Err(Error::Protocol(ProtocolError::InvalidRsv));
+            }
         }
 
         // Bits 4-7
         let opcode = OpCode::try_from(fin_and_rsv & 0xF)?;
 
         if opcode.is_control() {
-            if !fin {
+            if !is_final {
                 return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
             }
         } else if self.fragmented_message_opcode == OpCode::Continuation {
@@ -179,9 +207,10 @@ impl Decoder for WebsocketProtocol {
 
             if payload_length != payload_available {
                 // Validate partial frame payload data
-                if opcode == OpCode::Text
+                if (opcode == OpCode::Text
                     || (opcode == OpCode::Continuation
-                        && self.fragmented_message_opcode == OpCode::Text)
+                        && self.fragmented_message_opcode == OpCode::Text))
+                    && !is_compressed
                 {
                     if mask {
                         // SAFETY: The masking key and the payload do not overlap in src
@@ -232,16 +261,17 @@ impl Decoder for WebsocketProtocol {
                 mask::frame(masking_key, payload_masked, self.payload_processed & 3);
             }
 
-            if opcode == OpCode::Text
+            if (opcode == OpCode::Text
                 || (opcode == OpCode::Continuation
-                    && self.fragmented_message_opcode == OpCode::Text)
+                    && self.fragmented_message_opcode == OpCode::Text))
+                && !is_compressed
             {
                 // SAFETY: self.payload_data_validated <= payload_length
                 self.validator.feed(
                     unsafe {
                         src.get_unchecked(offset + self.payload_processed..offset + payload_length)
                     },
-                    fin,
+                    is_final,
                 )?;
             } else if opcode == OpCode::Close {
                 // SAFETY: Close frames with a non-zero payload length are validated to not have
@@ -271,22 +301,29 @@ impl Decoder for WebsocketProtocol {
         // It is possible to receive intermediate control frames between a large other
         // frame. We therefore can't simply reset the fragmented opcode after we receive
         // a "final" frame.
-        if fin && !opcode.is_control() {
+        if is_final && !opcode.is_control() {
             // Full, (possibly) chunked message received
             self.fragmented_message_opcode = OpCode::Continuation;
         } else if opcode != OpCode::Continuation && !opcode.is_control() {
             // First frame of a multi-frame message
             self.fragmented_message_opcode = opcode;
+
+            #[cfg(feature = "permessage-deflate")]
+            {
+                self.fragmented_message_compressed = is_compressed;
+            }
         }
         // In all other cases, we have either a continuation or control frame, neither
         // of which change change the opcode being assembled
 
         self.payload_processed = 0;
 
-        Ok(Some(Frame {
+        Ok(Some(dbg!(Frame {
             opcode,
             payload,
-            is_final: fin,
-        }))
+            is_final,
+            #[cfg(feature = "permessage-deflate")]
+            is_compressed: self.fragmented_message_compressed,
+        })))
     }
 }

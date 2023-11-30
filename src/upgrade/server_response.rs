@@ -8,7 +8,12 @@ use http::{header::HeaderName, HeaderValue, StatusCode, Version};
 use httparse::{Header, Response};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::{sha::digest, upgrade::Error};
+#[cfg(all(
+    any(feature = "client", feature = "server"),
+    feature = "permessage-deflate"
+))]
+use crate::extensions::{ExtensionIterator, Extensions};
+use crate::{sha::digest, upgrade::Error, ExtensionConfiguration};
 
 /// HTTP status code for Switching Protocols.
 const SWITCHING_PROTOCOLS: u16 = 101;
@@ -28,27 +33,45 @@ fn header<'a, 'header: 'a>(
 
 /// [`Decoder`] for parsing the server's response to the client's HTTP
 /// `Connection: Upgrade` request.
-pub struct Codec {
+pub struct Codec<'a> {
     /// The SHA-1 digest of the `Sec-WebSocket-Key` header.
     ws_accept: [u8; 20],
+    /// Extensions suggested by the client.
+    #[cfg(all(
+        any(feature = "client", feature = "server"),
+        feature = "permessage-deflate"
+    ))]
+    extensions: &'a ExtensionConfiguration,
 }
 
-impl Codec {
+impl<'a> Codec<'a> {
     /// Returns a new [`Codec`].
     ///
     /// The `key` parameter provides the string passed to the server via the
     /// HTTP `Sec-WebSocket-Key` header.
     #[must_use]
-    pub fn new(key: &[u8]) -> Self {
+    pub fn new(
+        key: &[u8],
+        #[cfg(all(
+            any(feature = "client", feature = "server"),
+            feature = "permessage-deflate"
+        ))]
+        extensions: &'a ExtensionConfiguration,
+    ) -> Self {
         Self {
             ws_accept: digest(key),
+            #[cfg(all(
+                any(feature = "client", feature = "server"),
+                feature = "permessage-deflate"
+            ))]
+            extensions,
         }
     }
 }
 
-impl Decoder for Codec {
+impl<'a> Decoder for Codec<'a> {
     type Error = crate::Error;
-    type Item = super::Response;
+    type Item = (super::Response, Extensions);
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let mut headers = [httparse::EMPTY_HEADER; 25];
@@ -76,6 +99,21 @@ impl Decoder for Codec {
             return Err(crate::Error::Upgrade(Error::WrongWebsocketAccept));
         }
 
+        #[cfg(all(
+            any(feature = "client", feature = "server"),
+            feature = "permessage-deflate"
+        ))]
+        let extensions = if let Some(ws_extensions_header) =
+            header(response.headers, "Sec-WebSocket-Extensions")
+                .ok()
+                .and_then(|h| crate::utf8::parse_str(h).ok())
+        {
+            let extensions = ExtensionIterator::new(ws_extensions_header);
+            self.extensions.verify_server_proposals(extensions)?
+        } else {
+            Extensions::default()
+        };
+
         let mut parsed_response = http::Response::new(());
         *parsed_response.status_mut() =
             StatusCode::from_u16(code).map_err(|_| Error::Parsing(httparse::Error::Status))?;
@@ -96,11 +134,11 @@ impl Decoder for Codec {
 
         src.advance(response_len);
 
-        Ok(Some(parsed_response))
+        Ok(Some((parsed_response, extensions)))
     }
 }
 
-impl Encoder<()> for Codec {
+impl<'a> Encoder<()> for Codec<'a> {
     type Error = crate::Error;
 
     fn encode(&mut self, _item: (), _dst: &mut BytesMut) -> Result<(), Self::Error> {

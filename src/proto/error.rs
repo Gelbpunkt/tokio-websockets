@@ -29,14 +29,14 @@ impl ProtocolError {
     /// Stringify this variant.
     pub(super) const fn as_str(&self) -> &'static str {
         match self {
-            ProtocolError::FragmentedControlFrame => "fragmented control frame",
-            ProtocolError::InvalidCloseCode => "invalid close code",
-            ProtocolError::InvalidOpcode => "invalid opcode",
-            ProtocolError::InvalidPayloadLength => "invalid payload length",
-            ProtocolError::InvalidRsv => "invalid extension",
-            ProtocolError::InvalidUtf8 => "invalid utf-8",
-            ProtocolError::UnexpectedMaskedFrame => "unexpected masked frame",
-            ProtocolError::UnexpectedUnmaskedFrame => "unexpected unmasked frame",
+            Self::FragmentedControlFrame => "fragmented control frame",
+            Self::InvalidCloseCode => "invalid close code",
+            Self::InvalidOpcode => "invalid opcode",
+            Self::InvalidPayloadLength => "invalid payload length",
+            Self::InvalidRsv => "invalid extension",
+            Self::InvalidUtf8 => "invalid utf-8",
+            Self::UnexpectedMaskedFrame => "unexpected masked frame",
+            Self::UnexpectedUnmaskedFrame => "unexpected unmasked frame",
         }
     }
 }

@@ -20,6 +20,11 @@ compile_error!("client and server implementation require at least one SHA1 backe
 #[cfg(feature = "client")]
 pub mod client;
 pub mod error;
+#[cfg(all(
+    any(feature = "client", feature = "server"),
+    feature = "permessage-deflate"
+))]
+pub mod extensions;
 #[cfg(all(feature = "http-integration", feature = "client"))]
 pub mod http;
 mod mask;
@@ -38,6 +43,11 @@ mod utf8;
 #[cfg(feature = "client")]
 pub use client::Builder as ClientBuilder;
 pub use error::Error;
+#[cfg(all(
+    any(feature = "client", feature = "server"),
+    feature = "permessage-deflate"
+))]
+pub use extensions::ExtensionConfiguration;
 pub use proto::{CloseCode, Config, Limits, Message, WebsocketStream};
 #[cfg(feature = "server")]
 pub use server::Builder as ServerBuilder;

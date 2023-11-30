@@ -14,7 +14,7 @@ use tokio_util::codec::{Decoder, Framed};
 use crate::{
     proto::{Config, Limits, Role},
     upgrade::client_request,
-    Error, WebsocketStream,
+    Error, ExtensionConfiguration, WebsocketStream,
 };
 
 /// HTTP/1.1 400 Bad Request response payload.
@@ -26,6 +26,8 @@ pub struct Builder {
     config: Config,
     /// Limits to impose on the websocket stream.
     limits: Limits,
+    /// Extensions to enable with respective configurations.
+    extensions: ExtensionConfiguration,
 }
 
 impl Default for Builder {
@@ -42,6 +44,7 @@ impl Builder {
         Self {
             config: Config::default(),
             limits: Limits::default(),
+            extensions: ExtensionConfiguration::default(),
         }
     }
 
@@ -61,6 +64,14 @@ impl Builder {
         self
     }
 
+    /// Set the configuration for extensions to enable for this connection.
+    #[must_use]
+    pub fn extensions(mut self, extensions: ExtensionConfiguration) -> Self {
+        self.extensions = extensions;
+
+        self
+    }
+
     /// Perform a HTTP upgrade handshake on an already established stream and
     /// uses it to send and receive websocket messages.
     ///
@@ -71,12 +82,12 @@ impl Builder {
         &self,
         stream: S,
     ) -> Result<WebsocketStream<S>, Error> {
-        let mut framed = client_request::Codec {}.framed(stream);
+        let mut framed = client_request::Codec::new(&self.extensions).framed(stream);
         let reply = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx)).await;
         let mut parts = framed.into_parts();
 
         match reply {
-            Some(Ok(response)) => {
+            Some(Ok((response, extensions))) => {
                 parts.io.write_all(response.as_bytes()).await?;
                 let framed = Framed::from_parts(parts);
                 Ok(WebsocketStream::from_framed(
@@ -84,6 +95,7 @@ impl Builder {
                     Role::Server,
                     self.config,
                     self.limits,
+                    extensions,
                 ))
             }
             Some(Err(e)) => {
@@ -100,6 +112,12 @@ impl Builder {
     ///
     /// This does not perform a HTTP upgrade handshake.
     pub fn serve<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(stream, Role::Server, self.config, self.limits)
+        WebsocketStream::from_raw_stream(
+            stream,
+            Role::Server,
+            self.config,
+            self.limits,
+            self.extensions.clone().into_extensions(Role::Server),
+        )
     }
 }

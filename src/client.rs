@@ -27,7 +27,7 @@ use tokio_util::codec::Decoder;
 use crate::{
     proto::{Config, Limits, Role},
     upgrade::{self, server_response},
-    Connector, Error, MaybeTlsStream, WebsocketStream,
+    Connector, Error, ExtensionConfiguration, MaybeTlsStream, WebsocketStream,
 };
 
 /// Generates a new, random 16-byte websocket key and encodes it as base64.
@@ -63,7 +63,12 @@ fn default_port(uri: &Uri) -> Option<u16> {
 
 /// Builds a HTTP/1.1 Upgrade request for a URI with extra headers and a
 /// websocket key.
-fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
+fn build_request(
+    uri: &Uri,
+    key: &[u8],
+    headers: &HeaderMap,
+    extensions: &ExtensionConfiguration,
+) -> Vec<u8> {
     let mut buf = Vec::new();
 
     buf.extend_from_slice(b"GET ");
@@ -91,6 +96,12 @@ fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
     buf.extend_from_slice(b"Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ");
     buf.extend_from_slice(key);
     buf.extend_from_slice(b"\r\nSec-WebSocket-Version: 13\r\n");
+
+    if let Some(extensions_header) = extensions.generate_extension_header() {
+        buf.extend_from_slice(b"\r\nSec-WebSocket-Extensions: ");
+        buf.extend_from_slice(extensions_header.as_bytes());
+        buf.extend_from_slice(b"\r\n");
+    }
 
     for (name, value) in headers {
         buf.extend_from_slice(name.as_str().as_bytes());
@@ -132,6 +143,8 @@ pub struct Builder<'a> {
     limits: Limits,
     /// Headers to be sent with the upgrade request.
     headers: HeaderMap,
+    /// Extensions to enable with respective configurations.
+    extensions: ExtensionConfiguration,
 }
 
 impl<'a> Builder<'a> {
@@ -145,6 +158,7 @@ impl<'a> Builder<'a> {
             config: Config::default(),
             limits: Limits::default(),
             headers: HeaderMap::new(),
+            extensions: ExtensionConfiguration::default(),
         }
     }
 
@@ -171,6 +185,7 @@ impl<'a> Builder<'a> {
             config: Config::default(),
             limits: Limits::default(),
             headers: HeaderMap::new(),
+            extensions: ExtensionConfiguration::default(),
         }
     }
 
@@ -205,6 +220,14 @@ impl<'a> Builder<'a> {
     #[must_use]
     pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Self {
         self.headers.insert(name, value);
+
+        self
+    }
+
+    /// Set the configuration for extensions to enable for this connection.
+    #[must_use]
+    pub fn extensions(mut self, extensions: ExtensionConfiguration) -> Self {
+        self.extensions = extensions;
 
         self
     }
@@ -265,17 +288,23 @@ impl<'a> Builder<'a> {
 
         let key_base64 = make_key();
 
-        let upgrade_codec = server_response::Codec::new(&key_base64);
-        let request = build_request(uri, &key_base64, &self.headers);
+        let request = build_request(uri, &key_base64, &self.headers, &self.extensions);
         stream.write_all(&request).await?;
 
+        let upgrade_codec = server_response::Codec::new(&key_base64, &self.extensions);
         let mut framed = upgrade_codec.framed(stream);
-        let res = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx))
+        let (res, extensions) = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx))
             .await
             .ok_or(Error::Io(io::ErrorKind::UnexpectedEof.into()))??;
 
         Ok((
-            WebsocketStream::from_framed(framed, Role::Client, self.config, self.limits),
+            WebsocketStream::from_framed(
+                framed,
+                Role::Client,
+                self.config,
+                self.limits,
+                extensions,
+            ),
             res,
         ))
     }
@@ -288,7 +317,13 @@ impl<'a> Builder<'a> {
     /// handshake, it assumes the stream is ready to use for writing and
     /// reading the websocket protocol.
     pub fn take_over<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(stream, Role::Client, self.config, self.limits)
+        WebsocketStream::from_raw_stream(
+            stream,
+            Role::Client,
+            self.config,
+            self.limits,
+            self.extensions.clone().into_extensions(Role::Client),
+        )
     }
 }
 

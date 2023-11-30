@@ -37,6 +37,12 @@ pub enum Error {
     /// The HTTP/1.1 Upgrade failed.
     #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(crate::upgrade::Error),
+    /// Extension error.
+    #[cfg(all(
+        any(feature = "client", feature = "server"),
+        feature = "permessage-deflate"
+    ))]
+    Extension(crate::extensions::Error),
 }
 
 #[cfg(feature = "native-tls")]
@@ -79,6 +85,16 @@ impl From<crate::upgrade::Error> for Error {
     }
 }
 
+#[cfg(all(
+    any(feature = "client", feature = "server"),
+    feature = "permessage-deflate"
+))]
+impl From<crate::extensions::Error> for Error {
+    fn from(err: crate::extensions::Error) -> Self {
+        Self::Extension(err)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -104,6 +120,11 @@ impl fmt::Display for Error {
             Error::Rustls(e) => e.fmt(f),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => e.fmt(f),
+            #[cfg(all(
+                any(feature = "client", feature = "server"),
+                feature = "permessage-deflate"
+            ))]
+            Error::Extension(e) => e.fmt(f),
         }
     }
 }
@@ -124,6 +145,11 @@ impl std::error::Error for Error {
             Error::Rustls(e) => Some(e),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => Some(e),
+            #[cfg(all(
+                any(feature = "client", feature = "server"),
+                feature = "permessage-deflate"
+            ))]
+            Error::Extension(e) => Some(e),
         }
     }
 }

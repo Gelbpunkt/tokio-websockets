@@ -2,7 +2,10 @@ use std::str::FromStr;
 
 use futures_util::{SinkExt, StreamExt};
 use http::Uri;
-use tokio_websockets::{ClientBuilder, Connector, Error, Limits};
+use tokio_websockets::{
+    extensions::permessage_deflate::Configuration, ClientBuilder, Connector, Error,
+    ExtensionConfiguration, Limits,
+};
 
 #[cfg(feature = "simd")]
 macro_rules! agent {
@@ -57,6 +60,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
     let (mut stream, _) = ClientBuilder::from_uri(uri)
         .limits(Limits::unlimited())
         .connector(&Connector::Plain)
+        .extensions(ExtensionConfiguration::default().permessage_deflate(Configuration::default()))
         .connect()
         .await?;
 

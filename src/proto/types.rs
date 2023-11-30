@@ -237,6 +237,12 @@ impl From<BytesMut> for Payload {
     }
 }
 
+impl From<Bytes> for Payload {
+    fn from(value: Bytes) -> Self {
+        Self(UnsafeCell::new(PayloadStorage::Shared(value)))
+    }
+}
+
 impl TryFrom<Payload> for BytesMut {
     type Error = Bytes;
 
@@ -407,16 +413,23 @@ impl Message {
 
     /// Returns an iterator over frames of `frame_size` length to split this
     /// message into.
-    pub(super) fn into_frames(self, frame_size: usize) -> MessageFrames {
+    pub(super) fn into_frames(
+        self,
+        frame_size: usize,
+        #[cfg(feature = "permessage-deflate")] is_compressed: bool,
+    ) -> MessageFrames {
         MessageFrames {
             frame_size,
             payload: self.payload,
             opcode: self.opcode,
+            #[cfg(feature = "permessage-deflate")]
+            is_compressed,
         }
     }
 }
 
 /// Iterator over frames of a chunked message.
+#[derive(Debug)]
 pub(super) struct MessageFrames {
     /// Iterator over payload chunks.
     frame_size: usize,
@@ -424,6 +437,9 @@ pub(super) struct MessageFrames {
     payload: Payload,
     /// Opcode for the next frame.
     opcode: OpCode,
+    /// Whether the payload is compressed.
+    #[cfg(feature = "permessage-deflate")]
+    is_compressed: bool,
 }
 
 impl Iterator for MessageFrames {
@@ -441,6 +457,8 @@ impl Iterator for MessageFrames {
                 opcode: replace(&mut self.opcode, OpCode::Continuation),
                 is_final: self.payload.is_empty(),
                 payload,
+                #[cfg(feature = "permessage-deflate")]
+                is_compressed: self.is_compressed && self.opcode != OpCode::Continuation,
             }
         })
     }
@@ -551,6 +569,9 @@ pub(super) struct Frame {
     pub is_final: bool,
     /// The payload bytes of the frame.
     pub payload: Payload,
+    /// Whether this frame is compressed.
+    #[cfg(feature = "permessage-deflate")]
+    pub is_compressed: bool,
 }
 
 impl Frame {
@@ -560,11 +581,21 @@ impl Frame {
         opcode: OpCode::Close,
         is_final: true,
         payload: Payload::from_static(&CloseCode::NORMAL_CLOSURE.0.get().to_be_bytes()),
+        #[cfg(feature = "permessage-deflate")]
+        is_compressed: false,
     };
 
     /// Encode the frame head into `out`, returning how many bytes were written.
     pub fn encode(&self, out: &mut [u8; 10]) -> u8 {
         out[0] = u8::from(self.is_final) << 7 | u8::from(self.opcode);
+
+        #[cfg(feature = "permessage-deflate")]
+        {
+            if self.is_compressed {
+                out[0] |= 0x40;
+            }
+        }
+
         if u16::try_from(self.payload.len()).is_err() {
             out[1] = 127;
             let len = u64::try_from(self.payload.len()).unwrap();
@@ -588,6 +619,8 @@ impl From<Message> for Frame {
             opcode: value.opcode,
             is_final: true,
             payload: value.payload,
+            #[cfg(feature = "permessage-deflate")]
+            is_compressed: false,
         }
     }
 }

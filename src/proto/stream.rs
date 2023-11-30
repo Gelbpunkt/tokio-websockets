@@ -11,6 +11,11 @@ use std::{
     task::{ready, Context, Poll},
 };
 
+#[cfg(all(
+    feature = "permessage-deflate",
+    any(feature = "client", feature = "server")
+))]
+use bytes::Bytes;
 use bytes::{Buf, BytesMut};
 use futures_core::Stream;
 use futures_sink::Sink;
@@ -24,6 +29,8 @@ use super::{
     types::{Frame, Message, OpCode, Payload, Role, StreamState},
     Config,
 };
+#[cfg(any(feature = "client", feature = "server"))]
+use crate::extensions::Extensions;
 use crate::{CloseCode, Error};
 
 /// Helper struct for storing a frame header, the header size and payload.
@@ -97,11 +104,17 @@ where
 {
     /// Create a new [`WebsocketStream`] from a raw stream.
     #[cfg(any(feature = "client", feature = "server"))]
-    pub(crate) fn from_raw_stream(stream: T, role: Role, config: Config, limits: Limits) -> Self {
+    pub(crate) fn from_raw_stream(
+        stream: T,
+        role: Role,
+        config: Config,
+        limits: Limits,
+        extensions: Extensions,
+    ) -> Self {
         use tokio_util::codec::Decoder;
 
         Self {
-            inner: WebsocketProtocol::new(role, limits).framed(stream),
+            inner: WebsocketProtocol::new(role, limits, extensions).framed(stream),
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
@@ -120,9 +133,10 @@ where
         role: Role,
         config: Config,
         limits: Limits,
+        extensions: Extensions,
     ) -> Self {
         Self {
-            inner: framed.map_codec(|_| WebsocketProtocol::new(role, limits)),
+            inner: framed.map_codec(|_| WebsocketProtocol::new(role, limits, extensions)),
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
@@ -249,12 +263,12 @@ where
         if mask.is_some() {
             self.header_buf[1] |= 1 << 7;
         }
-        self.frame_queue.push_back(EncodedFrame {
+        self.frame_queue.push_back(dbg!(EncodedFrame {
             header: self.header_buf,
             header_len,
             mask,
             payload: frame.payload,
-        });
+        }));
     }
 }
 
@@ -268,17 +282,52 @@ where
         let max_len = self.inner.codec().limits.max_payload_len;
 
         loop {
-            let (opcode, payload, fin) = match ready!(self.as_mut().poll_next_frame(cx)) {
-                Some(Ok(frame)) => (frame.opcode, frame.payload, frame.is_final),
+            let frame = match ready!(self.as_mut().poll_next_frame(cx)) {
+                Some(Ok(frame)) => frame,
                 Some(Err(e)) => return Poll::Ready(Some(Err(e))),
                 None => return Poll::Ready(None),
             };
 
-            if opcode != OpCode::Continuation {
-                if fin {
-                    return Poll::Ready(Some(Ok(Message { opcode, payload })));
+            // TODO: UTF-8 validation
+
+            #[cfg(all(
+                feature = "permessage-deflate",
+                any(feature = "client", feature = "server")
+            ))]
+            let payload = if frame.is_compressed {
+                if let Some(permessage_deflate) = self
+                    .inner
+                    .codec_mut()
+                    .extensions
+                    .permessage_deflate
+                    .as_mut()
+                {
+                    // SAFETY: It is always constructed from BytesMut
+                    let payload = unsafe { frame.payload.try_into().unwrap_unchecked() };
+                    match permessage_deflate.decompress(payload, frame.is_final) {
+                        Ok(payload) => payload.into(),
+                        Err(e) => return Poll::Ready(Some(Err(e.into()))),
+                    }
+                } else {
+                    frame.payload
                 }
-                self.partial_opcode = opcode;
+            } else {
+                frame.payload
+            };
+            #[cfg(not(all(
+                feature = "permessage-deflate",
+                any(feature = "client", feature = "server")
+            )))]
+            let payload = frame.payload;
+
+            if frame.opcode != OpCode::Continuation {
+                if frame.is_final {
+                    return Poll::Ready(Some(Ok(Message {
+                        opcode: frame.opcode,
+                        payload: payload,
+                    })));
+                }
+                self.partial_opcode = frame.opcode;
             } else if self.partial_payload.len() + payload.len() > max_len.unwrap_or(usize::MAX) {
                 return Poll::Ready(Some(Err(Error::PayloadTooLong {
                     len: self.partial_payload.len() + payload.len(),
@@ -288,7 +337,7 @@ where
 
             self.partial_payload.extend_from_slice(&payload);
 
-            if fin {
+            if frame.is_final {
                 break;
             }
         }
@@ -348,8 +397,39 @@ where
             let frame: Frame = item.into();
             self.queue_frame(frame);
         } else {
+            // Optionally compress the message payload
+            #[cfg(all(
+                feature = "permessage-deflate",
+                any(feature = "client", feature = "server")
+            ))]
+            let into_frames = if let Some(permessage_deflate) = self
+                .inner
+                .codec_mut()
+                .extensions
+                .permessage_deflate
+                .as_mut()
+            {
+                if item.opcode == OpCode::Binary || item.opcode == OpCode::Text {
+                    // TODO: Write compress_bytesmut and use that...
+                    let mut item = item;
+                    item.payload = Bytes::from(permessage_deflate.compress(&item.payload)?).into();
+                    item.into_frames(self.config.frame_size, true)
+                } else {
+                    item.into_frames(self.config.frame_size, false)
+                }
+            } else {
+                item.into_frames(self.config.frame_size, false)
+            };
+            #[cfg(all(
+                feature = "permessage-deflate",
+                not(any(feature = "client", feature = "server"))
+            ))]
+            let into_frames = item.into_frames(self.config.frame_size, false);
+            #[cfg(not(feature = "permessage-deflate"))]
+            let into_frames = item.into_frames(self.config.frame_size);
+
             // Chunk the message into frames
-            for frame in item.into_frames(self.config.frame_size) {
+            for frame in into_frames {
                 self.queue_frame(frame);
             }
         }
