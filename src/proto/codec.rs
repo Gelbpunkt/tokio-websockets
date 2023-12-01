@@ -6,7 +6,7 @@
 //! [`WebsocketStream`].
 //!
 //! [`WebsocketStream`]: super::WebsocketStream
-use std::hint::unreachable_unchecked;
+use std::{hint::unreachable_unchecked, mem::replace};
 
 use bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
@@ -86,7 +86,7 @@ impl Decoder for WebsocketProtocol {
         let payload_len_1 = unsafe { src.get_unchecked(1) };
 
         // Bit 0
-        let fin = fin_and_rsv >> 7 != 0;
+        let is_final = fin_and_rsv >> 7 != 0;
 
         // Bits 1-3
         let rsv = fin_and_rsv & 0x70;
@@ -96,17 +96,17 @@ impl Decoder for WebsocketProtocol {
         }
 
         // Bits 4-7
-        let opcode = OpCode::try_from(fin_and_rsv & 0xF)?;
+        let mut opcode = OpCode::try_from(fin_and_rsv & 0xF)?;
 
         if opcode.is_control() {
-            if !fin {
+            if !is_final {
                 return Err(Error::Protocol(ProtocolError::FragmentedControlFrame));
             }
-        } else if self.fragmented_message_opcode == OpCode::Continuation {
-            if opcode == OpCode::Continuation {
-                return Err(Error::Protocol(ProtocolError::InvalidOpcode));
-            }
-        } else if opcode != OpCode::Continuation {
+        } else if (self.fragmented_message_opcode == OpCode::Continuation
+            && opcode == OpCode::Continuation)
+            || (self.fragmented_message_opcode != OpCode::Continuation
+                && opcode != OpCode::Continuation)
+        {
             return Err(Error::Protocol(ProtocolError::InvalidOpcode));
         }
 
@@ -160,10 +160,10 @@ impl Decoder for WebsocketProtocol {
             }
         }
 
-        if payload_length > self.limits.max_payload_len.unwrap_or(usize::MAX) {
+        if payload_length > self.limits.max_payload_len {
             return Err(Error::PayloadTooLong {
                 len: payload_length,
-                max_len: self.limits.max_payload_len.unwrap_or(usize::MAX),
+                max_len: self.limits.max_payload_len,
             });
         }
 
@@ -241,7 +241,7 @@ impl Decoder for WebsocketProtocol {
                     unsafe {
                         src.get_unchecked(offset + self.payload_processed..offset + payload_length)
                     },
-                    fin,
+                    is_final,
                 )?;
             } else if opcode == OpCode::Close {
                 // SAFETY: Close frames with a non-zero payload length are validated to not have
@@ -271,22 +271,26 @@ impl Decoder for WebsocketProtocol {
         // It is possible to receive intermediate control frames between a large other
         // frame. We therefore can't simply reset the fragmented opcode after we receive
         // a "final" frame.
-        if fin && !opcode.is_control() {
-            // Full, (possibly) chunked message received
-            self.fragmented_message_opcode = OpCode::Continuation;
-        } else if opcode != OpCode::Continuation && !opcode.is_control() {
+        if !is_final && opcode.is_data() {
             // First frame of a multi-frame message
             self.fragmented_message_opcode = opcode;
+        } else if !is_final {
+            // Intermediate frame of a multi-frame message
+            opcode = self.fragmented_message_opcode;
+        } else if opcode == OpCode::Continuation {
+            // Last frame of a multi-frame message
+            opcode = replace(&mut self.fragmented_message_opcode, OpCode::Continuation);
         }
-        // In all other cases, we have either a continuation or control frame, neither
-        // of which change change the opcode being assembled
+        // In all other cases, we have received a full, single-frame message (like a
+        // control or data one). The fragmented message opcode doesn't need to be
+        // touched.
 
         self.payload_processed = 0;
 
         Ok(Some(Frame {
             opcode,
+            is_final,
             payload,
-            is_final: fin,
         }))
     }
 }

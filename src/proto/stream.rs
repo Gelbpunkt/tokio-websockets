@@ -6,7 +6,7 @@ use std::{
     collections::VecDeque,
     hint::unreachable_unchecked,
     io,
-    mem::{replace, take},
+    mem::take,
     pin::Pin,
     task::{ready, Context, Poll},
 };
@@ -73,8 +73,6 @@ pub struct WebsocketStream<T> {
 
     /// Payload of the full message that is being assembled.
     partial_payload: BytesMut,
-    /// Opcode of the full message that is being assembled.
-    partial_opcode: OpCode,
 
     /// Buffer that outgoing frame headers are formatted into.
     header_buf: [u8; 10],
@@ -105,7 +103,6 @@ where
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
-            partial_opcode: OpCode::Continuation,
             header_buf: [0; 10],
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
@@ -126,7 +123,6 @@ where
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
-            partial_opcode: OpCode::Continuation,
             header_buf: [0; 10],
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
@@ -267,33 +263,34 @@ where
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let max_len = self.inner.codec().limits.max_payload_len;
 
-        loop {
-            let (opcode, payload, fin) = match ready!(self.as_mut().poll_next_frame(cx)) {
+        let opcode = loop {
+            let (opcode, payload, is_final) = match ready!(self.as_mut().poll_next_frame(cx)) {
                 Some(Ok(frame)) => (frame.opcode, frame.payload, frame.is_final),
                 Some(Err(e)) => return Poll::Ready(Some(Err(e))),
                 None => return Poll::Ready(None),
             };
 
-            if opcode != OpCode::Continuation {
-                if fin {
-                    return Poll::Ready(Some(Ok(Message { opcode, payload })));
-                }
-                self.partial_opcode = opcode;
-            } else if self.partial_payload.len() + payload.len() > max_len.unwrap_or(usize::MAX) {
+            // Intermediate control frames are allowed and should be returned immediately
+            // We can also avoid copying single-frame data messages (indicated by the
+            // partial payload being empty)
+            if is_final && (self.partial_payload.is_empty() || opcode.is_control()) {
+                return Poll::Ready(Some(Ok(Message { opcode, payload })));
+            }
+
+            if self.partial_payload.len() + payload.len() > max_len {
                 return Poll::Ready(Some(Err(Error::PayloadTooLong {
                     len: self.partial_payload.len() + payload.len(),
-                    max_len: max_len.unwrap_or(usize::MAX),
+                    max_len,
                 })));
             }
 
             self.partial_payload.extend_from_slice(&payload);
 
-            if fin {
-                break;
+            if is_final {
+                break opcode;
             }
-        }
+        };
 
-        let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
         let payload = take(&mut self.partial_payload).into();
 
         Poll::Ready(Some(Ok(Message { opcode, payload })))
