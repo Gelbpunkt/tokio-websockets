@@ -19,7 +19,7 @@ High performance, strict, tokio-util based websockets implementation.
 - Reusable TLS connectors
 - Uses widely known crates from the ecosystem for types, for example `Uri` from `http` in the client
 - Cheaply clonable messages due to `Bytes` as payload storage
-- Tuned for performance: no unnecessary duplicate UTF-8 validation, no duplicate bounds checking (this however heavily uses unsafe code, which is sound to my knowledge, if not, open an issue!)
+- Tuned for performance (see [the benchmarks](./benches/README.md))
 
 ## Feature flags
 
