@@ -1,10 +1,15 @@
+use std::net::SocketAddr;
+
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_websockets::{Config, Error, Limits, ServerBuilder};
 
+const PORT: u16 = 3000;
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
-    let listener = TcpListener::bind("127.0.0.1:3000").await?;
+    let addr = SocketAddr::from(([127, 0, 0, 1], PORT));
+    let listener = TcpListener::bind(addr).await?;
 
     loop {
         let (conn, _) = listener.accept().await?;
