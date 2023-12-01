@@ -26,7 +26,8 @@ getrandom = { version = "0.2", default-features = false, optional = true }
 rand = { version = "0.8", default-features = false, features = ["std", "std_rng"], optional = true }
 
 # SIMD
-simdutf8 = { version = "0.1", default-features = false, features = ["std"], optional = true }
+# We enable aarch64_neon feature because it is MSRV-gated but ours is higher than 1.59
+simdutf8 = { version = "0.1", default-features = false, features = ["std", "aarch64_neon"], optional = true }
 
 # Client
 base64 = { version = "0.21", optional = true }
@@ -55,7 +56,7 @@ simd = ["dep:simdutf8"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:tokio-rustls", "ring", "dep:webpki", "dep:webpki-roots"]
 rustls-native-roots = ["dep:tokio-rustls", "ring", "dep:rustls-native-certs"]
-nightly = []
+nightly = ["simdutf8?/aarch64_neon_prefetch"]
 
 [dev-dependencies]
 futures-util = { version = "0.3.14", default-features = false, features = ["sink"] }
