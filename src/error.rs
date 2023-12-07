@@ -8,7 +8,7 @@ use tokio_native_tls::native_tls;
 
 use crate::proto::ProtocolError;
 
-/// Generic error when using websockets with this crate.
+/// Generic error when using WebSockets with this crate.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -19,7 +19,7 @@ pub enum Error {
     /// Attempted to connect a client to a remote without configured URI.
     #[cfg(feature = "client")]
     NoUriConfigured,
-    /// Websocket protocol violation.
+    /// WebSocket protocol violation.
     Protocol(ProtocolError),
     /// Payload length limit was exceeded.
     PayloadTooLong { len: usize, max_len: usize },

@@ -4,7 +4,7 @@
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/Gelbpunkt/tokio-websockets/ci.yml)
 [![Documentation](https://img.shields.io/docsrs/tokio-websockets)](https://docs.rs/tokio-websockets)
 
-High performance, strict, tokio-util based websockets implementation.
+High performance, strict, tokio-util based WebSockets implementation.
 
 ## Why use tokio-websockets?
 
@@ -14,7 +14,7 @@ High performance, strict, tokio-util based websockets implementation.
   - SHA1 backend, e.g. sha1_smol (see [Feature flags](#feature-flags))
 - Big selection of features to tailor dependencies to any project (see [Feature flags](#feature-flags))
 - SIMD support: AVX2, SSE2 or NEON for frame (un)masking and accelerated UTF-8 validation
-- Strict conformance with the websocket specification, passes the [Autobahn test suite](https://github.com/crossbario/autobahn-testsuite) without relaxations [by default](https://gelbpunkt.github.io/tokio-websockets/index.html)
+- Strict conformance with the WebSocket specification, passes the [Autobahn test suite](https://github.com/crossbario/autobahn-testsuite) without relaxations [by default](https://gelbpunkt.github.io/tokio-websockets/index.html)
 - TLS support
 - Reusable TLS connectors
 - Uses widely known crates from the ecosystem for types, for example `Uri` from `http` in the client
@@ -28,7 +28,7 @@ Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 - `simd` will enable AVX2, SSE2 or NEON accelerated masking and UTF-8 validation. Additionally enabling the `nightly` feature when using a nightly compiler will also enable AVX512 accelerated masking
 - `client` enables a tiny client implementation
 - `server` enables a tiny server implementation
-- `http-integration` enables a method for websocket upgrade [`http::Request`](https://docs.rs/http/latest/http/request/struct.Request.html) generation
+- `http-integration` enables a method for WebSocket upgrade [`http::Request`](https://docs.rs/http/latest/http/request/struct.Request.html) generation
 
 TLS support is supported via any of the following feature flags:
 
@@ -52,7 +52,7 @@ The `client` feature requires enabling one random number generator:
 
 ## Example
 
-This is a simple websocket echo server without any proper error handling.
+This is a simple WebSocket echo server without any proper error handling.
 
 More examples can be found in the [examples folder](https://github.com/Gelbpunkt/tokio-websockets/tree/main/examples).
 
@@ -110,4 +110,4 @@ The current MSRV for all feature combinations is Rust 1.64.
 
 ## Caveats / Limitations / ToDo
 
-Websocket compression is currently unsupported.
+WebSocket compression is currently unsupported.

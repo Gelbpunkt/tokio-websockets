@@ -1,6 +1,6 @@
 # Benchmarks
 
-It is a bit tricky to benchmark websocket libraries, since you're going to be limited by the speed of the slower end (i.e. benchmarking a server requires an even faster client and vice-versa). The [uWebSockets](https://github.com/uNetworking/uWebSockets) library for C/C++ comes with a benchmarking tool called `load_test` that should be fast enough not to bottleneck all currently known websocket library implementations and has been used for these benchmarks.
+It is a bit tricky to benchmark WebSocket libraries, since you're going to be limited by the speed of the slower end (i.e. benchmarking a server requires an even faster client and vice-versa). The [uWebSockets](https://github.com/uNetworking/uWebSockets) library for C/C++ comes with a benchmarking tool called `load_test` that should be fast enough not to bottleneck all currently known WebSocket library implementations and has been used for these benchmarks.
 
 ## Environment
 
@@ -15,7 +15,7 @@ and the benchmarks are run in a podman container based on Alpine Linux Edge.
 
 ## Methodology
 
-We're comparing some popular Rust websocket libraries to tokio-websockets and uWebSockets as a reference. All of the implementations are asynchronous. For benchmarking we use a simple plaintext echo server.
+We're comparing some popular Rust WebSocket libraries to tokio-websockets and uWebSockets as a reference. All of the implementations are asynchronous. For benchmarking we use a simple plaintext echo server.
 
 In order to bottleneck faster, we're also using a single-threaded runtime.
 

@@ -1,4 +1,4 @@
-//! Websocket protocol error type.
+//! WebSocket protocol error type.
 use std::fmt;
 
 /// Error encountered on protocol violations by the other end of the connection.

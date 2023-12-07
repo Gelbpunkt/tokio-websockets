@@ -1,9 +1,9 @@
 // This is a benchmark for utf-8 validation in tokio-websockets.
-// In order to properly be able to benchmark a websocket library, this client
-// must not use a websocket library. In the end, we want to benchmark the
+// In order to properly be able to benchmark a WebSocket library, this client
+// must not use a WebSocket library. In the end, we want to benchmark the
 // server, not the client.
 //
-// The client sends a single websocket message over and over again. This message
+// The client sends a single WebSocket message over and over again. This message
 // is split into a configurable amount of frames and sent in a configurable
 // amount of chops.
 // It expects to receive the message back. Benchmark performance is measured in

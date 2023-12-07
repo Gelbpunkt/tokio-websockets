@@ -1,4 +1,4 @@
-//! Types required for the websocket protocol implementation.
+//! Types required for the WebSocket protocol implementation.
 use std::{
     cell::UnsafeCell, fmt, hint::unreachable_unchecked, mem::replace, num::NonZeroU16, ops::Deref,
 };
@@ -7,7 +7,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 
 use super::error::ProtocolError;
 
-/// The opcode of a websocket frame. It denotes the type of the frame or an
+/// The opcode of a WebSocket frame. It denotes the type of the frame or an
 /// assembled message.
 ///
 /// A fully assembled [`Message`] will never have a continuation opcode.
@@ -95,7 +95,7 @@ impl CloseCode {
     pub const MESSAGE_TOO_BIG: Self = Self(unsafe { NonZeroU16::new_unchecked(1009) });
     /// Client is terminating the connection because it has expected the server
     /// to negotiate one or more extension, but the server didn't return them in
-    /// the response message of the Websocket handshake.
+    /// the response message of the WebSocket handshake.
     pub const MANDATORY_EXTENSION: Self = Self(unsafe { NonZeroU16::new_unchecked(1010) });
     /// Server is terminating the connection because it encountered an
     /// unexpected condition that prevented it from fulfilling the request.
@@ -257,7 +257,7 @@ enum PayloadStorage {
     Shared(Bytes),
 }
 
-/// A websocket message. This is cheaply clonable and uses [`Bytes`] as the
+/// A WebSocket message. This is cheaply clonable and uses [`Bytes`] as the
 /// payload storage underneath.
 ///
 /// Received messages are always validated prior to dealing with them, so all
@@ -447,9 +447,9 @@ impl Iterator for MessageFrames {
 }
 
 /// Configuration for limitations on reading of [`Message`]s from a
-/// [`WebsocketStream`] to prevent high memory usage caused by malicious actors.
+/// [`WebSocketStream`] to prevent high memory usage caused by malicious actors.
 ///
-/// [`WebsocketStream`]: super::WebsocketStream
+/// [`WebSocketStream`]: super::WebSocketStream
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     /// The maximum allowed payload length. The default
@@ -484,10 +484,10 @@ impl Default for Limits {
     }
 }
 
-/// Low-level configuration for a [`WebsocketStream`] that allows configuring
+/// Low-level configuration for a [`WebSocketStream`] that allows configuring
 /// behavior for sending and receiving messages.
 ///
-/// [`WebsocketStream`]: super::WebsocketStream
+/// [`WebSocketStream`]: super::WebSocketStream
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
     /// Frame size to split outgoing messages into.
@@ -518,7 +518,7 @@ impl Default for Config {
     }
 }
 
-/// Role assumed by the [`WebsocketStream`] in a connection.
+/// Role assumed by the [`WebSocketStream`] in a connection.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Role {
     /// The client end.
@@ -542,7 +542,7 @@ pub(super) enum StreamState {
     CloseAcknowledged,
 }
 
-/// A frame of a websocket [`Message`].
+/// A frame of a WebSocket [`Message`].
 #[derive(Clone, Debug)]
 pub(super) struct Frame {
     /// The [`OpCode`] of the frame.

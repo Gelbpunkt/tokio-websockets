@@ -20,7 +20,7 @@ use tokio_util::{codec::Framed, io::poll_write_buf};
 #[cfg(any(feature = "client", feature = "server"))]
 use super::types::Limits;
 use super::{
-    codec::WebsocketProtocol,
+    codec::WebSocketProtocol,
     types::{Frame, Message, OpCode, Payload, Role, StreamState},
     Config,
 };
@@ -46,12 +46,12 @@ impl EncodedFrame {
     }
 }
 
-/// A websocket stream that full messages can be read from and written to.
+/// A WebSocket stream that full messages can be read from and written to.
 ///
 /// The stream implements [`futures_sink::Sink`] and [`futures_core::Stream`].
 ///
 /// You must use a [`ClientBuilder`] or [`ServerBuilder`] to
-/// obtain a websocket stream.
+/// obtain a WebSocket stream.
 ///
 /// For usage examples, see the top level crate documentation, which showcases a
 /// simple echo server and client.
@@ -60,10 +60,10 @@ impl EncodedFrame {
 /// [`ServerBuilder`]: crate::ServerBuilder
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
-pub struct WebsocketStream<T> {
-    /// The underlying stream using the [`WebsocketProtocol`] to read and write
+pub struct WebSocketStream<T> {
+    /// The underlying stream using the [`WebSocketProtocol`] to read and write
     /// full frames.
-    inner: Framed<T, WebsocketProtocol>,
+    inner: Framed<T, WebSocketProtocol>,
 
     /// Configuration for the stream.
     config: Config,
@@ -85,23 +85,23 @@ pub struct WebsocketStream<T> {
     bytes_written: usize,
 }
 
-// SAFETY: The only !Sync field in `WebsocketStream` is `frame_queue`.
+// SAFETY: The only !Sync field in `WebSocketStream` is `frame_queue`.
 // `frame_queue` must be used with exclusive, mutable access, which is
 // currently the case. It is only used in methods that take `&mut self`
 // and not borrowed in the methods.
-unsafe impl<T> Sync for WebsocketStream<T> {}
+unsafe impl<T> Sync for WebSocketStream<T> {}
 
-impl<T> WebsocketStream<T>
+impl<T> WebSocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    /// Create a new [`WebsocketStream`] from a raw stream.
+    /// Create a new [`WebSocketStream`] from a raw stream.
     #[cfg(any(feature = "client", feature = "server"))]
     pub(crate) fn from_raw_stream(stream: T, role: Role, config: Config, limits: Limits) -> Self {
         use tokio_util::codec::Decoder;
 
         Self {
-            inner: WebsocketProtocol::new(role, limits).framed(stream),
+            inner: WebSocketProtocol::new(role, limits).framed(stream),
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
@@ -112,7 +112,7 @@ where
         }
     }
 
-    /// Create a new [`WebsocketStream`] from an existing [`Framed`]. This
+    /// Create a new [`WebSocketStream`] from an existing [`Framed`]. This
     /// allows for reusing the internal buffer of the [`Framed`] object.
     #[cfg(any(feature = "client", feature = "server"))]
     pub(crate) fn from_framed<U>(
@@ -122,7 +122,7 @@ where
         limits: Limits,
     ) -> Self {
         Self {
-            inner: framed.map_codec(|_| WebsocketProtocol::new(role, limits)),
+            inner: framed.map_codec(|_| WebSocketProtocol::new(role, limits)),
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
@@ -258,7 +258,7 @@ where
     }
 }
 
-impl<T> Stream for WebsocketStream<T>
+impl<T> Stream for WebSocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
@@ -313,7 +313,7 @@ where
 // with a hefty performance penalty when sending large payloads, since this adds
 // a memmove from the payload to the buffer. We completely avoid that overhead
 // by storing messages in a deque.
-impl<T> Sink<Message> for WebsocketStream<T>
+impl<T> Sink<Message> for WebSocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
