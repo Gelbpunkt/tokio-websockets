@@ -70,10 +70,10 @@ impl Decoder for Codec {
         let mut ws_accept = [0; 20];
         STANDARD
             .decode_slice_unchecked(ws_accept_header, &mut ws_accept)
-            .map_err(|_| Error::WrongWebsocketAccept)?;
+            .map_err(|_| Error::WrongWebSocketAccept)?;
 
         if self.ws_accept != ws_accept {
-            return Err(crate::Error::Upgrade(Error::WrongWebsocketAccept));
+            return Err(crate::Error::Upgrade(Error::WrongWebSocketAccept));
         }
 
         let mut parsed_response = http::Response::new(());

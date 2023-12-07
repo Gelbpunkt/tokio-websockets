@@ -1,4 +1,4 @@
-//! Implementation of a websocket client.
+//! Implementation of a WebSocket client.
 //!
 //! This can be used in three ways:
 //!   - By letting the library connect to a remote URI and performing a HTTP/1.1
@@ -6,7 +6,7 @@
 //!   - By letting the library perform a HTTP/1.1 Upgrade handshake on an
 //!     established stream, via [`Builder::connect_on`]
 //!   - By performing the handshake yourself and then using
-//!     [`Builder::take_over`] to let it take over a websocket stream
+//!     [`Builder::take_over`] to let it take over a WebSocket stream
 use std::{
     future::poll_fn,
     io,
@@ -27,10 +27,10 @@ use tokio_util::codec::Decoder;
 use crate::{
     proto::{Config, Limits, Role},
     upgrade::{self, server_response},
-    Connector, Error, MaybeTlsStream, WebsocketStream,
+    Connector, Error, MaybeTlsStream, WebSocketStream,
 };
 
-/// Generates a new, random 16-byte websocket key and encodes it as base64.
+/// Generates a new, random 16-byte WebSocket key and encodes it as base64.
 pub(crate) fn make_key() -> [u8; 24] {
     let mut key_base64 = [0; 24];
     let key_bytes = crate::rand::get_key();
@@ -62,7 +62,7 @@ fn default_port(uri: &Uri) -> Option<u16> {
 }
 
 /// Builds a HTTP/1.1 Upgrade request for a URI with extra headers and a
-/// websocket key.
+/// WebSocket key.
 fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
     let mut buf = Vec::new();
 
@@ -118,17 +118,17 @@ async fn resolve(host: String, port: u16) -> Result<SocketAddr, Error> {
     task.await.expect("Tokio threadpool failed")
 }
 
-/// Builder for websocket client connections.
+/// Builder for WebSocket client connections.
 pub struct Builder<'a> {
     /// URI to connect to, required unless connecting to an established
-    /// websocket stream.
+    /// WebSocket stream.
     uri: Option<Uri>,
     /// A TLS connector to use for the connection. If not set and required, a
     /// new one will be created.
     connector: Option<&'a Connector>,
-    /// Configuration for the websocket stream.
+    /// Configuration for the WebSocket stream.
     config: Config,
-    /// Limits to impose on the websocket stream.
+    /// Limits to impose on the WebSocket stream.
     limits: Limits,
     /// Headers to be sent with the upgrade request.
     headers: HeaderMap,
@@ -185,7 +185,7 @@ impl<'a> Builder<'a> {
         self
     }
 
-    /// Sets the configuration for the websocket stream.
+    /// Sets the configuration for the WebSocket stream.
     #[must_use]
     pub fn config(mut self, config: Config) -> Self {
         self.config = config;
@@ -193,7 +193,7 @@ impl<'a> Builder<'a> {
         self
     }
 
-    /// Sets the limits for the websocket stream.
+    /// Sets the limits for the WebSocket stream.
     #[must_use]
     pub fn limits(mut self, limits: Limits) -> Self {
         self.limits = limits;
@@ -209,7 +209,7 @@ impl<'a> Builder<'a> {
         self
     }
 
-    /// Establishes a connection to the websocket server. This requires a URI to
+    /// Establishes a connection to the WebSocket server. This requires a URI to
     /// be configured via [`Builder::uri`].
     ///
     /// # Errors
@@ -220,7 +220,7 @@ impl<'a> Builder<'a> {
         &self,
     ) -> Result<
         (
-            WebsocketStream<MaybeTlsStream<TcpStream>>,
+            WebSocketStream<MaybeTlsStream<TcpStream>>,
             upgrade::Response,
         ),
         Error,
@@ -258,7 +258,7 @@ impl<'a> Builder<'a> {
     }
 
     /// Takes over an already established stream and uses it to send and receive
-    /// websocket messages. This requires a URI to be configured via
+    /// WebSocket messages. This requires a URI to be configured via
     /// [`Builder::uri`].
     ///
     /// This method assumes that the TLS connection has already been
@@ -272,7 +272,7 @@ impl<'a> Builder<'a> {
     pub async fn connect_on<S: AsyncRead + AsyncWrite + Unpin>(
         &self,
         mut stream: S,
-    ) -> Result<(WebsocketStream<S>, upgrade::Response), Error> {
+    ) -> Result<(WebSocketStream<S>, upgrade::Response), Error> {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
 
         let key_base64 = make_key();
@@ -287,20 +287,20 @@ impl<'a> Builder<'a> {
             .ok_or(Error::Io(io::ErrorKind::UnexpectedEof.into()))??;
 
         Ok((
-            WebsocketStream::from_framed(framed, Role::Client, self.config, self.limits),
+            WebSocketStream::from_framed(framed, Role::Client, self.config, self.limits),
             res,
         ))
     }
 
     /// Takes over an already established stream that has already performed a
-    /// HTTP upgrade handshake and uses it to send and receive websocket
+    /// HTTP upgrade handshake and uses it to send and receive WebSocket
     /// messages.
     ///
     /// This method will not perform a TLS handshake or a HTTP upgrade
     /// handshake, it assumes the stream is ready to use for writing and
-    /// reading the websocket protocol.
-    pub fn take_over<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(stream, Role::Client, self.config, self.limits)
+    /// reading the WebSocket protocol.
+    pub fn take_over<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebSocketStream<S> {
+        WebSocketStream::from_raw_stream(stream, Role::Client, self.config, self.limits)
     }
 }
 

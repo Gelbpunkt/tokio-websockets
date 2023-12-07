@@ -1,4 +1,4 @@
-//! This module contains three implementations of websocket frame masking and
+//! This module contains three implementations of WebSocket frame masking and
 //! unmasking, both ways use the same algorithm and methods:
 //!   - One AVX512-based implementation that masks 64 bytes per cycle (requires
 //!     nightly rust)

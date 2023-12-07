@@ -19,19 +19,19 @@ pub enum Error {
     /// Header required in the request or response is not present.
     MissingHeader(&'static str),
     /// `Upgrade` header sent by the client does not match "websocket".
-    UpgradeNotWebsocket,
+    UpgradeNotWebSocket,
     /// `Connection` header sent by the client does not contain "Upgrade".
     ConnectionNotUpgrade,
     /// `Sec-WebSocket-Version` header sent by the client is not supported by
     /// the server.
-    UnsupportedWebsocketVersion,
+    UnsupportedWebSocketVersion,
     /// Failed to parse client request or server response.
     Parsing(httparse::Error),
     /// Server did not return a HTTP Switching Protocols response.
     DidNotSwitchProtocols(u16),
     /// Server returned a `Sec-WebSocket-Accept` that is not compatible with the
     /// `Sec-WebSocket-Key sent by the client.
-    WrongWebsocketAccept,
+    WrongWebSocketAccept,
 }
 
 impl fmt::Display for Error {
@@ -41,15 +41,15 @@ impl fmt::Display for Error {
                 f.write_str("missing required header: ")?;
                 f.write_str(header)
             }
-            Error::UpgradeNotWebsocket => f.write_str("upgrade header value was not websocket"),
+            Error::UpgradeNotWebSocket => f.write_str("upgrade header value was not websocket"),
             Error::ConnectionNotUpgrade => f.write_str("connection header value was not upgrade"),
-            Error::UnsupportedWebsocketVersion => f.write_str("unsupported websocket version"),
+            Error::UnsupportedWebSocketVersion => f.write_str("unsupported WebSocket version"),
             Error::Parsing(e) => e.fmt(f),
             Error::DidNotSwitchProtocols(status) => {
                 f.write_str("expected HTTP 101 Switching Protocols, got status code ")?;
                 f.write_fmt(format_args!("{status}"))
             }
-            Error::WrongWebsocketAccept => f.write_str("mismatching sec-websocket-accept header"),
+            Error::WrongWebSocketAccept => f.write_str("mismatching Sec-WebSocket-Accept header"),
         }
     }
 }
@@ -58,11 +58,11 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::MissingHeader(_)
-            | Error::UpgradeNotWebsocket
+            | Error::UpgradeNotWebSocket
             | Error::ConnectionNotUpgrade
-            | Error::UnsupportedWebsocketVersion
+            | Error::UnsupportedWebSocketVersion
             | Error::DidNotSwitchProtocols(_)
-            | Error::WrongWebsocketAccept => None,
+            | Error::WrongWebSocketAccept => None,
             Error::Parsing(e) => Some(e),
         }
     }

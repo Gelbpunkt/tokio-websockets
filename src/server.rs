@@ -1,10 +1,10 @@
-//! Implementation of a websocket server.
+//! Implementation of a WebSocket server.
 //!
 //! This can be used in two ways:
 //!   - By letting the library perform a HTTP/1.1 Upgrade handshake on an
 //!     established stream, via [`Builder::accept`]
 //!   - By performing the handshake yourself and then using [`Builder::serve`]
-//!     to let it take over a websocket stream
+//!     to let it take over a WebSocket stream
 use std::{future::poll_fn, io, pin::Pin};
 
 use futures_core::Stream;
@@ -14,17 +14,17 @@ use tokio_util::codec::{Decoder, Framed};
 use crate::{
     proto::{Config, Limits, Role},
     upgrade::client_request,
-    Error, WebsocketStream,
+    Error, WebSocketStream,
 };
 
 /// HTTP/1.1 400 Bad Request response payload.
 const BAD_REQUEST: &[u8] = b"HTTP/1.1 400 Bad Request\r\n\r\n";
 
-/// Builder for websocket server connections.
+/// Builder for WebSocket server connections.
 pub struct Builder {
-    /// Configuration for the websocket stream.
+    /// Configuration for the WebSocket stream.
     config: Config,
-    /// Limits to impose on the websocket stream.
+    /// Limits to impose on the WebSocket stream.
     limits: Limits,
 }
 
@@ -35,7 +35,7 @@ impl Default for Builder {
 }
 
 impl Builder {
-    /// Creates a [`Builder`] that can be used to create a [`WebsocketStream`]
+    /// Creates a [`Builder`] that can be used to create a [`WebSocketStream`]
     /// to receive messages at the server end.
     #[must_use]
     pub fn new() -> Self {
@@ -45,7 +45,7 @@ impl Builder {
         }
     }
 
-    /// Sets the configuration for the websocket stream.
+    /// Sets the configuration for the WebSocket stream.
     #[must_use]
     pub fn config(mut self, config: Config) -> Self {
         self.config = config;
@@ -53,7 +53,7 @@ impl Builder {
         self
     }
 
-    /// Sets the limits for the websocket stream.
+    /// Sets the limits for the WebSocket stream.
     #[must_use]
     pub fn limits(mut self, limits: Limits) -> Self {
         self.limits = limits;
@@ -62,7 +62,7 @@ impl Builder {
     }
 
     /// Perform a HTTP upgrade handshake on an already established stream and
-    /// uses it to send and receive websocket messages.
+    /// uses it to send and receive WebSocket messages.
     ///
     /// # Errors
     ///
@@ -70,7 +70,7 @@ impl Builder {
     pub async fn accept<S: AsyncRead + AsyncWrite + Unpin>(
         &self,
         stream: S,
-    ) -> Result<WebsocketStream<S>, Error> {
+    ) -> Result<WebSocketStream<S>, Error> {
         let mut framed = client_request::Codec {}.framed(stream);
         let reply = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx)).await;
         let mut parts = framed.into_parts();
@@ -79,7 +79,7 @@ impl Builder {
             Some(Ok(response)) => {
                 parts.io.write_all(response.as_bytes()).await?;
                 let framed = Framed::from_parts(parts);
-                Ok(WebsocketStream::from_framed(
+                Ok(WebSocketStream::from_framed(
                     framed,
                     Role::Server,
                     self.config,
@@ -96,10 +96,10 @@ impl Builder {
     }
 
     /// Takes over an already established stream and uses it to send and receive
-    /// websocket messages.
+    /// WebSocket messages.
     ///
     /// This does not perform a HTTP upgrade handshake.
-    pub fn serve<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebsocketStream<S> {
-        WebsocketStream::from_raw_stream(stream, Role::Server, self.config, self.limits)
+    pub fn serve<S: AsyncRead + AsyncWrite + Unpin>(&self, stream: S) -> WebSocketStream<S> {
+        WebSocketStream::from_raw_stream(stream, Role::Server, self.config, self.limits)
     }
 }

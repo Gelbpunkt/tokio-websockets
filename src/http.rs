@@ -1,5 +1,5 @@
 //! Helper for creating [`http::Request`] objects for HTTP/1.1 Upgrade requests
-//! with websocket servers.
+//! with WebSocket servers.
 use bytes::Bytes;
 use http::{
     header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE},
@@ -66,7 +66,7 @@ use crate::client::make_key;
 ///     Err(e) => panic!("upgrade error: {}", e),
 /// };
 ///
-/// // stream is a websocket stream like any other one
+/// // stream is a WebSocket stream like any other one
 ///
 /// # Ok(()) }
 /// ```

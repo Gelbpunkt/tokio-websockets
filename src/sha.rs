@@ -6,10 +6,10 @@ use ring::digest;
 #[cfg(all(feature = "sha1_smol", not(feature = "ring"), not(feature = "openssl")))]
 use sha1_smol::Sha1;
 
-/// The Globally Unique Identifier (GUID) used in the websocket protocol (see [the RFC](https://datatracker.ietf.org/doc/html/rfc6455#section-1.3)).
+/// The Globally Unique Identifier (GUID) used in the WebSocket protocol (see [the RFC](https://datatracker.ietf.org/doc/html/rfc6455#section-1.3)).
 const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-/// Calculate the SHA-1 digest of a websocket key and the GUID using the
+/// Calculate the SHA-1 digest of a WebSocket key and the GUID using the
 /// [`sha1_smol`] crate.
 #[cfg(all(feature = "sha1_smol", not(feature = "ring"), not(feature = "openssl")))]
 pub fn digest(key: &[u8]) -> [u8; 20] {
@@ -19,7 +19,7 @@ pub fn digest(key: &[u8]) -> [u8; 20] {
     s.digest().bytes()
 }
 
-/// Calculate the SHA-1 digest of a websocket key and the GUID using the
+/// Calculate the SHA-1 digest of a WebSocket key and the GUID using the
 /// [`ring`] crate.
 #[cfg(all(feature = "ring", not(feature = "openssl")))]
 pub fn digest(key: &[u8]) -> [u8; 20] {
@@ -29,7 +29,7 @@ pub fn digest(key: &[u8]) -> [u8; 20] {
     ctx.finish().as_ref().try_into().unwrap()
 }
 
-/// Calculate the SHA-1 digest of a websocket key and the GUID using the
+/// Calculate the SHA-1 digest of a WebSocket key and the GUID using the
 /// [`openssl`] crate.
 #[cfg(feature = "openssl")]
 pub fn digest(key: &[u8]) -> [u8; 20] {

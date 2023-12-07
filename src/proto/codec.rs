@@ -1,11 +1,11 @@
-//! Implementation of a tokio-util [`Decoder`] for websocket
+//! Implementation of a tokio-util [`Decoder`] for WebSocket
 //! frames. The [`Encoder`] is a placeholder and unreachable, since tokio-util's
 //! internal buffer used in the encoder comes with a hefty performance penalty
 //! for large payloads due to the required memmove. Instead, we implement our
 //! own, zero-copy implementation in the sink implementation of the
-//! [`WebsocketStream`].
+//! [`WebSocketStream`].
 //!
-//! [`WebsocketStream`]: super::WebsocketStream
+//! [`WebSocketStream`]: super::WebSocketStream
 use std::hint::unreachable_unchecked;
 
 use bytes::{Buf, BytesMut};
@@ -19,13 +19,13 @@ use crate::{
     CloseCode, Error,
 };
 
-/// The actual implementation of the websocket byte-level protocol.
+/// The actual implementation of the WebSocket byte-level protocol.
 /// It provides a [`Decoder`] for single frames that must be assembled by a
-/// client such as the [`WebsocketStream`] later.
+/// client such as the [`WebSocketStream`] later.
 ///
-/// [`WebsocketStream`]: super::WebsocketStream
+/// [`WebSocketStream`]: super::WebSocketStream
 #[derive(Debug)]
-pub(super) struct WebsocketProtocol {
+pub(super) struct WebSocketProtocol {
     /// The [`Role`] this implementation should assume for the stream.
     pub(super) role: Role,
     /// The [`Limits`] imposed on this stream.
@@ -38,8 +38,8 @@ pub(super) struct WebsocketProtocol {
     validator: Validator,
 }
 
-impl WebsocketProtocol {
-    /// Creates a new websocket codec.
+impl WebSocketProtocol {
+    /// Creates a new WebSocket codec.
     #[cfg(any(feature = "client", feature = "server"))]
     pub(super) fn new(role: Role, limits: Limits) -> Self {
         Self {
@@ -52,7 +52,7 @@ impl WebsocketProtocol {
     }
 }
 
-impl Encoder<Frame> for WebsocketProtocol {
+impl Encoder<Frame> for WebSocketProtocol {
     type Error = Error;
 
     fn encode(&mut self, _item: Frame, _dst: &mut BytesMut) -> Result<(), Self::Error> {
@@ -72,7 +72,7 @@ macro_rules! ensure_buffer_has_space {
     };
 }
 
-impl Decoder for WebsocketProtocol {
+impl Decoder for WebSocketProtocol {
     type Error = Error;
     type Item = Frame;
 

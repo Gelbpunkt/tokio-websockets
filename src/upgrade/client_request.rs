@@ -8,7 +8,7 @@ use crate::{sha::digest, upgrade::Error, utf8::parse_str};
 
 /// A static HTTP/1.1 101 Switching Protocols response up until the
 /// `Sec-WebSocket-Accept` header value.
-const SWITCHING_PROTOCOLS_BODY: &str = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-Websocket-Accept: ";
+const SWITCHING_PROTOCOLS_BODY: &str = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ";
 
 /// Returns whether an ASCII byte slice is contained in another one, ignoring
 /// captalization.
@@ -40,7 +40,7 @@ impl ClientRequest {
     ///
     /// # Errors
     ///
-    /// This method fails when a header required for the websocket protocol is
+    /// This method fails when a header required for the WebSocket protocol is
     /// missing in the handshake.
     pub fn parse<'a, F>(header: F) -> Result<Self, Error>
     where
@@ -66,12 +66,12 @@ impl ClientRequest {
             }
         };
 
-        check_header("Upgrade", "websocket", Error::UpgradeNotWebsocket)?;
+        check_header("Upgrade", "websocket", Error::UpgradeNotWebSocket)?;
         check_header_contains("Connection", "Upgrade", Error::ConnectionNotUpgrade)?;
         check_header(
             "Sec-WebSocket-Version",
             "13",
-            Error::UnsupportedWebsocketVersion,
+            Error::UnsupportedWebSocketVersion,
         )?;
 
         let key = find_header("Sec-WebSocket-Key")?;
