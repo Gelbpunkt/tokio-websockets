@@ -61,7 +61,7 @@ jobs:
         env:
           RUSTDOCFLAGS: --cfg docsrs
         run: |
-          cargo doc --all-features
+          cargo doc --no-deps --all-features
 
   clippy:
     name: Clippy
