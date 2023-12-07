@@ -286,7 +286,15 @@ where
                 })));
             }
 
-            self.partial_payload.extend_from_slice(&payload);
+            // Here we can avoid an allocation for the first frame of a multi-frame message.
+            // That is indicated by partial_payload being empty
+            if self.partial_payload.is_empty() {
+                // First frame of a multi-frame message
+                // SAFETY: Received payloads are always internally represented as BytesMut
+                self.partial_payload = unsafe { payload.try_into().unwrap_unchecked() };
+            } else {
+                self.partial_payload.extend_from_slice(&payload);
+            }
 
             if fin {
                 break;
