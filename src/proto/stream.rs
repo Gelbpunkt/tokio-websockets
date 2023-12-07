@@ -279,10 +279,10 @@ where
                     return Poll::Ready(Some(Ok(Message { opcode, payload })));
                 }
                 self.partial_opcode = opcode;
-            } else if self.partial_payload.len() + payload.len() > max_len.unwrap_or(usize::MAX) {
+            } else if self.partial_payload.len() + payload.len() > max_len {
                 return Poll::Ready(Some(Err(Error::PayloadTooLong {
                     len: self.partial_payload.len() + payload.len(),
-                    max_len: max_len.unwrap_or(usize::MAX),
+                    max_len,
                 })));
             }
 

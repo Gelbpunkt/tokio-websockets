@@ -160,10 +160,10 @@ impl Decoder for WebsocketProtocol {
             }
         }
 
-        if payload_length > self.limits.max_payload_len.unwrap_or(usize::MAX) {
+        if payload_length > self.limits.max_payload_len {
             return Err(Error::PayloadTooLong {
                 len: payload_length,
-                max_len: self.limits.max_payload_len.unwrap_or(usize::MAX),
+                max_len: self.limits.max_payload_len,
             });
         }
 
