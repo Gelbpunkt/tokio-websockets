@@ -1,11 +1,9 @@
 //! Helper for creating [`http::Request`] objects for HTTP/1.1 Upgrade requests
 //! with WebSocket servers.
-use bytes::Bytes;
 use http::{
     header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE},
     HeaderValue, Request, Uri,
 };
-use http_body_util::Empty;
 
 use crate::client::make_key;
 
@@ -50,7 +48,8 @@ use crate::client::make_key;
 /// // The HTTP Connector does not allow ws:// per default
 /// let mut connector = HttpConnector::new();
 /// connector.enforce_http(false);
-/// let client = Client::builder(TokioExecutor::new()).build(connector);
+/// // `upgrade_request` supports any `Body` type that implements `Default`
+/// let client: Client<_, String> = Client::builder(TokioExecutor::new()).build(connector);
 ///
 /// let uri = Uri::from_static("ws://localhost:3333");
 /// let response = client.request(upgrade_request(uri)?).await?;
@@ -75,10 +74,11 @@ use crate::client::make_key;
 ///
 /// This method returns a [`http::Error`] if assembling the request failed,
 /// which should never happen.
-pub fn upgrade_request<T>(uri: T) -> Result<Request<Empty<Bytes>>, http::Error>
+pub fn upgrade_request<T, B>(uri: T) -> Result<Request<B>, http::Error>
 where
     Uri: TryFrom<T>,
     <Uri as TryFrom<T>>::Error: Into<http::Error>,
+    B: Default,
 {
     let key_bytes = make_key();
 
@@ -88,5 +88,5 @@ where
         .header(UPGRADE, "websocket")
         .header(SEC_WEBSOCKET_VERSION, "13")
         .header(SEC_WEBSOCKET_KEY, HeaderValue::from_bytes(&key_bytes)?)
-        .body(Empty::new())
+        .body(B::default())
 }

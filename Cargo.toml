@@ -33,7 +33,6 @@ simdutf8 = { version = "0.1", default-features = false, features = ["std", "aarc
 # Client
 base64 = { version = "0.21", optional = true }
 http = { version = "1", default-features = false, features = ["std"], optional = true }
-http-body-util = { version = "0.1", default-features = false, optional = true }
 httparse = { version = "1.6", optional = true }
 
 # Native TLS
@@ -51,7 +50,7 @@ openssl = { version = "0.10", default-features = false, optional = true }
 
 [features]
 client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util", "tokio/rt"]
-http-integration = ["dep:http-body-util"]
+http-integration = []
 ring = ["dep:ring", "tokio-rustls?/ring"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
 simd = ["dep:simdutf8"]
