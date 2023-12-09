@@ -411,7 +411,6 @@ where
         {
             self.queue_frame(Frame::DEFAULT_CLOSE);
         }
-        while ready!(self.as_mut().poll_next(cx)).is_some() {}
 
         ready!(self.as_mut().poll_flush(cx))?;
         Pin::new(self.inner.get_mut())
