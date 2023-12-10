@@ -30,7 +30,7 @@ Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 - `server` enables a tiny server implementation
 - `http-integration` enables a method for WebSocket upgrade [`http::Request`](https://docs.rs/http/latest/http/request/struct.Request.html) generation
 
-TLS support is supported via any of the following feature flags:
+TLS is supported via any of the following feature flags:
 
 - `native-tls` for a [`tokio-native-tls`](https://docs.rs/tokio-native-tls/latest/tokio_native_tls/) backed implementation
 - `rustls-webpki-roots` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`webpki-roots`](https://docs.rs/webpki-roots/latest/webpki_roots/)
