@@ -39,13 +39,6 @@ struct EncodedFrame {
     payload: Payload,
 }
 
-impl EncodedFrame {
-    /// Whether this frame is a close frame.
-    fn is_close(&self) -> bool {
-        self.header[0] & 0xF == 8
-    }
-}
-
 /// A WebSocket stream that full messages can be read from and written to.
 ///
 /// The stream implements [`futures_sink::Sink`] and [`futures_core::Stream`].
@@ -161,18 +154,16 @@ where
                 } else {
                     self.state = StreamState::ClosedByPeer;
 
-                    if !self.frame_queue.iter().any(EncodedFrame::is_close) {
-                        match &e {
-                            Error::Protocol(e) => self.queue_frame(Frame::from(e)),
-                            Error::PayloadTooLong { max_len, .. } => self.queue_frame(
-                                Message::close(
-                                    Some(CloseCode::MESSAGE_TOO_BIG),
-                                    &format!("max length: {max_len}"),
-                                )
-                                .into(),
-                            ),
-                            _ => {}
-                        }
+                    match &e {
+                        Error::Protocol(e) => self.queue_frame(Frame::from(e)),
+                        Error::PayloadTooLong { max_len, .. } => self.queue_frame(
+                            Message::close(
+                                Some(CloseCode::MESSAGE_TOO_BIG),
+                                &format!("max length: {max_len}"),
+                            )
+                            .into(),
+                        ),
+                        _ => {}
                     }
                 }
                 return Poll::Ready(Some(Err(e)));
@@ -185,12 +176,10 @@ where
                 StreamState::Active => {
                     self.state = StreamState::ClosedByPeer;
 
-                    if !self.frame_queue.iter().any(EncodedFrame::is_close) {
-                        let mut frame = frame.clone();
-                        frame.payload.truncate(2);
+                    let mut frame = frame.clone();
+                    frame.payload.truncate(2);
 
-                        self.queue_frame(frame);
-                    }
+                    self.queue_frame(frame);
                 }
                 // SAFETY: match statement at the start of the method ensures that this is not the
                 // case
@@ -201,10 +190,7 @@ where
                     self.state = StreamState::CloseAcknowledged;
                 }
             },
-            OpCode::Ping
-                if self.state == StreamState::Active
-                    && !self.frame_queue.iter().any(EncodedFrame::is_close) =>
-            {
+            OpCode::Ping if self.state == StreamState::Active => {
                 let mut frame = frame.clone();
                 frame.opcode = OpCode::Pong;
 
@@ -218,6 +204,14 @@ where
 
     /// Masks and queues a frame for sending when [`poll_flush`] gets called.
     fn queue_frame(&mut self, frame: Frame) {
+        if frame.opcode == OpCode::Close {
+            if self.state == StreamState::ClosedByPeer {
+                self.state = StreamState::CloseAcknowledged;
+            } else {
+                self.state = StreamState::ClosedByUs;
+            }
+        }
+
         let (frame, mask): (Frame, Option<[u8; 4]>) = if self.inner.codec().role == Role::Client {
             #[cfg(feature = "client")]
             {
@@ -344,14 +338,6 @@ where
             return Err(Error::AlreadyClosed);
         }
 
-        if item.is_close() {
-            if self.state == StreamState::ClosedByPeer {
-                self.state = StreamState::CloseAcknowledged;
-            } else {
-                self.state = StreamState::ClosedByUs;
-            }
-        }
-
         if item.opcode.is_control() {
             let frame: Frame = item.into();
             self.queue_frame(frame);
@@ -407,8 +393,7 @@ where
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.state == StreamState::Active && !self.frame_queue.iter().any(EncodedFrame::is_close)
-        {
+        if self.state == StreamState::Active {
             self.queue_frame(Frame::DEFAULT_CLOSE);
         }
         while ready!(self.as_mut().poll_next(cx)).is_some() {}
