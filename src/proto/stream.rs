@@ -211,12 +211,8 @@ where
 
     /// Masks and queues a frame for sending when [`poll_flush`] gets called.
     fn queue_frame(&mut self, frame: Frame) {
-        if frame.opcode == OpCode::Close {
-            if self.state == StreamState::ClosedByPeer {
-                self.state = StreamState::CloseAcknowledged;
-            } else {
-                self.state = StreamState::ClosedByUs;
-            }
+        if frame.opcode == OpCode::Close && self.state != StreamState::ClosedByPeer {
+            self.state = StreamState::ClosedByUs;
         }
 
         let (frame, mask): (Frame, Option<[u8; 4]>) = if self.inner.codec().role == Role::Client {
