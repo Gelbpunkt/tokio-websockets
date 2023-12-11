@@ -335,9 +335,7 @@ where
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
-        if !(self.state == StreamState::Active
-            || matches!(self.state, StreamState::ClosedByPeer if item.is_close()))
-        {
+        if self.state != StreamState::Active {
             return Err(Error::AlreadyClosed);
         }
 
