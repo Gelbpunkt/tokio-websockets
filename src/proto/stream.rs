@@ -137,7 +137,14 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame, Error>>> {
-        if !matches!(self.state, StreamState::Active | StreamState::ClosedByUs) {
+        // In the case of Active or ClosedByUs, we want to receive more messages from
+        // the remote. In the case of ClosedByPeer, we have to flush to make sure our
+        // close acknowledge goes through.
+        if self.state == StreamState::CloseAcknowledged {
+            return Poll::Ready(None);
+        } else if self.state == StreamState::ClosedByPeer {
+            ready!(self.as_mut().poll_flush(cx))?;
+            self.state = StreamState::CloseAcknowledged;
             return Poll::Ready(None);
         }
 
