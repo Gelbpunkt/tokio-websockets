@@ -345,7 +345,7 @@ where
             return Err(Error::AlreadyClosed);
         }
 
-        if item.opcode.is_control() {
+        if item.opcode.is_control() || item.payload.len() <= self.config.frame_size {
             let frame: Frame = item.into();
             self.queue_frame(frame);
         } else {
