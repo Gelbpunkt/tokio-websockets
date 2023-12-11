@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2023-12-11
+
+### Dependencies
+
+- Updated `http` to 1.0 and `rustls`-related dependencies to those compatible with `rustls` 0.22
+- **[breaking]** `ring` is now an optional dependency with `rustls` and different crypto providers can be used
+- Optimized `simdutf8` feature flags for aarch64
+
+### Changed
+
+- **[breaking]** `upgrade_request` no longer uses an explicit body type, now it only requires the body to implement `Default`
+- **[breaking]** `WebsocketStream` has been renamed to `WebSocketStream`
+- **[breaking]** `Message` payloads are now exposed as `Payload` and it is possible to create messages from `Bytes`-backed payloads
+- Removed a few excess allocations in hot paths
+
+### Fixed
+
+- Fixed issues with the close sequence handling
+
 ## [0.4.1] - 2023-11-23
 
 ### Fixed
