@@ -146,8 +146,9 @@ impl TryFrom<u16> for CloseCode {
 /// The websocket message payload storage. Internally implemented as a smart
 /// wrapper around [`Bytes`] and [`BytesMut`].
 ///
-/// Payloads can be created by using the [`From<Bytes>`] and [`From<BytesMut>`]
-/// implementations.
+/// Payloads can be created by using the [`From<Bytes>`], [`From<BytesMut>`] and
+/// [`From<String>`] implementations. The `String` implementation uses
+/// [`Bytes`] under the hood.
 ///
 /// Sending the payloads is zero-copy, except when sending a payload backed by
 /// [`Bytes`] as a client to a server. The use of [`BytesMut`] as the backing
@@ -155,6 +156,7 @@ impl TryFrom<u16> for CloseCode {
 ///
 /// [`From<Bytes>`]: #impl-From<Bytes>-for-Payload
 /// [`From<BytesMut>`]: #impl-From<BytesMut>-for-Payload
+/// [`From<String>`]: #impl-From<String>-for-Payload
 pub struct Payload(UnsafeCell<PayloadStorage>);
 
 impl Payload {
@@ -258,6 +260,17 @@ impl From<BytesMut> for Payload {
     }
 }
 
+impl From<String> for Payload {
+    fn from(value: String) -> Self {
+        // Possible options:
+        // * BytesMut::from(&[u8]) will copy the slice - generally bad. BytesMut does
+        //   not expose from_vec.
+        // * Bytes::from(Vec<u8>) - will not allocate. Worst case we allocate due to
+        //   copying when sending, but at least this is only conditionally
+        Self::from(Bytes::from(value.into_bytes()))
+    }
+}
+
 /// [`Payload`] backend.
 #[derive(Debug)]
 enum PayloadStorage {
@@ -283,15 +296,10 @@ pub struct Message {
 impl Message {
     /// Create a new text message.
     #[must_use]
-    pub fn text(payload: String) -> Self {
+    pub fn text<P: Into<Payload>>(payload: P) -> Self {
         Self {
             opcode: OpCode::Text,
-            // Possible options:
-            // * BytesMut::from(&[u8]) will copy the slice - generally bad. BytesMut does not expose
-            //   from_vec.
-            // * Bytes::from(Vec<u8>) - will not allocate. Worst case we allocate due to copying
-            //   when sending, but at least this is only conditionally
-            payload: Bytes::from(payload.into_bytes()).into(),
+            payload: payload.into(),
         }
     }
 
