@@ -55,8 +55,8 @@ RUN cd /build/uWebSockets && \
 WORKDIR /build/tokio-websockets
 COPY . .
 RUN source $HOME/.cargo/env && \
-    cargo build --release --no-default-features --features nightly,server,simd,sha1_smol --example echo-server --target x86_64-unknown-linux-musl && \
-    cp target/x86_64-unknown-linux-musl/release/examples/echo-server /usr/bin/tokio-websockets && \
+    cargo build --release --no-default-features --features nightly,server,simd,sha1_smol --example echo_server --target x86_64-unknown-linux-musl && \
+    cp target/x86_64-unknown-linux-musl/release/examples/echo_server /usr/bin/tokio-websockets && \
     cd ..
 
 # Environment for benchmarking all executables

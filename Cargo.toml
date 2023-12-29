@@ -82,7 +82,7 @@ name = "client"
 required-features = ["client"]
 
 [[example]]
-name = "echo-server"
+name = "echo_server"
 required-features = ["server"]
 
 [[example]]
