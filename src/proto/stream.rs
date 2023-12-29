@@ -149,7 +149,7 @@ where
         }
 
         // If there are pending items, try to flush the sink
-        if !self.frame_queue.is_empty() && self.as_mut().poll_ready(cx)?.is_ready() {
+        if !self.frame_queue.is_empty() {
             _ = self.as_mut().poll_flush(cx)?;
         }
 
