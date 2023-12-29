@@ -51,7 +51,7 @@ impl Debug for Connector {
             #[cfg(feature = "native-tls")]
             Self::NativeTls(connector) => connector.fmt(f),
             #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
-            Self::Rustls(_) => f.write_str("Connector::RustlsAsync"),
+            Self::Rustls(_) => f.write_str("Connector::Rustls"),
         }
     }
 }
