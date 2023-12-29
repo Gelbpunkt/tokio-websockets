@@ -1,4 +1,4 @@
-import { $ } from "https://deno.land/x/dax@0.31.1/mod.ts";
+import { $ } from "https://deno.land/x/dax/mod.ts";
 import { chart } from "https://deno.land/x/fresh_charts/core.ts";
 import { TextLineStream } from "https://deno.land/std/streams/text_line_stream.ts";
 
