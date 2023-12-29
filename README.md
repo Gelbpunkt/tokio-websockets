@@ -90,7 +90,7 @@ async fn main() -> Result<(), Error> {
   let uri = Uri::from_static("ws://127.0.0.1:3000");
   let (mut client, _) = ClientBuilder::from_uri(uri).connect().await?;
 
-  client.send(Message::text(String::from("Hello world!"))).await?;
+  client.send(Message::text("Hello world!")).await?;
 
   while let Some(Ok(msg)) = client.next().await {
     if let Some(text) = msg.as_text() {

@@ -146,17 +146,14 @@ impl TryFrom<u16> for CloseCode {
 /// The websocket message payload storage. Internally implemented as a smart
 /// wrapper around [`Bytes`] and [`BytesMut`].
 ///
-/// Payloads can be created by using the [`From<Bytes>`], [`From<BytesMut>`] and
-/// [`From<String>`] implementations. The `String` implementation uses
-/// [`Bytes`] under the hood.
+/// Payloads can be created by using the `From<T>` implementations. All of them
+/// except the [`From<BytesMut>`] implementation use [`Bytes`] under the hood.
 ///
 /// Sending the payloads is zero-copy, except when sending a payload backed by
 /// [`Bytes`] as a client to a server. The use of [`BytesMut`] as the backing
 /// storage where cheaply possible is recommended to ensure zero-copy sending.
 ///
-/// [`From<Bytes>`]: #impl-From<Bytes>-for-Payload
 /// [`From<BytesMut>`]: #impl-From<BytesMut>-for-Payload
-/// [`From<String>`]: #impl-From<String>-for-Payload
 pub struct Payload(UnsafeCell<PayloadStorage>);
 
 impl Payload {
@@ -268,6 +265,22 @@ impl From<String> for Payload {
         // * Bytes::from(Vec<u8>) - will not allocate. Worst case we allocate due to
         //   copying when sending, but at least this is only conditionally
         Self::from(Bytes::from(value.into_bytes()))
+    }
+}
+
+impl From<&'static [u8]> for Payload {
+    fn from(value: &'static [u8]) -> Self {
+        Self(UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(
+            value,
+        ))))
+    }
+}
+
+impl From<&'static str> for Payload {
+    fn from(value: &'static str) -> Self {
+        Self(UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(
+            value.as_bytes(),
+        ))))
     }
 }
 
