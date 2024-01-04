@@ -123,6 +123,8 @@ pub struct Builder<'a> {
     /// URI to connect to, required unless connecting to an established
     /// WebSocket stream.
     uri: Option<Uri>,
+    /// An optional hostname used for the TLS handshake.
+    tls_hostname: Option<String>,
     /// A TLS connector to use for the connection. If not set and required, a
     /// new one will be created.
     connector: Option<&'a Connector>,
@@ -141,6 +143,7 @@ impl<'a> Builder<'a> {
     pub fn new() -> Self {
         Self {
             uri: None,
+            tls_hostname: None,
             connector: None,
             config: Config::default(),
             limits: Limits::default(),
@@ -167,6 +170,7 @@ impl<'a> Builder<'a> {
     pub fn from_uri(uri: Uri) -> Self {
         Self {
             uri: Some(uri),
+            tls_hostname: None,
             connector: None,
             config: Config::default(),
             limits: Limits::default(),
@@ -189,6 +193,14 @@ impl<'a> Builder<'a> {
     #[must_use]
     pub fn config(mut self, config: Config) -> Self {
         self.config = config;
+
+        self
+    }
+
+    /// Sets the hostname used for ths TLS handshake.
+    #[must_use]
+    pub fn tls_hostname(mut self, tls_hostname: String) -> Self {
+        self.tls_hostname = Some(tls_hostname);
 
         self
     }
@@ -229,6 +241,7 @@ impl<'a> Builder<'a> {
         let host = uri.host().ok_or(Error::CannotResolveHost)?;
         let port = default_port(uri).unwrap_or(80);
         let addr = resolve(host.to_string(), port).await?;
+        let host = self.tls_hostname.as_deref().unwrap_or(host);
 
         let stream = TcpStream::connect(&addr).await?;
 
