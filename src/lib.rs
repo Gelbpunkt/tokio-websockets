@@ -26,6 +26,8 @@ mod mask;
 pub mod proto;
 #[cfg(feature = "client")]
 mod rand;
+#[cfg(feature = "client")]
+pub mod resolver;
 #[cfg(feature = "server")]
 pub mod server;
 #[cfg(any(feature = "client", feature = "server"))]

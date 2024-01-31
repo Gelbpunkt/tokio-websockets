@@ -7,13 +7,7 @@
 //!     established stream, via [`Builder::connect_on`]
 //!   - By performing the handshake yourself and then using
 //!     [`Builder::take_over`] to let it take over a WebSocket stream
-use std::{
-    future::poll_fn,
-    io,
-    net::{SocketAddr, ToSocketAddrs},
-    pin::Pin,
-    str::FromStr,
-};
+use std::{future::poll_fn, io, pin::Pin, str::FromStr};
 
 use base64::{engine::general_purpose, Engine};
 use futures_core::Stream;
@@ -26,6 +20,7 @@ use tokio_util::codec::Decoder;
 
 use crate::{
     proto::{Config, Limits, Role},
+    resolver::{self, Resolver},
     upgrade::{self, server_response},
     Connector, Error, MaybeTlsStream, WebSocketStream,
 };
@@ -104,28 +99,16 @@ fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
     buf
 }
 
-/// Resolve a hostname and a port to an IP address.
-///
-/// This currently uses a blocking `getaddrinfo` syscall.
-async fn resolve(host: String, port: u16) -> Result<SocketAddr, Error> {
-    let task = tokio::task::spawn_blocking(move || {
-        (host, port)
-            .to_socket_addrs()?
-            .next()
-            .ok_or(Error::CannotResolveHost)
-    });
-
-    task.await.expect("Tokio threadpool failed")
-}
-
 /// Builder for WebSocket client connections.
-pub struct Builder<'a> {
+pub struct Builder<'a, R: Resolver = resolver::Gai> {
     /// URI to connect to, required unless connecting to an established
     /// WebSocket stream.
     uri: Option<Uri>,
     /// A TLS connector to use for the connection. If not set and required, a
     /// new one will be created.
     connector: Option<&'a Connector>,
+    /// A DNS resolver to use for looking up the hostname.
+    resolver: R,
     /// Configuration for the WebSocket stream.
     config: Config,
     /// Limits to impose on the WebSocket stream.
@@ -142,12 +125,30 @@ impl<'a> Builder<'a> {
         Self {
             uri: None,
             connector: None,
+            resolver: resolver::Gai,
             config: Config::default(),
             limits: Limits::default(),
             headers: HeaderMap::new(),
         }
     }
 
+    /// Creates a [`Builder`] that connects to a given URI.
+    ///
+    /// This method never fails as the URI has already been parsed.
+    #[must_use]
+    pub fn from_uri(uri: Uri) -> Self {
+        Self {
+            uri: Some(uri),
+            connector: None,
+            resolver: resolver::Gai,
+            config: Config::default(),
+            limits: Limits::default(),
+            headers: HeaderMap::new(),
+        }
+    }
+}
+
+impl<'a, R: Resolver> Builder<'a, R> {
     /// Sets the [`Uri`] to connect to.
     ///
     /// # Errors
@@ -160,20 +161,6 @@ impl<'a> Builder<'a> {
         Ok(self)
     }
 
-    /// Creates a [`Builder`] that connects to a given URI.
-    ///
-    /// This method never fails as the URI has already been parsed.
-    #[must_use]
-    pub fn from_uri(uri: Uri) -> Self {
-        Self {
-            uri: Some(uri),
-            connector: None,
-            config: Config::default(),
-            limits: Limits::default(),
-            headers: HeaderMap::new(),
-        }
-    }
-
     /// Sets the TLS connector for the client.
     ///
     /// By default, the client will create a new one for each connection instead
@@ -183,6 +170,33 @@ impl<'a> Builder<'a> {
         self.connector = Some(connector);
 
         self
+    }
+
+    /// Sets the DNS resolver for the client.
+    ///
+    /// By default, the client will use the [`Gai`] resolver, a wrapper around
+    /// the blocking `getaddrinfo` syscall.
+    ///
+    /// [`Gai`]: resolver::Gai
+    #[must_use]
+    pub fn resolver<NewR: Resolver>(self, resolver: NewR) -> Builder<'a, NewR> {
+        let Builder {
+            uri,
+            connector,
+            resolver: _,
+            config,
+            limits,
+            headers,
+        } = self;
+
+        Builder {
+            uri,
+            connector,
+            resolver,
+            config,
+            limits,
+            headers,
+        }
     }
 
     /// Sets the configuration for the WebSocket stream.
@@ -228,7 +242,7 @@ impl<'a> Builder<'a> {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
         let host = uri.host().ok_or(Error::CannotResolveHost)?;
         let port = default_port(uri).unwrap_or(80);
-        let addr = resolve(host.to_string(), port).await?;
+        let addr = self.resolver.resolve(host, port).await?;
 
         let stream = TcpStream::connect(&addr).await?;
 
