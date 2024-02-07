@@ -257,6 +257,15 @@ impl From<BytesMut> for Payload {
     }
 }
 
+impl From<Payload> for Bytes {
+    fn from(value: Payload) -> Self {
+        match value.0.into_inner() {
+            PayloadStorage::Unique(p) => p.freeze(),
+            PayloadStorage::Shared(p) => p,
+        }
+    }
+}
+
 impl From<String> for Payload {
     fn from(value: String) -> Self {
         // Possible options:
