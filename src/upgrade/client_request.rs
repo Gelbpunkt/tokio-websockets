@@ -100,7 +100,7 @@ impl Decoder for Codec {
     type Item = String;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let mut headers = [httparse::EMPTY_HEADER; 25];
+        let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut request = Request::new(&mut headers);
         let status = request.parse(src).map_err(Error::Parsing)?;
 
