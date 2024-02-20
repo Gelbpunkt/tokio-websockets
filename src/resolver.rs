@@ -1,10 +1,6 @@
 //! Abstractions over DNS resolvers.
 
-use std::{
-    future::Future,
-    net::{SocketAddr, ToSocketAddrs},
-    pin::Pin,
-};
+use std::{future::Future, net::SocketAddr, pin::Pin};
 
 use crate::Error;
 
@@ -31,14 +27,11 @@ impl Resolver for Gai {
         let host = host.to_owned();
 
         Box::pin(async move {
-            let task = tokio::task::spawn_blocking(move || {
-                (host, port)
-                    .to_socket_addrs()?
-                    .next()
-                    .ok_or(Error::CannotResolveHost)
-            });
-
-            task.await.expect("Tokio threadpool failed")
+            tokio::net::lookup_host((host, port))
+                .await
+                .map_err(|_| Error::CannotResolveHost)?
+                .next()
+                .ok_or(Error::CannotResolveHost)
         })
     }
 }
