@@ -132,7 +132,8 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Creates a [`Builder`] that connects to a given URI.
+    /// Creates a [`Builder`] that connects to a given URI. This URI must use
+    /// the `ws` or `wss` schemes.
     ///
     /// This method never fails as the URI has already been parsed.
     #[must_use]
@@ -149,7 +150,8 @@ impl<'a> Builder<'a> {
 }
 
 impl<'a, R: Resolver> Builder<'a, R> {
-    /// Sets the [`Uri`] to connect to.
+    /// Sets the [`Uri`] to connect to. This URI must use the `ws` or `wss`
+    /// schemes.
     ///
     /// # Errors
     ///
@@ -266,8 +268,10 @@ impl<'a, R: Resolver> Builder<'a, R> {
                     connector.wrap(host, stream).await?
                 }
             }
-        } else {
+        } else if uri.scheme_str() == Some("ws") {
             Connector::Plain.wrap(host, stream).await?
+        } else {
+            return Err(Error::UnsupportedScheme);
         };
 
         self.connect_on(stream).await
