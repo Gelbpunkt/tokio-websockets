@@ -16,7 +16,7 @@ use crate::{
     mask,
     proto::ProtocolError,
     utf8::{self, Validator},
-    CloseCode, Error,
+    CloseCode, Error, Payload,
 };
 
 /// The actual implementation of the WebSocket byte-level protocol.
@@ -266,7 +266,8 @@ impl Decoder for WebSocketProtocol {
         // Advance the offset into the payload body
         src.advance(offset);
         // Take the payload
-        let payload = src.split_to(payload_length).into();
+        let mut payload = Payload::from(src.split_to(payload_length));
+        payload.set_utf8_validated(opcode == OpCode::Text && fin);
 
         // It is possible to receive intermediate control frames between a large other
         // frame. We therefore can't simply reset the fragmented opcode after we receive

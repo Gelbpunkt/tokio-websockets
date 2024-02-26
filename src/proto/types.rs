@@ -6,6 +6,7 @@ use std::{
 use bytes::{BufMut, Bytes, BytesMut};
 
 use super::error::ProtocolError;
+use crate::utf8;
 
 /// The opcode of a WebSocket frame. It denotes the type of the frame or an
 /// assembled message.
@@ -154,20 +155,31 @@ impl TryFrom<u16> for CloseCode {
 /// storage where cheaply possible is recommended to ensure zero-copy sending.
 ///
 /// [`From<BytesMut>`]: #impl-From<BytesMut>-for-Payload
-pub struct Payload(UnsafeCell<PayloadStorage>);
+pub struct Payload {
+    /// The raw payload data.
+    data: UnsafeCell<PayloadStorage>,
+    /// Whether the payload data was validated to be valid UTF-8.
+    utf8_validated: bool,
+}
 
 impl Payload {
     /// Creates a new shared `Payload` from a static slice.
     const fn from_static(bytes: &'static [u8]) -> Self {
-        Self(UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(
-            bytes,
-        ))))
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(bytes))),
+            utf8_validated: false,
+        }
+    }
+
+    /// Marks whether the payload contents were validated to be valid UTF-8.
+    pub(super) fn set_utf8_validated(&mut self, value: bool) {
+        self.utf8_validated = value;
     }
 
     /// Shortens the buffer, keeping the first `len` bytes and dropping the
     /// rest.
     pub(super) fn truncate(&mut self, len: usize) {
-        match self.0.get_mut() {
+        match self.data.get_mut() {
             PayloadStorage::Unique(b) => b.truncate(len),
             PayloadStorage::Shared(b) => b.truncate(len),
         }
@@ -175,13 +187,20 @@ impl Payload {
 
     /// Splits the buffer into two at the given index.
     fn split_to(&mut self, at: usize) -> Self {
-        Self(UnsafeCell::new(match self.0.get_mut() {
-            PayloadStorage::Unique(b) => PayloadStorage::Unique(b.split_to(at)),
-            PayloadStorage::Shared(b) => PayloadStorage::Shared(b.split_to(at)),
-        }))
+        // This is only used by the outgoing message frame iterator, so we do not care
+        // about the value of utf8_validated. For the sake of correctness (in case we
+        // split a utf8 codepoint), we set it to false.
+        self.utf8_validated = false;
+        Self {
+            data: UnsafeCell::new(match self.data.get_mut() {
+                PayloadStorage::Unique(b) => PayloadStorage::Unique(b.split_to(at)),
+                PayloadStorage::Shared(b) => PayloadStorage::Shared(b.split_to(at)),
+            }),
+            utf8_validated: false,
+        }
     }
 
-    /// Converts the payloads internal representation to [`Bytes`].
+    /// Converts the payload's internal representation to [`Bytes`].
     fn as_bytes(&self) -> &Bytes {
         if let PayloadStorage::Shared(bytes) = self.as_ref() {
             bytes
@@ -189,12 +208,12 @@ impl Payload {
             // SAFETY: No concurrent access is possible as Payload is !Sync and
             // `0` is not read again before it's overwritten.
             unsafe {
-                let payload = self.0.get().read();
+                let payload = self.data.get().read();
                 let bytes = match payload {
                     PayloadStorage::Unique(p) => p.freeze(),
                     PayloadStorage::Shared(_) => unreachable_unchecked(),
                 };
-                self.0.get().write(PayloadStorage::Shared(bytes));
+                self.data.get().write(PayloadStorage::Shared(bytes));
             }
             match self.as_ref() {
                 // SAFETY: We just wrote `Shared` into `value`
@@ -207,7 +226,7 @@ impl Payload {
     /// Convert the payload to [`BytesMut`] if it is currently represented as
     /// such, otherwise returns it as [`Bytes`].
     pub(super) fn try_into_bytesmut(self) -> Result<BytesMut, Bytes> {
-        match self.0.into_inner() {
+        match self.data.into_inner() {
             PayloadStorage::Unique(s) => Ok(s),
             PayloadStorage::Shared(e) => Err(e),
         }
@@ -217,14 +236,17 @@ impl Payload {
 impl AsRef<PayloadStorage> for Payload {
     fn as_ref(&self) -> &PayloadStorage {
         // SAFETY: No outstanding mutable references exists.
-        unsafe { &*self.0.get() }
+        unsafe { &*self.data.get() }
     }
 }
 
 impl Clone for Payload {
     fn clone(&self) -> Self {
         let bytes = self.as_bytes();
-        Self(UnsafeCell::new(PayloadStorage::Shared(bytes.clone())))
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Shared(bytes.clone())),
+            utf8_validated: self.utf8_validated,
+        }
     }
 }
 
@@ -247,19 +269,25 @@ impl fmt::Debug for Payload {
 
 impl From<Bytes> for Payload {
     fn from(value: Bytes) -> Self {
-        Self(UnsafeCell::new(PayloadStorage::Shared(value)))
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Shared(value)),
+            utf8_validated: false,
+        }
     }
 }
 
 impl From<BytesMut> for Payload {
     fn from(value: BytesMut) -> Self {
-        Self(UnsafeCell::new(PayloadStorage::Unique(value)))
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Unique(value)),
+            utf8_validated: false,
+        }
     }
 }
 
 impl From<Payload> for Bytes {
     fn from(value: Payload) -> Self {
-        match value.0.into_inner() {
+        match value.data.into_inner() {
             PayloadStorage::Unique(p) => p.freeze(),
             PayloadStorage::Shared(p) => p,
         }
@@ -273,23 +301,28 @@ impl From<String> for Payload {
         //   not expose from_vec.
         // * Bytes::from(Vec<u8>) - will not allocate. Worst case we allocate due to
         //   copying when sending, but at least this is only conditionally
-        Self::from(Bytes::from(value.into_bytes()))
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from(value.into_bytes()))),
+            utf8_validated: true,
+        }
     }
 }
 
 impl From<&'static [u8]> for Payload {
     fn from(value: &'static [u8]) -> Self {
-        Self(UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(
-            value,
-        ))))
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(value))),
+            utf8_validated: false,
+        }
     }
 }
 
 impl From<&'static str> for Payload {
     fn from(value: &'static str) -> Self {
-        Self(UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(
-            value.as_bytes(),
-        ))))
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(value.as_bytes()))),
+            utf8_validated: true,
+        }
     }
 }
 
@@ -316,7 +349,7 @@ pub struct Message {
 }
 
 impl Message {
-    /// Create a new text message.
+    /// Create a new text message. The payload contents must be valid UTF-8.
     #[must_use]
     pub fn text<P: Into<Payload>>(payload: P) -> Self {
         Self {
@@ -414,10 +447,21 @@ impl Message {
 
     /// Returns a reference to the message payload as a string if it is a text
     /// message.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic when the message was created via
+    /// [`Message::text`] with invalid UTF-8.
     pub fn as_text(&self) -> Option<&str> {
-        // SAFETY: Opcode is Text so the payload is valid UTF-8
-        (self.opcode == OpCode::Text)
-            .then(|| unsafe { std::str::from_utf8_unchecked(&self.payload) })
+        // SAFETY: Received messages were validated to be valid UTF-8, otherwise
+        // we check if it is valid UTF-8.
+        (self.opcode == OpCode::Text).then(|| {
+            assert!(
+                self.payload.utf8_validated || utf8::parse_str(&self.payload).is_ok(),
+                "called as_text on message created from payload with invalid utf-8"
+            );
+            unsafe { std::str::from_utf8_unchecked(&self.payload) }
+        })
     }
 
     /// Returns the [`CloseCode`] and close reason if the message is a close
