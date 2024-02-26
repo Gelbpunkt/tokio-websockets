@@ -299,7 +299,8 @@ where
         }
 
         let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
-        let payload = take(&mut self.partial_payload).into();
+        let mut payload = Payload::from(take(&mut self.partial_payload));
+        payload.set_utf8_validated(opcode == OpCode::Text);
 
         Poll::Ready(Some(Ok(Message { opcode, payload })))
     }
