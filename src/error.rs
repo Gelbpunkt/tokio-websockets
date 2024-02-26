@@ -34,6 +34,9 @@ pub enum Error {
     /// A general rustls error.
     #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
     Rustls(tokio_rustls::rustls::Error),
+    /// An unsupported, i.e. not `ws` or `wss`, or no URI scheme was specified.
+    #[cfg(feature = "client")]
+    UnsupportedScheme,
     /// The HTTP/1.1 Upgrade failed.
     #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(crate::upgrade::Error),
@@ -109,6 +112,8 @@ impl fmt::Display for Error {
             Error::InvalidDNSName(_) => f.write_str("invalid DNS name"),
             #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
             Error::Rustls(e) => e.fmt(f),
+            #[cfg(feature = "client")]
+            Error::UnsupportedScheme => f.write_str("unsupported or no URI scheme used"),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => e.fmt(f),
             #[cfg(all(
@@ -133,6 +138,8 @@ impl std::error::Error for Error {
                 not(feature = "ring")
             ))]
             Error::NoTlsConnectorConfigured => None,
+            #[cfg(feature = "client")]
+            Error::UnsupportedScheme => None,
             Error::Protocol(e) => Some(e),
             Error::Io(e) => Some(e),
             #[cfg(feature = "native-tls")]
