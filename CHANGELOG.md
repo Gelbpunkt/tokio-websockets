@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2024-02-27
+
+### Added
+
+- `Payload` now implements `From<&'static [u8]>` and `From<&'static str>`
+- The `ClientBuilder` now allows specifying a DNS resolver that implements the `Resolver` trait via `ClientBuilder::resolver`, stored as a generic on the builder. It defaults to `resolver::Gai`, which matches behavior on previous versions
+
+### Changed
+
+- **[breaking]** `ClientBuilder::connect` now returns an `Error::UnsupportedScheme` if the URI does not set the scheme to `ws` or `wss`
+- **[breaking]** `ClientBuilder::connect` will no longer unconditionally use the specified custom connector, instead it will always use a plain connector for the `ws` scheme
+- **[breaking]** The `nightly` feature now uses the new `stdsimd` feature instead of `stdarch_x86_avx512`, which was removed in recent nightly compiler versions
+
+### Fixed
+
+- The `Debug` implementation of `Connector` now prints the correct name of the `Rustls` variant
+- The header buffer size in the built-in server was increased to 64, which allows clients sending larger amounts of headers to connect
+- Fixed a case of UB when a message was constructed via `Message::text` with invalid UTF-8 and then converted to a `&str` via `Message::as_text`. This will now cause a panic
+
 ## [0.5.1] - 2023-12-29
 
 ### Changed
