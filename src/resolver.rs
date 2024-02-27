@@ -5,13 +5,13 @@ use std::{future::Future, net::SocketAddr, pin::Pin};
 use crate::Error;
 
 /// Trait for a DNS resolver to resolve hostnames and ports to IP addresses.
-pub trait Resolver {
+pub trait Resolver: Send {
     /// Resolve a hostname and port to an IP address, asynchronously.
     fn resolve(
         &self,
         host: &str,
         port: u16,
-    ) -> Pin<Box<dyn Future<Output = Result<SocketAddr, Error>>>>;
+    ) -> Pin<Box<dyn Future<Output = Result<SocketAddr, Error>> + Send>>;
 }
 
 /// A [`Resolver`] that uses the blocking `getaddrinfo` syscall in the tokio
@@ -23,7 +23,7 @@ impl Resolver for Gai {
         &self,
         host: &str,
         port: u16,
-    ) -> Pin<Box<dyn Future<Output = Result<SocketAddr, Error>>>> {
+    ) -> Pin<Box<dyn Future<Output = Result<SocketAddr, Error>> + Send>> {
         let host = host.to_owned();
 
         Box::pin(async move {
