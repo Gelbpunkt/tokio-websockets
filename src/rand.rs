@@ -3,14 +3,13 @@
 #[cfg(not(any(feature = "fastrand", feature = "getrandom", feature = "rand")))]
 compile_error!("Using the `client` feature requires enabling a random number generator implementation via one of the following features: `fastrand`, `getrandom` or `rand`.");
 
+/// Random numbers generation utilities using [`fastrand`].
 #[cfg(all(
     feature = "fastrand",
     not(feature = "getrandom"),
     not(feature = "rand")
 ))]
 mod imp {
-    //! Random numbers generation utilities using [`fastrand`].
-
     /// Generate a random 16-byte WebSocket key.
     pub fn get_key() -> [u8; 16] {
         fastrand::u128(..).to_ne_bytes()
@@ -22,9 +21,9 @@ mod imp {
     }
 }
 
+/// Random numbers generation utilities using [`getrandom`].
 #[cfg(all(feature = "getrandom", not(feature = "rand")))]
 mod imp {
-    //! Random numbers generation utilities using [`getrandom`].
 
     /// Generate a random 16-byte WebSocket key.
     pub fn get_key() -> [u8; 16] {
@@ -41,9 +40,9 @@ mod imp {
     }
 }
 
+/// Random numbers generation utilities using [`rand`].
 #[cfg(feature = "rand")]
 mod imp {
-    //! Random numbers generation utilities using [`rand`].
 
     use rand::RngCore;
 

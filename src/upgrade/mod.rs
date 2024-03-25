@@ -30,7 +30,7 @@ pub enum Error {
     /// Server did not return a HTTP Switching Protocols response.
     DidNotSwitchProtocols(u16),
     /// Server returned a `Sec-WebSocket-Accept` that is not compatible with the
-    /// `Sec-WebSocket-Key sent by the client.
+    /// `Sec-WebSocket-Key` sent by the client.
     WrongWebSocketAccept,
 }
 
