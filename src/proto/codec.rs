@@ -167,14 +167,14 @@ impl Decoder for WebSocketProtocol {
         }
 
         if payload_length != 0 {
+            let is_text = opcode == OpCode::Text
+                || (opcode == OpCode::Continuation
+                    && self.fragmented_message_opcode == OpCode::Text);
             let payload_available = (src.len() - offset).min(payload_length);
 
             if payload_length != payload_available {
                 // Validate partial frame payload data
-                if opcode == OpCode::Text
-                    || (opcode == OpCode::Continuation
-                        && self.fragmented_message_opcode == OpCode::Text)
-                {
+                if is_text {
                     if mask {
                         // SAFETY: The masking key and the payload do not overlap in src
                         // TODO: Replace with split_at_mut_unchecked when stable
@@ -224,10 +224,7 @@ impl Decoder for WebSocketProtocol {
                 mask::frame(masking_key, payload_masked, self.payload_processed & 3);
             }
 
-            if opcode == OpCode::Text
-                || (opcode == OpCode::Continuation
-                    && self.fragmented_message_opcode == OpCode::Text)
-            {
+            if is_text {
                 // SAFETY: self.payload_data_validated <= payload_length
                 self.validator.feed(
                     unsafe {
