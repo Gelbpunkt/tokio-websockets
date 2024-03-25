@@ -15,7 +15,7 @@ use bytes::{Buf, BytesMut};
 use futures_core::Stream;
 use futures_sink::Sink;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::{codec::Framed, io::poll_write_buf};
+use tokio_util::{codec::FramedRead, io::poll_write_buf};
 
 #[cfg(any(feature = "client", feature = "server"))]
 use super::types::Limits;
@@ -56,7 +56,7 @@ struct EncodedFrame {
 pub struct WebSocketStream<T> {
     /// The underlying stream using the [`WebSocketProtocol`] to read and write
     /// full frames.
-    inner: Framed<T, WebSocketProtocol>,
+    inner: FramedRead<T, WebSocketProtocol>,
 
     /// Configuration for the stream.
     config: Config,
@@ -91,10 +91,8 @@ where
     /// Create a new [`WebSocketStream`] from a raw stream.
     #[cfg(any(feature = "client", feature = "server"))]
     pub(crate) fn from_raw_stream(stream: T, role: Role, config: Config, limits: Limits) -> Self {
-        use tokio_util::codec::Decoder;
-
         Self {
-            inner: WebSocketProtocol::new(role, limits).framed(stream),
+            inner: FramedRead::new(stream, WebSocketProtocol::new(role, limits)),
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
@@ -105,17 +103,17 @@ where
         }
     }
 
-    /// Create a new [`WebSocketStream`] from an existing [`Framed`]. This
-    /// allows for reusing the internal buffer of the [`Framed`] object.
+    /// Create a new [`WebSocketStream`] from an existing [`FramedRead`]. This
+    /// allows for reusing the internal buffer of the [`FramedRead`] object.
     #[cfg(any(feature = "client", feature = "server"))]
     pub(crate) fn from_framed<U>(
-        framed: Framed<T, U>,
+        framed: FramedRead<T, U>,
         role: Role,
         config: Config,
         limits: Limits,
     ) -> Self {
         Self {
-            inner: framed.map_codec(|_| WebSocketProtocol::new(role, limits)),
+            inner: framed.map_decoder(|_| WebSocketProtocol::new(role, limits)),
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
@@ -215,7 +213,7 @@ where
             self.state = StreamState::ClosedByUs;
         }
 
-        let (frame, mask): (Frame, Option<[u8; 4]>) = if self.inner.codec().role == Role::Client {
+        let (frame, mask): (Frame, Option<[u8; 4]>) = if self.inner.decoder().role == Role::Client {
             #[cfg(feature = "client")]
             {
                 let mut frame = frame;
@@ -262,7 +260,7 @@ where
     type Item = Result<Message, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let max_len = self.inner.codec().limits.max_payload_len;
+        let max_len = self.inner.decoder().limits.max_payload_len;
 
         loop {
             let (opcode, payload, fin) = match ready!(self.as_mut().poll_next_frame(cx)) {

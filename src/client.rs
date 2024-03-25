@@ -16,7 +16,7 @@ use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
 };
-use tokio_util::codec::Decoder;
+use tokio_util::codec::FramedRead;
 
 use crate::{
     proto::{Config, Limits, Role},
@@ -301,7 +301,7 @@ impl<'a, R: Resolver> Builder<'a, R> {
         let request = build_request(uri, &key_base64, &self.headers);
         stream.write_all(&request).await?;
 
-        let mut framed = upgrade_codec.framed(stream);
+        let mut framed = FramedRead::new(stream, upgrade_codec);
         let res = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx))
             .await
             .ok_or(Error::Io(io::ErrorKind::UnexpectedEof.into()))??;
