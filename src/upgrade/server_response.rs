@@ -1,12 +1,12 @@
 //! A [`Codec`] to perform a HTTP Upgrade handshake with a server and validate
 //! the response.
-use std::{hint::unreachable_unchecked, str::FromStr};
+use std::str::FromStr;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
 use http::{header::HeaderName, HeaderValue, StatusCode, Version};
 use httparse::{Header, Response};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::Decoder;
 
 use crate::{sha::digest, upgrade::Error};
 
@@ -97,15 +97,5 @@ impl Decoder for Codec {
         src.advance(response_len);
 
         Ok(Some(parsed_response))
-    }
-}
-
-impl Encoder<()> for Codec {
-    type Error = crate::Error;
-
-    fn encode(&mut self, _item: (), _dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // SAFETY: This is never called. Encoder is implemented to satisfy requirements
-        // for Framed.
-        unsafe { unreachable_unchecked() }
     }
 }

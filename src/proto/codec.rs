@@ -9,7 +9,7 @@
 use std::hint::unreachable_unchecked;
 
 use bytes::{Buf, BytesMut};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::Decoder;
 
 use super::types::{Frame, Limits, OpCode, Role};
 use crate::{
@@ -49,14 +49,6 @@ impl WebSocketProtocol {
             payload_processed: 0,
             validator: Validator::new(),
         }
-    }
-}
-
-impl Encoder<Frame> for WebSocketProtocol {
-    type Error = Error;
-
-    fn encode(&mut self, _item: Frame, _dst: &mut BytesMut) -> Result<(), Self::Error> {
-        unsafe { unreachable_unchecked() }
     }
 }
 
