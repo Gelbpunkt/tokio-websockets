@@ -9,7 +9,7 @@ use std::{future::poll_fn, io, pin::Pin};
 
 use futures_core::Stream;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use tokio_util::codec::{Decoder, Framed};
+use tokio_util::codec::FramedRead;
 
 use crate::{
     proto::{Config, Limits, Role},
@@ -71,14 +71,12 @@ impl Builder {
         &self,
         stream: S,
     ) -> Result<WebSocketStream<S>, Error> {
-        let mut framed = client_request::Codec {}.framed(stream);
+        let mut framed = FramedRead::new(stream, client_request::Codec {});
         let reply = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx)).await;
-        let mut parts = framed.into_parts();
 
         match reply {
             Some(Ok(response)) => {
-                parts.io.write_all(response.as_bytes()).await?;
-                let framed = Framed::from_parts(parts);
+                framed.get_mut().write_all(response.as_bytes()).await?;
                 Ok(WebSocketStream::from_framed(
                     framed,
                     Role::Server,
@@ -87,7 +85,7 @@ impl Builder {
                 ))
             }
             Some(Err(e)) => {
-                parts.io.write_all(BAD_REQUEST).await?;
+                framed.get_mut().write_all(BAD_REQUEST).await?;
 
                 Err(e)
             }
