@@ -172,6 +172,7 @@ jobs:
           cargo hack check \
             --feature-powerset \
             --no-dev-deps \
+            --exclude-features aws-lc-rs \
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol
 

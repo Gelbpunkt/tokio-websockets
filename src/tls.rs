@@ -18,7 +18,12 @@ use rustls_pki_types::ServerName;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 #[cfg(all(
     any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-    feature = "ring"
+    feature = "aws_lc_rs"
+))]
+use tokio_rustls::rustls::crypto::aws_lc_rs;
+#[cfg(all(
+    any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+    all(feature = "ring", not(feature = "aws_lc_rs"))
 ))]
 use tokio_rustls::rustls::crypto::ring;
 #[cfg(any(feature = "rustls-native-roots", feature = "rustls-webpki-roots"))]
@@ -166,11 +171,11 @@ impl Connector {
         )),
         feature = "native-tls",
         all(
-            feature = "ring",
+            any(feature = "aws_lc_rs", feature = "ring"),
             any(feature = "rustls-webpki-roots", feature = "rustls-native-roots")
         )
     ))] // Method is available at any time *except* when a rustls flag is enabled
-        // without ring
+        // without ring or aws_lc_rs
     pub fn new() -> Result<Self, Error> {
         #[cfg(not(any(
             feature = "native-tls",
@@ -184,7 +189,7 @@ impl Connector {
             feature = "native-tls",
             not(all(
                 any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-                feature = "ring"
+                any(feature = "ring", feature = "aws_lc_rs")
             ))
         ))]
         {
@@ -194,7 +199,14 @@ impl Connector {
         }
         #[cfg(all(
             any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-            feature = "ring"
+            feature = "aws_lc_rs"
+        ))]
+        {
+            Self::new_rustls_with_crypto_provider(aws_lc_rs::default_provider().into())
+        }
+        #[cfg(all(
+            any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+            all(feature = "ring", not(feature = "aws_lc_rs"))
         ))]
         {
             Self::new_rustls_with_crypto_provider(ring::default_provider().into())
