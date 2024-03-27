@@ -254,13 +254,13 @@ impl<'a, R: Resolver> Builder<'a, R> {
             } else {
                 #[cfg(all(
                     any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-                    not(feature = "ring")
+                    not(any(feature = "ring", feature = "aws_lc_rs"))
                 ))]
                 return Err(Error::NoTlsConnectorConfigured);
 
                 #[cfg(not(all(
                     any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-                    not(feature = "ring")
+                    not(any(feature = "ring", feature = "aws_lc_rs"))
                 )))]
                 {
                     let connector = Connector::new()?;
