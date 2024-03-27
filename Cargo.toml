@@ -16,7 +16,10 @@ futures-core = "0.3"
 futures-sink = "0.3"
 tokio = "1"
 tokio-util = { version = "0.7.1", features = ["codec", "io"] }
-tracing = { version = "0.1.36", default-features = false } # Transitive dependency through tokio-util, this is for minvers fix
+# tracing-attributes 0.1.27 (required by tracing 0.1.39) is the first version to depend on proc-macro2 > 1.0.60
+# All older proc-macro2 versions use unknown features and break minvers
+# This is a transitive dependency through tokio-util
+tracing = { version = "0.1.39", default-features = false }
 
 # SHA-1 fallback when no TLS is enabled
 sha1_smol = { version = "1.0", optional = true }
@@ -31,7 +34,7 @@ rand = { version = "0.8", default-features = false, features = ["std", "std_rng"
 simdutf8 = { version = "0.1", default-features = false, features = ["std", "aarch64_neon"], optional = true }
 
 # Client
-base64 = { version = "0.21", optional = true }
+base64 = { version = "0.22", optional = true }
 http = { version = "1", default-features = false, features = ["std"], optional = true }
 httparse = { version = "1.6", optional = true }
 
@@ -42,7 +45,7 @@ tokio-native-tls = { version = "0.3", optional = true }
 rustls-pki-types = { version = "1", optional = true }
 ring = { version = "0.17", default-features = false, optional = true }
 rustls-native-certs = { version = "0.7", default-features = false, optional = true }
-tokio-rustls = { version = "0.25", default-features = false, optional = true }
+tokio-rustls = { version = "0.26", default-features = false, optional = true }
 webpki-roots = { version = "0.26", default-features = false, optional = true }
 
 # Users can manually tune into OpenSSL for SHA-1 when native-tls is enabled
@@ -51,12 +54,15 @@ openssl = { version = "0.10", default-features = false, optional = true }
 [features]
 client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util"]
 http-integration = []
+aws_lc_rs = ["tokio-rustls?/aws_lc_rs"] # Underscores for consistency with other rustls crates
+aws-lc-rs = ["aws_lc_rs"] # Alias because Cargo features commonly use `-`
 ring = ["dep:ring", "tokio-rustls?/ring"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
 simd = ["dep:simdutf8"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots"]
 rustls-native-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-native-certs"]
+rustls-tls12 = ["tokio-rustls?/tls12"]
 nightly = ["simdutf8?/aarch64_neon_prefetch"]
 
 [dev-dependencies]
@@ -67,7 +73,7 @@ hyper-util = { version = "0.1", default-features = false, features = ["client-le
 rustls-pemfile = "2"
 rustls-pki-types = "1"
 tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread"] }
-tokio-rustls = "0.25"
+tokio-rustls = "0.26"
 
 [[example]]
 name = "autobahn_client"
