@@ -44,7 +44,7 @@ pub enum Error {
     /// configured prior to connecting.
     #[cfg(all(
         any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-        not(feature = "ring")
+        not(any(feature = "ring", feature = "aws_lc_rs"))
     ))]
     NoTlsConnectorConfigured,
 }
@@ -118,7 +118,7 @@ impl fmt::Display for Error {
             Error::Upgrade(e) => e.fmt(f),
             #[cfg(all(
                 any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-                not(feature = "ring")
+                not(any(feature = "ring", feature = "aws_lc_rs"))
             ))]
             Error::NoTlsConnectorConfigured => {
                 f.write_str("wss uri set but no tls connector was configured")
@@ -135,7 +135,7 @@ impl std::error::Error for Error {
             Error::NoUriConfigured => None,
             #[cfg(all(
                 any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
-                not(feature = "ring")
+                not(any(feature = "ring", feature = "aws_lc_rs"))
             ))]
             Error::NoTlsConnectorConfigured => None,
             #[cfg(feature = "client")]
