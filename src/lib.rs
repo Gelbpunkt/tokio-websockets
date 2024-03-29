@@ -24,8 +24,6 @@ compile_error!("client and server implementation require at least one SHA1 backe
 #[cfg(feature = "client")]
 pub mod client;
 pub mod error;
-#[cfg(all(feature = "http-integration", feature = "client"))]
-pub mod http;
 mod mask;
 pub mod proto;
 #[cfg(feature = "client")]
@@ -48,6 +46,3 @@ pub use proto::{CloseCode, Config, Limits, Message, Payload, WebSocketStream};
 #[cfg(feature = "server")]
 pub use server::Builder as ServerBuilder;
 pub use tls::{Connector, MaybeTlsStream};
-
-#[cfg(all(feature = "http-integration", feature = "client"))]
-pub use self::http::upgrade_request;
