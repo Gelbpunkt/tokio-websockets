@@ -15,7 +15,8 @@ bytes = "1"
 futures-core = "0.3"
 futures-sink = "0.3"
 tokio = "1"
-tokio-util = { version = "0.7.1", features = ["codec", "io"] }
+# tokio-util 0.7.3 is the first to depend on tracing without default features, otherwise minvers break
+tokio-util = { version = "0.7.3", features = ["codec", "io"] }
 
 # SHA-1 fallback when no TLS is enabled
 sha1_smol = { version = "1.0", optional = true }
