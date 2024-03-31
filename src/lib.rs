@@ -6,7 +6,11 @@
     warnings
 )]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-#![cfg_attr(feature = "nightly", feature(stdarch_x86_avx512))] // Required for AVX512 until stable
+// Required for AVX512 until stable
+#![cfg_attr(
+    all(feature = "nightly", target_arch = "x86_64"),
+    feature(stdarch_x86_avx512)
+)]
 #![doc = include_str!("../README.md")]
 
 // If the client or server implementation is enabled, at least one SHA1 backend
