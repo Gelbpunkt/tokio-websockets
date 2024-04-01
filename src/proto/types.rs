@@ -576,18 +576,18 @@ impl Default for Limits {
 /// [`WebSocketStream`]: super::WebSocketStream
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
-    /// Frame size to split outgoing messages into.
+    /// Frame payload size to split outgoing messages into.
     ///
     /// Consider decreasing this if the remote imposes a limit on the frame
-    /// size. The default is 4MiB.
+    /// payload size. The default is 4MiB.
     pub(super) frame_size: usize,
 }
 
 impl Config {
-    /// Set the frame size to split outgoing messages into.
+    /// Set the frame payload size to split outgoing messages into.
     ///
     /// Consider decreasing this if the remote imposes a limit on the frame
-    /// size. The default is 4MiB.
+    /// payload size. The default is 4MiB.
     #[must_use]
     pub fn frame_size(mut self, frame_size: usize) -> Self {
         self.frame_size = frame_size;
