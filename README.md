@@ -10,8 +10,8 @@ High performance, strict, tokio-util based WebSockets implementation.
 
 - Built with tokio-util, intended to be used with tokio from the ground up
 - Minimal dependencies: The base only requires:
-  - tokio, tokio-util, bytes, futures-core, futures-sink
-  - SHA1 backend, e.g. sha1_smol (see [Feature flags](#feature-flags))
+  - `tokio`, `tokio-util`, `bytes`, `futures-core`, `futures-sink`
+  - SHA1 backend, e.g. `sha1_smol` (see [Feature flags](#feature-flags))
 - Big selection of features to tailor dependencies to any project (see [Feature flags](#feature-flags))
 - SIMD support: AVX2, SSE2 or NEON for frame (un)masking and accelerated UTF-8 validation
 - Strict conformance with the WebSocket specification, passes the [Autobahn test suite](https://github.com/crossbario/autobahn-testsuite) without relaxations [by default](https://gelbpunkt.github.io/tokio-websockets/index.html)
