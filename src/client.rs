@@ -253,13 +253,21 @@ impl<'a, R: Resolver> Builder<'a, R> {
                 connector.wrap(host, stream).await?
             } else {
                 #[cfg(all(
-                    any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                    any(
+                        feature = "rustls-webpki-roots",
+                        feature = "rustls-native-roots",
+                        feature = "rustls-platform-verifier"
+                    ),
                     not(any(feature = "ring", feature = "aws_lc_rs"))
                 ))]
                 return Err(Error::NoTlsConnectorConfigured);
 
                 #[cfg(not(all(
-                    any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                    any(
+                        feature = "rustls-webpki-roots",
+                        feature = "rustls-native-roots",
+                        feature = "rustls-platform-verifier"
+                    ),
                     not(any(feature = "ring", feature = "aws_lc_rs"))
                 )))]
                 {

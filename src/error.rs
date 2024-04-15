@@ -1,7 +1,11 @@
 //! General error type used in the crate.
 use std::{fmt, io};
 
-#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+#[cfg(any(
+    feature = "rustls-webpki-roots",
+    feature = "rustls-native-roots",
+    feature = "rustls-platform-verifier"
+))]
 use rustls_pki_types::InvalidDnsNameError;
 #[cfg(feature = "native-tls")]
 use tokio_native_tls::native_tls;
@@ -29,10 +33,18 @@ pub enum Error {
     #[cfg(feature = "native-tls")]
     NativeTls(native_tls::Error),
     /// Attempted to connect to an invalid DNS name.
-    #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+    #[cfg(any(
+        feature = "rustls-webpki-roots",
+        feature = "rustls-native-roots",
+        feature = "rustls-platform-verifier"
+    ))]
     InvalidDNSName(InvalidDnsNameError),
     /// A general rustls error.
-    #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+    #[cfg(any(
+        feature = "rustls-webpki-roots",
+        feature = "rustls-native-roots",
+        feature = "rustls-platform-verifier"
+    ))]
     Rustls(tokio_rustls::rustls::Error),
     /// An unsupported, i.e. not `ws` or `wss`, or no URI scheme was specified.
     #[cfg(feature = "client")]
@@ -43,7 +55,11 @@ pub enum Error {
     /// Rustls was enabled via crate features, but no crypto provider was
     /// configured prior to connecting.
     #[cfg(all(
-        any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+        any(
+            feature = "rustls-webpki-roots",
+            feature = "rustls-native-roots",
+            feature = "rustls-platform-verifier"
+        ),
         not(any(feature = "ring", feature = "aws_lc_rs"))
     ))]
     NoTlsConnectorConfigured,
@@ -68,14 +84,22 @@ impl From<io::Error> for Error {
     }
 }
 
-#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+#[cfg(any(
+    feature = "rustls-webpki-roots",
+    feature = "rustls-native-roots",
+    feature = "rustls-platform-verifier"
+))]
 impl From<InvalidDnsNameError> for Error {
     fn from(err: InvalidDnsNameError) -> Self {
         Self::InvalidDNSName(err)
     }
 }
 
-#[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+#[cfg(any(
+    feature = "rustls-webpki-roots",
+    feature = "rustls-native-roots",
+    feature = "rustls-platform-verifier"
+))]
 impl From<tokio_rustls::rustls::Error> for Error {
     fn from(err: tokio_rustls::rustls::Error) -> Self {
         Self::Rustls(err)
@@ -108,16 +132,28 @@ impl fmt::Display for Error {
             Error::Io(e) => e.fmt(f),
             #[cfg(feature = "native-tls")]
             Error::NativeTls(e) => e.fmt(f),
-            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            #[cfg(any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
+            ))]
             Error::InvalidDNSName(_) => f.write_str("invalid DNS name"),
-            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            #[cfg(any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
+            ))]
             Error::Rustls(e) => e.fmt(f),
             #[cfg(feature = "client")]
             Error::UnsupportedScheme => f.write_str("unsupported or no URI scheme used"),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => e.fmt(f),
             #[cfg(all(
-                any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                any(
+                    feature = "rustls-webpki-roots",
+                    feature = "rustls-native-roots",
+                    feature = "rustls-platform-verifier"
+                ),
                 not(any(feature = "ring", feature = "aws_lc_rs"))
             ))]
             Error::NoTlsConnectorConfigured => {
@@ -134,7 +170,11 @@ impl std::error::Error for Error {
             #[cfg(feature = "client")]
             Error::NoUriConfigured => None,
             #[cfg(all(
-                any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"),
+                any(
+                    feature = "rustls-webpki-roots",
+                    feature = "rustls-native-roots",
+                    feature = "rustls-platform-verifier"
+                ),
                 not(any(feature = "ring", feature = "aws_lc_rs"))
             ))]
             Error::NoTlsConnectorConfigured => None,
@@ -144,9 +184,17 @@ impl std::error::Error for Error {
             Error::Io(e) => Some(e),
             #[cfg(feature = "native-tls")]
             Error::NativeTls(e) => Some(e),
-            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            #[cfg(any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
+            ))]
             Error::InvalidDNSName(e) => Some(e),
-            #[cfg(any(feature = "rustls-webpki-roots", feature = "rustls-native-roots"))]
+            #[cfg(any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
+            ))]
             Error::Rustls(e) => Some(e),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => Some(e),

@@ -34,6 +34,7 @@ TLS is supported via any of the following feature flags:
 - `native-tls` for a [`tokio-native-tls`](https://docs.rs/tokio-native-tls/latest/tokio_native_tls/) backed implementation
 - `rustls-webpki-roots` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`webpki-roots`](https://docs.rs/webpki-roots/latest/webpki_roots/)
 - `rustls-native-roots` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`rustls-native-certs`](https://docs.rs/rustls-native-certs/latest/rustls_native_certs/)
+- `rustls-platform-verifier` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`rustls-platform-verifier`](https://docs.rs/rustls-native-certs/latest/rustls_platform_verifier/)
 
 The `rustls-*-roots` features require a crypto provider for `rustls`. You can either enable the `aws_lc_rs` (optionally also FIPS-compliant via the `fips` feature) or `ring` features to use these crates as the providers and then use `TlsConnector::new()`, or bring your own with `TlsConnector::new_rustls_with_crypto_provider()`.
 
