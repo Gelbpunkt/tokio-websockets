@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2024-04-15
+
+### Added
+
+- Support for `aws_lc_rs` as a SHA1 and crypto provider was added via the `aws_lc_rs` feature, optionally also FIPS-compliant via the `fips` feature
+- The new `rustls-tls12` feature will enable TLS1.2 support in rustls
+
+### Changed
+
+- **[breaking]** The rustls dependency was updated to 0.23 and tokio-rustls to 0.26
+- **[breaking]** The minimum required version of tokio-util is now 0.7.3
+- A bunch of leftover unused `Encoder` implementations and the associated write buffers were removed
+- The `client` feature no longer depends on `tokio/rt`
+
+### Fixed
+
+- The `nightly` feature now enables the `stdarch_x86_avx512` nightly feature only on x86_64 instead of all architectures
+- The documentation for `Config::frame_size` was ambiguous about whether it affected the payload size or the entire frame size, this has been clarified to be the payload size
+
+### Removed
+
+- The `http-integration` feature and associated `upgrade_request` method were removed, it offered little to no value over manually crafting a request and bloated the dev-dependency stack unnecessarily
+
 ## [0.7.0] - 2024-02-27
 
 ### Changed
