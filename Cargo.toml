@@ -109,7 +109,8 @@ name = "utf8_benchmark_server"
 required-features = ["server"]
 
 [package.metadata.docs.rs]
-all-features = true
+# aws_lc_rs' fips mode can't be built in docs.rs
+features = ["client", "aws_lc_rs", "ring", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.release]
