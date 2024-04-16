@@ -43,6 +43,7 @@ aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"]
 ring = { version = "0.17", default-features = false, optional = true }
 rustls-native-certs = { version = "0.7", default-features = false, optional = true }
 rustls-pki-types = { version = "1", optional = true }
+rustls-platform-verifier = { version = "0.3", optional = true }
 tokio-rustls = { version = "0.26", default-features = false, optional = true }
 webpki-roots = { version = "0.26", default-features = false, optional = true }
 
@@ -60,6 +61,7 @@ simd = ["dep:simdutf8"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots"]
 rustls-native-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-native-certs"]
+rustls-platform-verifier = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-platform-verifier"]
 rustls-tls12 = ["tokio-rustls?/tls12"]
 nightly = ["simdutf8?/aarch64_neon_prefetch"]
 
