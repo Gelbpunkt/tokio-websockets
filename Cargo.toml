@@ -1,6 +1,6 @@
 [package]
 name = "tokio-websockets"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 description = "High performance, strict, tokio-util based WebSockets implementation"
 categories = ["web-programming::websocket", "network-programming", "asynchronous", "concurrency"]
@@ -110,7 +110,7 @@ required-features = ["server"]
 
 [package.metadata.docs.rs]
 # aws_lc_rs' fips mode can't be built in docs.rs
-features = ["client", "aws_lc_rs", "ring", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
+features = ["client", "aws_lc_rs", "ring", "fastrand", "getrandom", "rand", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.release]
