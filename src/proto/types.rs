@@ -485,7 +485,8 @@ impl Message {
             };
 
             // SAFETY: Opcode is Close so the rest of the payload is valid UTF-8
-            let reason = unsafe { std::str::from_utf8_unchecked(self.payload.get_unchecked(2..)) };
+            let reason =
+                unsafe { std::str::from_utf8_unchecked(self.payload.get(2..).unwrap_or_default()) };
 
             (code, reason)
         })
