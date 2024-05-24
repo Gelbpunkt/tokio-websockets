@@ -1,6 +1,6 @@
 [package]
 name = "tokio-websockets"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2021"
 description = "High performance, strict, tokio-util based WebSockets implementation"
 categories = ["web-programming::websocket", "network-programming", "asynchronous", "concurrency"]
