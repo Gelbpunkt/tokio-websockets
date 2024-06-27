@@ -176,19 +176,15 @@ impl Decoder for WebSocketProtocol {
                 // Validate partial frame payload data
                 if is_text {
                     if mask {
-                        // SAFETY: The masking key and the payload do not overlap in src
-                        // TODO: Replace with split_at_mut_unchecked when stable
-                        let (masking_key, payload_masked) = unsafe {
-                            let masking_key_ptr =
-                                src.get_unchecked(offset - 4..offset) as *const [u8];
-                            let payload_masked_ptr = src.get_unchecked_mut(
-                                offset + self.payload_processed..offset + payload_available,
-                            ) as *mut [u8];
+                        unsafe {
+                            let (masking_key, rest_of_payload) = src
+                                .get_unchecked_mut(offset - 4..)
+                                .split_at_mut_unchecked(4);
+                            let payload_masked = rest_of_payload
+                                .get_unchecked_mut(self.payload_processed..payload_available);
 
-                            (&*masking_key_ptr, &mut *payload_masked_ptr)
+                            mask::frame(masking_key, payload_masked, self.payload_processed & 3);
                         };
-
-                        mask::frame(masking_key, payload_masked, self.payload_processed & 3);
                     }
 
                     // SAFETY: self.payload_data_validated <= payload_available
@@ -210,18 +206,15 @@ impl Decoder for WebSocketProtocol {
             }
 
             if mask {
-                // SAFETY: The masking key and the payload do not overlap in src
-                // TODO: Replace with split_at_mut_unchecked when stable
-                let (masking_key, payload_masked) = unsafe {
-                    let masking_key_ptr = src.get_unchecked(offset - 4..offset) as *const [u8];
-                    let payload_masked_ptr = src
-                        .get_unchecked_mut(offset + self.payload_processed..offset + payload_length)
-                        as *mut [u8];
+                unsafe {
+                    let (masking_key, rest_of_payload) = src
+                        .get_unchecked_mut(offset - 4..)
+                        .split_at_mut_unchecked(4);
+                    let payload_masked = rest_of_payload
+                        .get_unchecked_mut(self.payload_processed..payload_available);
 
-                    (&*masking_key_ptr, &mut *payload_masked_ptr)
+                    mask::frame(masking_key, payload_masked, self.payload_processed & 3);
                 };
-
-                mask::frame(masking_key, payload_masked, self.payload_processed & 3);
             }
 
             if is_text {

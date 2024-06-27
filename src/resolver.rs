@@ -1,6 +1,6 @@
 //! Abstractions over DNS resolvers.
 
-use std::{future::Future, net::SocketAddr, pin::Pin};
+use std::{future::Future, net::SocketAddr};
 
 use crate::Error;
 
@@ -11,7 +11,7 @@ pub trait Resolver: Send {
         &self,
         host: &str,
         port: u16,
-    ) -> Pin<Box<dyn Future<Output = Result<SocketAddr, Error>> + Send>>;
+    ) -> impl Future<Output = Result<SocketAddr, Error>> + Send;
 }
 
 /// A [`Resolver`] that uses the blocking `getaddrinfo` syscall in the tokio
@@ -19,19 +19,13 @@ pub trait Resolver: Send {
 pub struct Gai;
 
 impl Resolver for Gai {
-    fn resolve(
-        &self,
-        host: &str,
-        port: u16,
-    ) -> Pin<Box<dyn Future<Output = Result<SocketAddr, Error>> + Send>> {
+    async fn resolve(&self, host: &str, port: u16) -> Result<SocketAddr, Error> {
         let host = host.to_owned();
 
-        Box::pin(async move {
-            tokio::net::lookup_host((host, port))
-                .await
-                .map_err(|_| Error::CannotResolveHost)?
-                .next()
-                .ok_or(Error::CannotResolveHost)
-        })
+        tokio::net::lookup_host((host, port))
+            .await
+            .map_err(|_| Error::CannotResolveHost)?
+            .next()
+            .ok_or(Error::CannotResolveHost)
     }
 }
