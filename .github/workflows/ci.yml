@@ -204,10 +204,10 @@ jobs:
           crate: cargo-hack
           locked: false
 
-      - name: Install 1.64.0 toolchain
+      - name: Install 1.79.0 toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.64.0
+          toolchain: 1.79.0
           targets: aarch64-unknown-linux-gnu
 
       - name: Cache dependencies
