@@ -294,15 +294,25 @@ impl From<Payload> for Bytes {
     }
 }
 
+impl From<Vec<u8>> for Payload {
+    fn from(value: Vec<u8>) -> Self {
+        // BytesMut::from_iter goes through a specialization in std if the iterator is a
+        // Vec, effectively allowing us to use BytesMut::from_vec which isn't
+        // exposed in bytes. See https://github.com/tokio-rs/bytes/issues/723 for details.
+        Self {
+            data: UnsafeCell::new(PayloadStorage::Unique(BytesMut::from_iter(value))),
+            utf8_validated: false,
+        }
+    }
+}
+
 impl From<String> for Payload {
     fn from(value: String) -> Self {
-        // Possible options:
-        // * BytesMut::from(&[u8]) will copy the slice - generally bad. BytesMut does
-        //   not expose from_vec.
-        // * Bytes::from(Vec<u8>) - will not allocate. Worst case we allocate due to
-        //   copying when sending, but at least this is only conditionally
+        // See From<Vec<u8>> impl for reasoning behind this.
         Self {
-            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from(value.into_bytes()))),
+            data: UnsafeCell::new(PayloadStorage::Unique(BytesMut::from_iter(
+                value.into_bytes(),
+            ))),
             utf8_validated: true,
         }
     }
