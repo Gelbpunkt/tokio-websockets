@@ -217,10 +217,7 @@ where
             #[cfg(feature = "client")]
             {
                 let mut frame = frame;
-                let mut payload = match frame.payload.try_into_bytesmut() {
-                    Ok(b) => b,
-                    Err(b) => BytesMut::from(&*b),
-                };
+                let mut payload = BytesMut::from(frame.payload);
                 let mask = crate::rand::get_mask();
                 crate::mask::frame(&mask, &mut payload, 0);
                 frame.payload = Payload::from(payload);
@@ -285,8 +282,7 @@ where
             // That is indicated by partial_payload being empty
             if self.partial_payload.is_empty() {
                 // First frame of a multi-frame message
-                // SAFETY: Received payloads are always internally represented as BytesMut
-                self.partial_payload = unsafe { payload.try_into_bytesmut().unwrap_unchecked() };
+                self.partial_payload = BytesMut::from(payload);
             } else {
                 self.partial_payload.extend_from_slice(&payload);
             }

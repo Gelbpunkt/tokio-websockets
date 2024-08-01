@@ -222,15 +222,6 @@ impl Payload {
             }
         }
     }
-
-    /// Convert the payload to [`BytesMut`] if it is currently represented as
-    /// such, otherwise returns it as [`Bytes`].
-    pub(super) fn try_into_bytesmut(self) -> Result<BytesMut, Bytes> {
-        match self.data.into_inner() {
-            PayloadStorage::Unique(s) => Ok(s),
-            PayloadStorage::Shared(e) => Err(e),
-        }
-    }
 }
 
 impl AsRef<PayloadStorage> for Payload {
@@ -269,9 +260,15 @@ impl fmt::Debug for Payload {
 
 impl From<Bytes> for Payload {
     fn from(value: Bytes) -> Self {
-        Self {
-            data: UnsafeCell::new(PayloadStorage::Shared(value)),
-            utf8_validated: false,
+        match value.try_into_mut() {
+            Ok(value) => Self {
+                data: UnsafeCell::new(PayloadStorage::Unique(value)),
+                utf8_validated: false,
+            },
+            Err(value) => Self {
+                data: UnsafeCell::new(PayloadStorage::Shared(value)),
+                utf8_validated: false,
+            },
         }
     }
 }
@@ -290,6 +287,15 @@ impl From<Payload> for Bytes {
         match value.data.into_inner() {
             PayloadStorage::Unique(p) => p.freeze(),
             PayloadStorage::Shared(p) => p,
+        }
+    }
+}
+
+impl From<Payload> for BytesMut {
+    fn from(value: Payload) -> Self {
+        match value.data.into_inner() {
+            PayloadStorage::Unique(p) => p,
+            PayloadStorage::Shared(p) => p.into(),
         }
     }
 }
