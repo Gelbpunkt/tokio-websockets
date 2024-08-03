@@ -148,13 +148,18 @@ impl TryFrom<u16> for CloseCode {
 /// wrapper around [`Bytes`] and [`BytesMut`].
 ///
 /// Payloads can be created by using the `From<T>` implementations. All of them
-/// except the [`From<BytesMut>`] implementation use [`Bytes`] under the hood.
+/// use [`BytesMut`] under the hood, except when created using [`From<Bytes>`]
+/// with a reference counter greater than one.
 ///
 /// Sending the payloads is zero-copy, except when sending a payload backed by
 /// [`Bytes`] as a client to a server. The use of [`BytesMut`] as the backing
 /// storage where cheaply possible is recommended to ensure zero-copy sending.
 ///
-/// [`From<BytesMut>`]: #impl-From<BytesMut>-for-Payload
+/// All conversions to other types are zero-cost, except [`Into<BytesMut>`] if
+/// the backing type is [`Bytes`] with a reference counter greater than one.
+///
+/// [`From<Bytes>`]: #impl-From<Bytes>-for-Payload
+/// [`Into<BytesMut>`]: #impl-From<Payload>-for-BytesMut    
 pub struct Payload {
     /// The raw payload data.
     data: UnsafeCell<PayloadStorage>,

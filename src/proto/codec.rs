@@ -210,8 +210,8 @@ impl Decoder for WebSocketProtocol {
                     let (masking_key, rest_of_payload) = src
                         .get_unchecked_mut(offset - 4..)
                         .split_at_mut_unchecked(4);
-                    let payload_masked = rest_of_payload
-                        .get_unchecked_mut(self.payload_processed..payload_available);
+                    let payload_masked =
+                        rest_of_payload.get_unchecked_mut(self.payload_processed..payload_length);
 
                     mask::frame(masking_key, payload_masked, self.payload_processed & 3);
                 };
