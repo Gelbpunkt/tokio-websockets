@@ -149,7 +149,7 @@ impl TryFrom<u16> for CloseCode {
 ///
 /// Payloads can be created by using the `From<T>` implementations. All of them
 /// use [`BytesMut`] under the hood, except when created using [`From<Bytes>`]
-/// with a reference counter greater than one.
+/// with a reference counter greater than one or when using a static reference.
 ///
 /// Sending the payloads is zero-copy, except when sending a payload backed by
 /// [`Bytes`] as a client to a server. The use of [`BytesMut`] as the backing
