@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2024-08-05
+
+### Added
+
+- `Payload` now implements `From<Vec<u8>>`
+- `Payload` now also implements `Into<BytesMut>`, which is a cheap conversion unless multiple references to the backing buffer exist
+
+### Changed
+
+- **[breaking]** The MSRV is now 1.79, allowing use of `split_at_mut_unchecked` to make some unsafe code less error prone
+- **[breaking]** The minimum required version of bytes is now 1.7
+- **[breaking]** The `Resolver` trait now uses async fn syntax
+- The `From<String>` implementation on `Payload` now uses `BytesMut` internally, improving performance in some cases
+- The `From<Bytes>` implementation on `Payload` now uses `BytesMut` internally if cheaply possible, improving performance in some cases
+
 ## [0.8.3] - 2024-05-24
 
 ### Fixed
