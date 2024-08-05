@@ -1,0 +1,120 @@
+{
+   "agent": "Tungstenite",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 236,
+   "closedByMe": true,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send close with invalid close code 0",
+   "droppedByMe": true,
+   "duration": 1,
+   "expectation": "Clean close with protocol error code or drop TCP",
+   "expected": {
+      "OK": []
+   },
+   "expectedClose": {
+      "closeCode": [
+         1002
+      ],
+      "closedByMe": true,
+      "requireClean": false
+   },
+   "failedByMe": false,
+   "httpRequest": "GET /runCase?case=236&agent=Tungstenite HTTP/1.1\r\nHost: localhost:9001\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: WXlMO+w/CLJQk2KbKlImiQ==\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nServer: AutobahnTestSuite/0.8.2-0.10.9\r\nX-Powered-By: AutobahnPython/0.10.9\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: 1066uBGh627BHEjBhuiAcUJ0Ce8=\r\n\r\n",
+   "id": "7.9.1",
+   "isServer": true,
+   "localCloseCode": 0,
+   "localCloseReason": null,
+   "received": [],
+   "remoteCloseCode": 1002,
+   "remoteCloseReason": "Protocol violation",
+   "reportCompressionRatio": false,
+   "reportTime": false,
+   "result": "Actual events match at least one expected.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {
+      "8": 1
+   },
+   "rxOctetStats": {
+      "26": 1,
+      "187": 1
+   },
+   "started": "2024-08-04T23:59:51.608Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "8": 1
+   },
+   "txOctetStats": {
+      "4": 1,
+      "206": 1
+   },
+   "wasClean": true,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": null,
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "RO",
+         [
+            187,
+            "474554202f72756e436173653f636173653d323336266167656e743d54756e677374656e69746520485454502f312e310d0a486f73743a206c6f63616c686f73 ..."
+         ]
+      ],
+      [
+         "TO",
+         [
+            206,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a5365727665723a204175746f6261686e5465737453756974652f302e382e ..."
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            2,
+            "\u0000\u0000"
+         ],
+         8,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            4,
+            "88020000"
+         ],
+         false
+      ],
+      [
+         "KL",
+         1
+      ],
+      [
+         "RO",
+         [
+            26,
+            "88940feb3c250c016c57609f534660871c53668450447b82534b"
+         ]
+      ],
+      [
+         "RF",
+         [
+            20,
+            "0x03ea50726f746f636f6c2076696f6c6174696f6e"
+         ],
+         8,
+         true,
+         0,
+         true,
+         "0feb3c25"
+      ]
+   ]
+}
