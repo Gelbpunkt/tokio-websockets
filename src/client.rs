@@ -242,7 +242,14 @@ impl<'a, R: Resolver> Builder<'a, R> {
         Error,
     > {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
-        let host = uri.host().ok_or(Error::CannotResolveHost)?;
+        // Uri::host contains square brackets around IPv6 addresses, which is required
+        // by the RFC: https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2
+        // These, however, do not resolve.
+        let host = uri
+            .host()
+            .ok_or(Error::CannotResolveHost)?
+            .trim_start_matches('[')
+            .trim_end_matches(']');
         let port = default_port(uri).unwrap_or(80);
         let addr = self.resolver.resolve(host, port).await?;
 
