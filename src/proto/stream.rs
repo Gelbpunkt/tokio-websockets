@@ -260,9 +260,8 @@ where
         let max_len = self.inner.decoder().limits.max_payload_len;
 
         loop {
-            let (opcode, payload, fin) = match ready!(self.as_mut().poll_next_frame(cx)) {
-                Some(Ok(frame)) => (frame.opcode, frame.payload, frame.is_final),
-                Some(Err(e)) => return Poll::Ready(Some(Err(e))),
+            let (opcode, payload, fin) = match ready!(self.as_mut().poll_next_frame(cx)?) {
+                Some(frame) => (frame.opcode, frame.payload, frame.is_final),
                 None => return Poll::Ready(None),
             };
 
@@ -356,7 +355,7 @@ where
         let bytes_written = &mut this.bytes_written;
 
         while !frame_queue.is_empty() {
-            let frame = { unsafe { frame_queue.front().unwrap_unchecked() } };
+            let frame = unsafe { frame_queue.front().unwrap_unchecked() };
             let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len as usize) };
             let mut buf = frame_header
                 .chain(
