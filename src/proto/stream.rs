@@ -264,24 +264,16 @@ where
                 Some(frame) => (frame.opcode, frame.payload, frame.is_final),
                 None => return Poll::Ready(None),
             };
+            let len = self.partial_payload.len() + payload.len();
 
             if opcode != OpCode::Continuation {
                 if fin {
                     return Poll::Ready(Some(Ok(Message { opcode, payload })));
                 }
                 self.partial_opcode = opcode;
-            } else if self.partial_payload.len() + payload.len() > max_len {
-                return Poll::Ready(Some(Err(Error::PayloadTooLong {
-                    len: self.partial_payload.len() + payload.len(),
-                    max_len,
-                })));
-            }
-
-            // Here we can avoid an allocation for the first frame of a multi-frame message.
-            // That is indicated by partial_payload being empty
-            if self.partial_payload.is_empty() {
-                // First frame of a multi-frame message
                 self.partial_payload = BytesMut::from(payload);
+            } else if len > max_len {
+                return Poll::Ready(Some(Err(Error::PayloadTooLong { len, max_len })));
             } else {
                 self.partial_payload.extend_from_slice(&payload);
             }
