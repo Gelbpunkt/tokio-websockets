@@ -222,24 +222,6 @@ impl Connector {
     ///
     /// This method returns an [`Error`] when creating the underlying TLS
     /// connector fails.
-    #[cfg(any(
-        not(any(
-            feature = "native-tls",
-            feature = "rustls-webpki-roots",
-            feature = "rustls-native-roots",
-            feature = "rustls-platform-verifier"
-        )),
-        feature = "native-tls",
-        all(
-            any(feature = "aws_lc_rs", feature = "ring"),
-            any(
-                feature = "rustls-webpki-roots",
-                feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
-            )
-        )
-    ))] // Method is available at any time *except* when a rustls flag is enabled
-        // without ring or aws_lc_rs
     pub fn new() -> Result<Self, Error> {
         #[cfg(not(any(
             feature = "native-tls",
@@ -252,19 +234,31 @@ impl Connector {
         }
         #[cfg(all(
             feature = "native-tls",
-            not(all(
-                any(
-                    feature = "rustls-webpki-roots",
-                    feature = "rustls-native-roots",
-                    feature = "rustls-platform-verifier"
-                ),
-                any(feature = "ring", feature = "aws_lc_rs")
+            not(any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
             ))
         ))]
         {
             Ok(Self::NativeTls(
                 tokio_native_tls::native_tls::TlsConnector::new()?.into(),
             ))
+        }
+        #[cfg(all(
+            any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
+            ),
+            not(any(feature = "ring", feature = "aws_lc_rs"))
+        ))]
+        {
+            Self::new_rustls_with_crypto_provider(
+                CryptoProvider::get_default()
+                    .ok_or(Error::NoCryptoProviderConfigured)?
+                    .clone(),
+            )
         }
         #[cfg(all(
             any(

@@ -259,29 +259,9 @@ impl<'a, R: Resolver> Builder<'a, R> {
             if let Some(connector) = self.connector {
                 connector.wrap(host, stream).await?
             } else {
-                #[cfg(all(
-                    any(
-                        feature = "rustls-webpki-roots",
-                        feature = "rustls-native-roots",
-                        feature = "rustls-platform-verifier"
-                    ),
-                    not(any(feature = "ring", feature = "aws_lc_rs"))
-                ))]
-                return Err(Error::NoTlsConnectorConfigured);
+                let connector = Connector::new()?;
 
-                #[cfg(not(all(
-                    any(
-                        feature = "rustls-webpki-roots",
-                        feature = "rustls-native-roots",
-                        feature = "rustls-platform-verifier"
-                    ),
-                    not(any(feature = "ring", feature = "aws_lc_rs"))
-                )))]
-                {
-                    let connector = Connector::new()?;
-
-                    connector.wrap(host, stream).await?
-                }
+                connector.wrap(host, stream).await?
             }
         } else if uri.scheme_str() == Some("ws") {
             Connector::Plain.wrap(host, stream).await?
