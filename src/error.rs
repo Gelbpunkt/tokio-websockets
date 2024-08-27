@@ -53,7 +53,8 @@ pub enum Error {
     #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(crate::upgrade::Error),
     /// Rustls was enabled via crate features, but no crypto provider was
-    /// configured prior to connecting.
+    /// configured via [`rustls::crypto::CryptoProvider::install_default`]
+    /// prior to connecting.
     #[cfg(all(
         any(
             feature = "rustls-webpki-roots",
@@ -62,7 +63,7 @@ pub enum Error {
         ),
         not(any(feature = "ring", feature = "aws_lc_rs"))
     ))]
-    NoTlsConnectorConfigured,
+    NoCryptoProviderConfigured,
 }
 
 #[cfg(feature = "native-tls")]
@@ -156,7 +157,7 @@ impl fmt::Display for Error {
                 ),
                 not(any(feature = "ring", feature = "aws_lc_rs"))
             ))]
-            Error::NoTlsConnectorConfigured => {
+            Error::NoCryptoProviderConfigured => {
                 f.write_str("wss uri set but no tls connector was configured")
             }
         }
@@ -177,7 +178,7 @@ impl std::error::Error for Error {
                 ),
                 not(any(feature = "ring", feature = "aws_lc_rs"))
             ))]
-            Error::NoTlsConnectorConfigured => None,
+            Error::NoCryptoProviderConfigured => None,
             #[cfg(feature = "client")]
             Error::UnsupportedScheme => None,
             Error::Protocol(e) => Some(e),
