@@ -64,6 +64,14 @@ pub enum Error {
         not(any(feature = "ring", feature = "aws_lc_rs"))
     ))]
     NoCryptoProviderConfigured,
+    /// No native root certificates were found and no other root certificate
+    /// source was enabled.
+    #[cfg(all(
+        not(feature = "rustls-webpki-roots"),
+        feature = "rustls-native-roots",
+        not(feature = "rustls-platform-verifier")
+    ))]
+    NoNativeRootCertificatesFound(Vec<rustls_native_certs::Error>),
 }
 
 #[cfg(feature = "native-tls")]
@@ -160,6 +168,15 @@ impl fmt::Display for Error {
             Error::NoCryptoProviderConfigured => {
                 f.write_str("wss uri set but no tls connector was configured")
             }
+            #[cfg(all(
+                not(feature = "rustls-webpki-roots"),
+                feature = "rustls-native-roots",
+                not(feature = "rustls-platform-verifier")
+            ))]
+            Error::NoNativeRootCertificatesFound(e) => {
+                f.write_str("no native root certificates were found, errors encountered: ")?;
+                std::fmt::Debug::fmt(e, f)
+            }
         }
     }
 }
@@ -179,6 +196,12 @@ impl std::error::Error for Error {
                 not(any(feature = "ring", feature = "aws_lc_rs"))
             ))]
             Error::NoCryptoProviderConfigured => None,
+            #[cfg(all(
+                not(feature = "rustls-webpki-roots"),
+                feature = "rustls-native-roots",
+                not(feature = "rustls-platform-verifier")
+            ))]
+            Error::NoNativeRootCertificatesFound(e) => Some(e.first()?),
             #[cfg(feature = "client")]
             Error::UnsupportedScheme => None,
             Error::Protocol(e) => Some(e),
