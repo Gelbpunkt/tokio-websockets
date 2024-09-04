@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2024-09-04
+
+### Added
+
+- `Error::NoNativeRootCertificatesFound` was added and is returned in `TlsConnector::new` if no native root certificates were found and the rustls-webpki-roots feature is not enabled
+
+### Changed
+
+- If no crypto provider is specified via crate features, tokio-websockets will now try to use the installed default provider in rustls
+- `TlsConnector::new` is now always available
+- **[breaking]** `Error::NoTlsConnectorConfigured` was removed and replaced by `Error::NoCryptoProviderConfigured`
+- `rustls-native-certs` was updated to 0.8
+
+### Fixed
+
+- Fixed an issue where connecting to an IPv6 address would fail
+- Specify the actual minimum version required of rustls-platform-verifier
+
 ## [0.9.0] - 2024-08-05
 
 ### Added
