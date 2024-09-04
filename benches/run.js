@@ -66,10 +66,10 @@ const cases = [
 
 for (const { conn, bytes } of cases) {
   let results = {};
-  for (const { port, name, server, arg } of targets) {
-    let logs = [];
+  for (const { port, name, server } of targets) {
+    const logs = [];
     try {
-      const proc = $`${server} ${arg || ""}`.spawn();
+      const proc = $`${server}`.spawn();
       console.log(`Waiting for ${name} to start...`);
       await wait(1000);
 
@@ -86,8 +86,8 @@ for (const { conn, bytes } of cases) {
           break;
         }
       }
-      client.abort();
-      proc.abort();
+      client.kill();
+      proc.kill();
       await proc;
       await client;
     } catch (e) {
