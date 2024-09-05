@@ -57,7 +57,7 @@ impl WebSocketProtocol {
 macro_rules! ensure_buffer_has_space {
     ($buf:expr, $space:expr) => {
         if $buf.len() < $space {
-            $buf.reserve(($space as usize).saturating_sub($buf.capacity()));
+            $buf.reserve($space as usize);
 
             return Ok(None);
         }
@@ -200,7 +200,7 @@ impl Decoder for WebSocketProtocol {
                     self.payload_processed = payload_available;
                 }
 
-                src.reserve((payload_length - payload_available).saturating_sub(src.capacity()));
+                src.reserve(payload_length - payload_available);
 
                 return Ok(None);
             }
