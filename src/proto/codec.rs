@@ -254,11 +254,9 @@ impl Decoder for WebSocketProtocol {
         // It is possible to receive intermediate control frames between a large other
         // frame. We therefore can't simply reset the fragmented opcode after we receive
         // a "final" frame.
-        if fin && !opcode.is_control() {
-            // Full, (possibly) chunked message received
-            self.fragmented_message_opcode = OpCode::Continuation;
-        } else if opcode != OpCode::Continuation && !opcode.is_control() {
-            // First frame of a multi-frame message
+        if (fin && opcode == OpCode::Continuation) || (!fin && opcode != OpCode::Continuation) {
+            // Full chunked message received (and opcode is Continuation)
+            // or first frame of a multi-frame message received
             self.fragmented_message_opcode = opcode;
         }
         // In all other cases, we have either a continuation or control frame, neither
