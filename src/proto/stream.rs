@@ -76,6 +76,8 @@ pub struct WebSocketStream<T> {
     frame_queue: VecDeque<EncodedFrame>,
     /// Amount of partial bytes written of the first frame in the queue.
     bytes_written: usize,
+    /// Total amount of bytes remaining to be sent in the frame queue.
+    pending_bytes: usize,
 }
 
 // SAFETY: The only !Sync field in `WebSocketStream` is `frame_queue`.
@@ -100,6 +102,7 @@ where
             header_buf: [0; 10],
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
+            pending_bytes: 0,
         }
     }
 
@@ -121,6 +124,7 @@ where
             header_buf: [0; 10],
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
+            pending_bytes: 0,
         }
     }
 
@@ -241,6 +245,8 @@ where
         if mask.is_some() {
             self.header_buf[1] |= 1 << 7;
         }
+        self.pending_bytes +=
+            header_len as usize + (u8::from(mask.is_some()) * 4) as usize + frame.payload.len();
         self.frame_queue.push_back(EncodedFrame {
             header: self.header_buf,
             header_len,
@@ -305,15 +311,7 @@ where
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // tokio-util calls poll_flush when more than 8096 bytes are pending, otherwise
         // it returns Ready. We will just replicate that behavior
-        let pending_bytes = self
-            .frame_queue
-            .iter()
-            .map(|f| {
-                f.header_len as usize + (u8::from(f.mask.is_some()) * 4) as usize + f.payload.len()
-            })
-            .sum::<usize>();
-
-        if pending_bytes >= 8096 {
+        if self.pending_bytes >= 8096 {
             self.as_mut().poll_flush(cx)
         } else {
             Poll::Ready(Ok(()))
@@ -345,6 +343,7 @@ where
         let frame_queue = &mut this.frame_queue;
         let io = this.inner.get_mut();
         let bytes_written = &mut this.bytes_written;
+        let pending_bytes = &mut this.pending_bytes;
 
         while !frame_queue.is_empty() {
             let frame = unsafe { frame_queue.front().unwrap_unchecked() };
@@ -368,6 +367,7 @@ where
                 }
 
                 *bytes_written += n;
+                *pending_bytes -= n;
             }
 
             frame_queue.pop_front();
