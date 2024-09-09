@@ -89,16 +89,16 @@
 </g>
 <g stroke="none" fill="#666" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-2)" >
 <text style="font:normal 12px &apos;Helvetica Neue&apos;, &apos;Helvetica&apos;, &apos;Arial&apos;, sans-serif;" text-anchor="middle" dominant-baseline="middle" transform="matrix(1 0 0 1 127.2 366.6)" 
-><tspan x="0" y="7.199999999999999">fastwebsockets</tspan></text></g>
-<g stroke="none" fill="#666" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-2)" >
-<text style="font:normal 12px &apos;Helvetica Neue&apos;, &apos;Helvetica&apos;, &apos;Arial&apos;, sans-serif;" text-anchor="middle" dominant-baseline="middle" transform="matrix(1 0 0 1 269.6 366.6)" 
 ><tspan x="0" y="7.199999999999999">uWebSockets</tspan></text></g>
 <g stroke="none" fill="#666" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-2)" >
+<text style="font:normal 12px &apos;Helvetica Neue&apos;, &apos;Helvetica&apos;, &apos;Arial&apos;, sans-serif;" text-anchor="middle" dominant-baseline="middle" transform="matrix(1 0 0 1 269.6 366.6)" 
+><tspan x="0" y="7.199999999999999">fastwebsockets</tspan></text></g>
+<g stroke="none" fill="#666" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-2)" >
 <text style="font:normal 12px &apos;Helvetica Neue&apos;, &apos;Helvetica&apos;, &apos;Arial&apos;, sans-serif;" text-anchor="middle" dominant-baseline="middle" transform="matrix(1 0 0 1 412 366.6)" 
-><tspan x="0" y="7.199999999999999">tokio-tungstenite</tspan></text></g>
+><tspan x="0" y="7.199999999999999">tokio-websockets</tspan></text></g>
 <g stroke="none" fill="#666" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-2)" >
 <text style="font:normal 12px &apos;Helvetica Neue&apos;, &apos;Helvetica&apos;, &apos;Arial&apos;, sans-serif;" text-anchor="middle" dominant-baseline="middle" transform="matrix(1 0 0 1 554.4 366.6)" 
-><tspan x="0" y="7.199999999999999">tokio-websockets</tspan></text></g>
+><tspan x="0" y="7.199999999999999">tokio-tungstenite</tspan></text></g>
 <g stroke="none" fill="#666" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-2)" >
 <text style="font:normal 12px &apos;Helvetica Neue&apos;, &apos;Helvetica&apos;, &apos;Arial&apos;, sans-serif;" text-anchor="middle" dominant-baseline="middle" transform="matrix(1 0 0 1 696.8000000000001 366.6)" 
 ><tspan x="0" y="7.199999999999999">rust-websocket</tspan></text></g>
@@ -124,18 +124,18 @@
 <text style="font:normal 12px &apos;Helvetica Neue&apos;, &apos;Helvetica&apos;, &apos;Arial&apos;, sans-serif;" text-anchor="end" dominant-baseline="middle" transform="matrix(1 0 0 1 45 32)" 
 ><tspan x="0" y="0">250,000</tspan></text></g>
 <g stroke="none" fill="rgb(54,162,235)" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-4)" >
-<path d="M 75.936,63.896173 L 75.936,355.1 178.464,355.1 178.464,63.896173 Z" />
+<path d="M 75.936,42.061371 L 75.936,355.1 178.464,355.1 178.464,42.061371 Z" />
 </g>
 <g stroke="none" fill="rgb(54,162,235)" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-4)" >
-<path d="M 218.336,65.085727 L 218.336,355.1 320.864,355.1 320.864,65.085727 Z" />
+<path d="M 218.336,48.712861 L 218.336,355.1 320.864,355.1 320.864,48.712861 Z" />
 </g>
 <g stroke="none" fill="rgb(54,162,235)" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-4)" >
-<path d="M 360.736,71.400242 L 360.736,355.1 463.264,355.1 463.264,71.400242 Z" />
+<path d="M 360.736,59.525416 L 360.736,355.1 463.264,355.1 463.264,59.525416 Z" />
 </g>
 <g stroke="none" fill="rgb(54,162,235)" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-4)" >
-<path d="M 503.136,75.826658 L 503.136,355.1 605.664,355.1 605.664,75.826658 Z" />
+<path d="M 503.136,60.941058 L 503.136,355.1 605.664,355.1 605.664,60.941058 Z" />
 </g>
 <g stroke="none" fill="rgb(54,162,235)" fill-rule="nonzero" fill-opacity="1"  clip-path="url(#clip-4)" >
-<path d="M 645.536,99.310957 L 645.536,355.1 748.064,355.1 748.064,99.310957 Z" />
+<path d="M 645.536,91.827168 L 645.536,355.1 748.064,355.1 748.064,91.827168 Z" />
 </g>
 </svg>
