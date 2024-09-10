@@ -54,6 +54,10 @@ jobs:
           toolchain: nightly
           components: rust-src
 
+      - name: Use MSRV-specific .cargo/config.toml
+        run: |
+          mv .cargo/config.toml.msrv .cargo/config.toml
+
       - name: Install cargo-fuzz
         uses: baptiste0928/cargo-install@v3
         with:
