@@ -3,10 +3,10 @@
 extern crate tokio_websockets;
 
 use std::{
+    convert::TryFrom,
     io,
     num::NonZeroUsize,
     pin::Pin,
-    std::convert::TryFrom,
     task::{Context, Poll},
 };
 
