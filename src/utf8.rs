@@ -161,11 +161,11 @@ impl Validator {
                 }
                 Err(utf8_error) => {
                     // Incomplete input, copy the partial codepoints to the validator
-                    self.partial_codepoint_len = input.len() - utf8_error.valid_up_to();
+                    self.partial_codepoint_len = remaining_bytes.len() - utf8_error.valid_up_to();
                     unsafe {
                         self.partial_codepoint
                             .get_unchecked_mut(..self.partial_codepoint_len)
-                            .copy_from_slice(input.get_unchecked(utf8_error.valid_up_to()..));
+                            .copy_from_slice(remaining_bytes.get_unchecked(utf8_error.valid_up_to()..));
                     }
 
                     Ok(())
