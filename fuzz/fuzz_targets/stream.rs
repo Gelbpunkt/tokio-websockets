@@ -1,19 +1,20 @@
 #![no_main]
+
+extern crate tokio_websockets;
+
 use std::{
     io,
     num::NonZeroUsize,
     pin::Pin,
+    std::convert::TryFrom,
     task::{Context, Poll},
 };
 
+use arbitrary::Arbitrary;
 use futures::{stream::StreamExt, SinkExt};
 use libfuzzer_sys::fuzz_target;
-use tokio_websockets::{CloseCode, Config, Limits, Message};
-extern crate tokio_websockets;
-use std::convert::TryFrom;
-
-use arbitrary::Arbitrary;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio_websockets::{CloseCode, Config, Limits, Message};
 
 #[derive(Arbitrary, Debug)]
 enum ArbitraryMessage {
