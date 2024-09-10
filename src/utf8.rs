@@ -110,7 +110,7 @@ impl Validator {
             }
 
             // If we know that the codepoint is complete, we can use the basic variant
-            if available_bytes == missing_bytes {
+            if available_bytes >= missing_bytes {
                 if FROM_UTF8_BASIC(unsafe {
                     self.partial_codepoint
                         .get_unchecked(..codepoint_len_after_copy)
