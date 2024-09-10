@@ -62,10 +62,9 @@ RUN source $HOME/.cargo/env && \
 # Environment for benchmarking all executables
 FROM docker.io/library/alpine:edge
 
-RUN echo 'https://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories && \
-    apk update --no-cache && \
+RUN apk update --no-cache && \
     apk upgrade --no-cache && \
-    apk add deno --no-cache
+    apk add gnuplot libstdc++ --no-cache
 
 COPY --from=builder /usr/bin/fastwebsockets /usr/bin/fastwebsockets
 COPY --from=builder /usr/bin/uWebSockets /usr/bin/uWebSockets
@@ -74,10 +73,8 @@ COPY --from=builder /usr/bin/rust-websocket /usr/bin/rust-websocket
 COPY --from=builder /usr/bin/tokio-websockets /usr/bin/tokio-websockets
 COPY --from=builder /usr/bin/load_test /usr/bin/load_test
 
-RUN mkdir /deno-dir && chmod 777 /deno-dir
-
 WORKDIR /benches
 
 ENV HOME /tmp
 
-CMD ["deno", "run", "--allow-all", "run.js"]
+CMD ["./run.sh"]
