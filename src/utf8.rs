@@ -58,6 +58,7 @@ impl Validator {
     }
 
     /// The length of the partial codepoint, once complete.
+    #[inline]
     fn complete_codepoint_len(&self) -> usize {
         // SAFETY: This is guaranteed to be four bytes large
         match unsafe { self.partial_codepoint.get_unchecked(0) } {
