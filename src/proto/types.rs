@@ -159,7 +159,7 @@ impl TryFrom<u16> for CloseCode {
 /// the backing type is [`Bytes`] with a reference counter greater than one.
 ///
 /// [`From<Bytes>`]: #impl-From<Bytes>-for-Payload
-/// [`Into<BytesMut>`]: #impl-From<Payload>-for-BytesMut    
+/// [`Into<BytesMut>`]: #impl-From<Payload>-for-BytesMut
 pub struct Payload {
     /// The raw payload data.
     data: UnsafeCell<PayloadStorage>,
@@ -603,6 +603,9 @@ pub struct Config {
     /// Consider decreasing this if the remote imposes a limit on the frame
     /// payload size. The default is 4MiB.
     pub(super) frame_size: usize,
+    /// Threshold of queued up bytes after which the underlying I/O is flushed
+    /// before the sink is declared ready. The default is 8 KiB.
+    pub(super) flush_threshold: usize,
 }
 
 impl Config {
@@ -616,12 +619,22 @@ impl Config {
 
         self
     }
+
+    /// Sets the threshold of queued up bytes after which the underlying I/O is
+    /// flushed before the sink is declared ready. The default is 8 KiB.
+    #[must_use]
+    pub fn flush_threshold(mut self, threshold: usize) -> Self {
+        self.flush_threshold = threshold;
+
+        self
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             frame_size: 4 * 1024 * 1024,
+            flush_threshold: 8 * 1024,
         }
     }
 }
