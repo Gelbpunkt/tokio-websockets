@@ -170,9 +170,9 @@ impl Decoder for WebSocketProtocol {
             let is_text = opcode == OpCode::Text
                 || (opcode == OpCode::Continuation
                     && self.fragmented_message_opcode == OpCode::Text);
-            let payload_available = (src.len() - offset).min(payload_length);
+            let payload_available = src.len() - offset;
 
-            if payload_length != payload_available {
+            if payload_length > payload_available {
                 // Validate partial frame payload data
                 if is_text {
                     if mask {
