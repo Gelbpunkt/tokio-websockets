@@ -9,9 +9,10 @@ edition = "2018"
 cargo-fuzz = true
 
 [dependencies]
+arbitrary = { version = "1", features = ["derive"] }
+futures = "0.3"
 libfuzzer-sys = "0.4"
 tokio = "1"
-futures = "0.3"
 
 [dependencies.tokio-websockets]
 path = ".."
@@ -22,7 +23,7 @@ features = ["server", "ring"]
 members = ["."]
 
 [[bin]]
-name = "decode"
-path = "fuzz_targets/decode.rs"
+name = "stream"
+path = "fuzz_targets/stream.rs"
 test = false
 doc = false
