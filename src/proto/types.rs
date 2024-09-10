@@ -563,6 +563,9 @@ pub struct Limits {
     /// The maximum allowed payload length. The default
     /// is 64 MiB.
     pub(super) max_payload_len: usize,
+    /// Threshold of queued up bytes after which the underlying I/O is flushed
+    /// before the sink is declared ready. The default is 8 KiB.
+    pub(super) flush_threshold: usize,
 }
 
 impl Limits {
@@ -571,6 +574,7 @@ impl Limits {
     pub fn unlimited() -> Self {
         Self {
             max_payload_len: usize::MAX,
+            flush_threshold: usize::MAX,
         }
     }
 
@@ -582,12 +586,23 @@ impl Limits {
 
         self
     }
+
+    /// Sets the threshold of queued up bytes after which the underlying I/O is
+    /// flushed before the sink is declared ready. `None` equals no limit. The
+    /// default is 8 KiB.
+    #[must_use]
+    pub fn flush_threshold(mut self, threshold: Option<usize>) -> Self {
+        self.flush_threshold = threshold.unwrap_or(usize::MAX);
+
+        self
+    }
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Self {
             max_payload_len: 64 * 1024 * 1024,
+            flush_threshold: 8 * 1024,
         }
     }
 }
