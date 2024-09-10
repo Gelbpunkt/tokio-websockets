@@ -19,6 +19,9 @@ use crate::{
     CloseCode, Error, Payload,
 };
 
+/// Maximum size of a frame header (2 + 8 + 4).
+const MAX_FRAME_HEADER_SIZE: usize = 14;
+
 /// The actual implementation of the WebSocket byte-level protocol.
 /// It provides a [`Decoder`] for single frames that must be assembled by a
 /// client such as the [`WebSocketStream`] later.
@@ -57,7 +60,7 @@ impl WebSocketProtocol {
 macro_rules! ensure_buffer_has_space {
     ($buf:expr, $space:expr) => {
         if $buf.len() < $space {
-            $buf.reserve($space as usize);
+            $buf.reserve(MAX_FRAME_HEADER_SIZE - $space);
 
             return Ok(None);
         }
