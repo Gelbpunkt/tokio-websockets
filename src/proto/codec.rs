@@ -162,8 +162,8 @@ impl Decoder for WebSocketProtocol {
         // There could be a mask here, but we only load it later,
         // so just increase the offset to calculate the available data
         if mask {
-            ensure_buffer_has_space!(src, offset + 4);
             offset += 4;
+            ensure_buffer_has_space!(src, offset);
         }
 
         if payload_length != 0 {
