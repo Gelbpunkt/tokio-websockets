@@ -165,7 +165,9 @@ impl Validator {
                     unsafe {
                         self.partial_codepoint
                             .get_unchecked_mut(..self.partial_codepoint_len)
-                            .copy_from_slice(remaining_bytes.get_unchecked(utf8_error.valid_up_to()..));
+                            .copy_from_slice(
+                                remaining_bytes.get_unchecked(utf8_error.valid_up_to()..),
+                            );
                     }
 
                     Ok(())
