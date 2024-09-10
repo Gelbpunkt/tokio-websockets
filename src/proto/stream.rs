@@ -311,7 +311,7 @@ where
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // tokio-util calls poll_flush when more than 8096 bytes are pending, otherwise
         // it returns Ready. We will just replicate that behavior
-        if self.pending_bytes >= self.inner.decoder().limits.flush_threshold {
+        if self.pending_bytes >= self.config.flush_threshold {
             self.as_mut().poll_flush(cx)
         } else {
             Poll::Ready(Ok(()))
