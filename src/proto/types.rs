@@ -610,8 +610,13 @@ impl Config {
     ///
     /// Consider decreasing this if the remote imposes a limit on the frame
     /// payload size. The default is 4MiB.
+    /// 
+    /// # Panics
+    /// 
+    /// If `frame_size` is `0`.
     #[must_use]
     pub fn frame_size(mut self, frame_size: usize) -> Self {
+        assert_ne!(frame_size, 0, "frame_size must be non-zero");
         self.frame_size = frame_size;
 
         self
