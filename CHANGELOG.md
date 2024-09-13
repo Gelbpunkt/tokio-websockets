@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2024-09-13
+
+### Added
+
+- The new `rustls-bring-your-own-connector` feature allows for creating a `Connector::Rustls` instance without pulling in any other certificate roots
+- The sink flush threshold is now configurable via `Config::flush_threshold`
+
+### Changed
+
+- `Config::frame_size` now panics when the frame size is set to 0
+- Reduced the number of allocations which was caused by a misunderstanding of `BytesMut::reserve` internals, improving throughput by up to 30%
+- The number of pending bytes to be written is no longer calculated in a potentially expensive loop in `poll_ready`, but rather tracked as messages are queued
+
+### Fixed
+
+- Fixed a case of possible UB in the UTF-8 validator discovered by the new fuzzer ([@finnbear](https://github.com/finnbear))
+- The UTF-8 validator now uses the faster validation for partial codepoints as intended, earlier this was only the case if the number of bytes available matched the number expected
+
 ## [0.10.0] - 2024-09-04
 
 ### Added
