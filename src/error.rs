@@ -4,7 +4,8 @@ use std::{fmt, io};
 #[cfg(any(
     feature = "rustls-webpki-roots",
     feature = "rustls-native-roots",
-    feature = "rustls-platform-verifier"
+    feature = "rustls-platform-verifier",
+    feature = "rustls-bring-your-own-connector"
 ))]
 use rustls_pki_types::InvalidDnsNameError;
 #[cfg(feature = "native-tls")]
@@ -36,14 +37,16 @@ pub enum Error {
     #[cfg(any(
         feature = "rustls-webpki-roots",
         feature = "rustls-native-roots",
-        feature = "rustls-platform-verifier"
+        feature = "rustls-platform-verifier",
+        feature = "rustls-bring-your-own-connector"
     ))]
     InvalidDNSName(InvalidDnsNameError),
     /// A general rustls error.
     #[cfg(any(
         feature = "rustls-webpki-roots",
         feature = "rustls-native-roots",
-        feature = "rustls-platform-verifier"
+        feature = "rustls-platform-verifier",
+        feature = "rustls-bring-your-own-connector"
     ))]
     Rustls(tokio_rustls::rustls::Error),
     /// An unsupported, i.e. not `ws` or `wss`, or no URI scheme was specified.
@@ -69,7 +72,7 @@ pub enum Error {
     #[cfg(all(
         not(feature = "rustls-webpki-roots"),
         feature = "rustls-native-roots",
-        not(feature = "rustls-platform-verifier")
+        not(feature = "rustls-platform-verifier"),
     ))]
     NoNativeRootCertificatesFound(Vec<rustls_native_certs::Error>),
 }
@@ -96,7 +99,8 @@ impl From<io::Error> for Error {
 #[cfg(any(
     feature = "rustls-webpki-roots",
     feature = "rustls-native-roots",
-    feature = "rustls-platform-verifier"
+    feature = "rustls-platform-verifier",
+    feature = "rustls-bring-your-own-connector"
 ))]
 impl From<InvalidDnsNameError> for Error {
     fn from(err: InvalidDnsNameError) -> Self {
@@ -107,7 +111,8 @@ impl From<InvalidDnsNameError> for Error {
 #[cfg(any(
     feature = "rustls-webpki-roots",
     feature = "rustls-native-roots",
-    feature = "rustls-platform-verifier"
+    feature = "rustls-platform-verifier",
+    feature = "rustls-bring-your-own-connector"
 ))]
 impl From<tokio_rustls::rustls::Error> for Error {
     fn from(err: tokio_rustls::rustls::Error) -> Self {
@@ -144,13 +149,15 @@ impl fmt::Display for Error {
             #[cfg(any(
                 feature = "rustls-webpki-roots",
                 feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Error::InvalidDNSName(_) => f.write_str("invalid DNS name"),
             #[cfg(any(
                 feature = "rustls-webpki-roots",
                 feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Error::Rustls(e) => e.fmt(f),
             #[cfg(feature = "client")]
@@ -211,13 +218,15 @@ impl std::error::Error for Error {
             #[cfg(any(
                 feature = "rustls-webpki-roots",
                 feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Error::InvalidDNSName(e) => Some(e),
             #[cfg(any(
                 feature = "rustls-webpki-roots",
                 feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Error::Rustls(e) => Some(e),
             #[cfg(any(feature = "client", feature = "server"))]

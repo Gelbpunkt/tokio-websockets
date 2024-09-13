@@ -20,7 +20,8 @@ use std::{
 #[cfg(any(
     feature = "rustls-webpki-roots",
     feature = "rustls-native-roots",
-    feature = "rustls-platform-verifier"
+    feature = "rustls-platform-verifier",
+    feature = "rustls-bring-your-own-connector"
 ))]
 use rustls_pki_types::ServerName;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -71,7 +72,8 @@ pub enum Connector {
     #[cfg(any(
         feature = "rustls-native-roots",
         feature = "rustls-webpki-roots",
-        feature = "rustls-platform-verifier"
+        feature = "rustls-platform-verifier",
+        feature = "rustls-bring-your-own-connector"
     ))]
     Rustls(tokio_rustls::TlsConnector),
 }
@@ -85,7 +87,8 @@ impl Debug for Connector {
             #[cfg(any(
                 feature = "rustls-native-roots",
                 feature = "rustls-webpki-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(_) => f.write_str("Connector::Rustls"),
         }
@@ -109,7 +112,8 @@ pub enum MaybeTlsStream<S> {
     #[cfg(any(
         feature = "rustls-native-roots",
         feature = "rustls-webpki-roots",
-        feature = "rustls-platform-verifier"
+        feature = "rustls-platform-verifier",
+        feature = "rustls-bring-your-own-connector"
     ))]
     Rustls(tokio_rustls::client::TlsStream<S>),
 }
@@ -127,7 +131,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncRead for MaybeTlsStream<S> {
             #[cfg(any(
                 feature = "rustls-native-roots",
                 feature = "rustls-webpki-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(s) => Pin::new(s).poll_read(cx, buf),
         }
@@ -147,7 +152,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             #[cfg(any(
                 feature = "rustls-native-roots",
                 feature = "rustls-webpki-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(s) => Pin::new(s).poll_write(cx, buf),
         }
@@ -161,7 +167,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             #[cfg(any(
                 feature = "rustls-native-roots",
                 feature = "rustls-webpki-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(s) => Pin::new(s).poll_flush(cx),
         }
@@ -175,7 +182,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             #[cfg(any(
                 feature = "rustls-native-roots",
                 feature = "rustls-webpki-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(s) => Pin::new(s).poll_shutdown(cx),
         }
@@ -193,7 +201,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             #[cfg(any(
                 feature = "rustls-native-roots",
                 feature = "rustls-webpki-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(s) => Pin::new(s).poll_write_vectored(cx, bufs),
         }
@@ -207,7 +216,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeTlsStream<S> {
             #[cfg(any(
                 feature = "rustls-native-roots",
                 feature = "rustls-webpki-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(s) => s.is_write_vectored(),
         }
@@ -349,7 +359,8 @@ impl Connector {
             feature = "native-tls",
             feature = "rustls-webpki-roots",
             feature = "rustls-native-roots",
-            feature = "rustls-platform-verifier"
+            feature = "rustls-platform-verifier",
+            feature = "rustls-bring-your-own-connector"
         )),
         allow(unused_variables, clippy::unused_async)
     )]
@@ -367,7 +378,8 @@ impl Connector {
             #[cfg(any(
                 feature = "rustls-webpki-roots",
                 feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
+                feature = "rustls-platform-verifier",
+                feature = "rustls-bring-your-own-connector"
             ))]
             Self::Rustls(connector) => Ok(MaybeTlsStream::Rustls(
                 connector

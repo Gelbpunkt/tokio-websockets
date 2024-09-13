@@ -62,6 +62,7 @@ native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots"]
 rustls-native-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-native-certs"]
 rustls-platform-verifier = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-platform-verifier"]
+rustls-bring-your-own-connector = ["dep:rustls-pki-types", "dep:tokio-rustls"]
 rustls-tls12 = ["tokio-rustls?/tls12"]
 nightly = ["simdutf8?/aarch64_neon_prefetch"]
 
