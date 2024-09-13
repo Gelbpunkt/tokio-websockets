@@ -265,7 +265,7 @@ jobs:
         env:
           CROSS_COMPILE: aarch64-linux-gnu-
         run: |
-          wget https://www.openssl.org/source/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
+          wget https://github.com/openssl/openssl/releases/download/openssl-${{ env.OPENSSL_VERSION }}/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
           tar xzf openssl-${{ env.OPENSSL_VERSION }}.tar.gz
           cd openssl-${{ env.OPENSSL_VERSION }}
           ./Configure linux-aarch64 --cross-compile-prefix=aarch64-linux-gnu- --prefix=${{ github.workspace }}/aarch64-linux-gnu
