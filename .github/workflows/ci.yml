@@ -39,7 +39,7 @@ jobs:
       - name: Run tests
         run: |
           cargo test --all-targets --all-features
-  
+
   run-fuzzer:
     name: Run fuzzer
     runs-on: ubuntu-latest
@@ -200,7 +200,7 @@ jobs:
           cargo hack check \
             --feature-powerset \
             --no-dev-deps \
-            --exclude-features aws-lc-rs \
+            --exclude-features aws-lc-rs,rustls-tls12 \
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol
 
@@ -249,7 +249,7 @@ jobs:
           cargo hack check \
             --feature-powerset \
             --no-dev-deps \
-            --exclude-features aws-lc-rs,nightly \
+            --exclude-features aws-lc-rs,rustls-tls12,nightly \
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol
 
@@ -280,6 +280,6 @@ jobs:
             --target aarch64-unknown-linux-gnu \
             --feature-powerset \
             --no-dev-deps \
-            --exclude-features aws-lc-rs,nightly \
+            --exclude-features aws-lc-rs,rustls-tls12,nightly \
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol
