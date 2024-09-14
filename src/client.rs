@@ -113,6 +113,8 @@ pub struct Builder<'a, R: Resolver = resolver::Gai> {
     config: Config,
     /// Limits to impose on the WebSocket stream.
     limits: Limits,
+    /// Disable Nagle's algorithm.
+    nodelay: bool,
     /// Headers to be sent with the upgrade request.
     headers: HeaderMap,
 }
@@ -128,6 +130,7 @@ impl<'a> Builder<'a> {
             resolver: resolver::Gai,
             config: Config::default(),
             limits: Limits::default(),
+            nodelay: false,
             headers: HeaderMap::new(),
         }
     }
@@ -144,6 +147,7 @@ impl<'a> Builder<'a> {
             resolver: resolver::Gai,
             config: Config::default(),
             limits: Limits::default(),
+            nodelay: false,
             headers: HeaderMap::new(),
         }
     }
@@ -188,6 +192,7 @@ impl<'a, R: Resolver> Builder<'a, R> {
             resolver: _,
             config,
             limits,
+            nodelay,
             headers,
         } = self;
 
@@ -197,6 +202,7 @@ impl<'a, R: Resolver> Builder<'a, R> {
             resolver,
             config,
             limits,
+            nodelay,
             headers,
         }
     }
@@ -213,6 +219,14 @@ impl<'a, R: Resolver> Builder<'a, R> {
     #[must_use]
     pub fn limits(mut self, limits: Limits) -> Self {
         self.limits = limits;
+
+        self
+    }
+
+    /// If `true`, disable Nagle's algorithm. The default is `false`.
+    #[must_use]
+    pub fn nodelay(mut self, nodelay: bool) -> Self {
+        self.nodelay = nodelay;
 
         self
     }
@@ -254,6 +268,10 @@ impl<'a, R: Resolver> Builder<'a, R> {
         let addr = self.resolver.resolve(host, port).await?;
 
         let stream = TcpStream::connect(&addr).await?;
+
+        if self.nodelay {
+            stream.set_nodelay(true)?;
+        }
 
         let stream = if uri.scheme_str() == Some("wss") {
             if let Some(connector) = self.connector {
