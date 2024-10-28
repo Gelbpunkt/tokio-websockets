@@ -11,6 +11,14 @@
     all(feature = "nightly", target_arch = "x86_64"),
     feature(stdarch_x86_avx512)
 )]
+// Required for VSX until stable
+#![cfg_attr(
+    all(
+        feature = "nightly",
+        any(target_arch = "powerpc64", target_arch = "powerpc")
+    ),
+    feature(stdarch_powerpc)
+)]
 #![doc = include_str!("../README.md")]
 
 // If the client or server implementation is enabled, at least one SHA1 backend

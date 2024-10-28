@@ -269,6 +269,63 @@ mod imp {
     }
 }
 
+/// Websocket frame masking implementation using VSX.
+#[cfg(all(feature = "simd", feature = "nightly", target_feature = "vsx"))]
+mod imp {
+    use std::{
+        alloc::{alloc, dealloc, Layout},
+        arch::powerpc64::{vec_ld, vec_xor, vector_unsigned_char},
+        ptr,
+    };
+
+    /// VSX can operate on 128-bit input data.
+    const VSX_ALIGNMENT: usize = 16;
+
+    /// (Un-)masks input bytes with the framing key using VSX.
+    ///
+    /// The input bytes may be further in the payload and therefore the offset
+    /// into the payload must be specified.
+    ///
+    /// This will use a fallback implementation for less than 16 bytes. For
+    /// sufficiently large inputs, it masks in chunks of 16 bytes per
+    /// instruction, applying the fallback method on all remaining data.
+    pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
+        unsafe {
+            let (prefix, aligned_data, suffix) = input.align_to_mut::<vector_unsigned_char>();
+
+            // Run fallback implementation on unaligned prefix data
+            super::fallback_frame(key, prefix, offset);
+            offset = (offset + prefix.len()) & 3;
+
+            // Align the key so we can do an aligned load for the mask
+            let layout = Layout::from_size_align_unchecked(VSX_ALIGNMENT, VSX_ALIGNMENT);
+            let mem_ptr = alloc(layout);
+
+            ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
+
+            for j in (4 - offset..VSX_ALIGNMENT - offset).step_by(4) {
+                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+            }
+
+            if offset != 0 {
+                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(VSX_ALIGNMENT - offset), offset);
+            }
+
+            let mask = vec_ld(0, mem_ptr.cast_const());
+
+            for block in &mut *aligned_data {
+                *block = vec_xor(*block, mask);
+            }
+
+            dealloc(mem_ptr, layout);
+
+            // Run fallback implementation on unaligned suffix data
+            offset = (offset + aligned_data.len() * VSX_ALIGNMENT) & 3;
+            super::fallback_frame(key, suffix, offset);
+        }
+    }
+}
+
 /// Websocket frame masking fallback implementation.
 #[cfg(any(
     not(feature = "simd"),
@@ -277,7 +334,18 @@ mod imp {
         any(target_arch = "aarch64", target_arch = "arm"),
         not(target_feature = "neon")
     ),
-    not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "arm"))
+    all(
+        feature = "simd",
+        any(target_arch = "powerpc64", target_arch = "powerpc"),
+        any(not(target_feature = "vsx"), not(feature = "nightly"))
+    ),
+    not(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "arm",
+        target_arch = "powerpc64",
+        target_arch = "powerpc"
+    ))
 ))]
 mod imp {
     /// (Un-)masks input bytes with the framing key.

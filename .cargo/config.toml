@@ -13,3 +13,15 @@ rustflags = ["-C", "target-feature=+neon", "-C", "panic=abort", "-Z", "panic_abo
 
 [target.armv7-unknown-linux-gnueabi]
 rustflags = ["-C", "target-feature=+neon", "-C", "panic=abort", "-Z", "panic_abort_tests"]
+
+[target.powerpc64le-unknown-linux-gnu]
+rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
+
+[target.powerpc64le-unknown-linux-musl]
+rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
+
+[target.powerpc64-unknown-linux-gnu]
+rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
+
+[target.powerpc-unknown-linux-gnu]
+rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
