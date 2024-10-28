@@ -117,7 +117,7 @@ pub struct Builder<'a, R: Resolver = resolver::Gai> {
     headers: HeaderMap,
 }
 
-impl<'a> Builder<'a> {
+impl Builder<'_> {
     /// Creates a [`Builder`] with all defaults that is not configured to
     /// connect to any server.
     #[must_use]
@@ -319,7 +319,7 @@ impl<'a, R: Resolver> Builder<'a, R> {
     }
 }
 
-impl<'a> Default for Builder<'a> {
+impl Default for Builder<'_> {
     fn default() -> Self {
         Self::new()
     }
