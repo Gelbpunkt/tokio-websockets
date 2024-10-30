@@ -128,6 +128,23 @@ where
         }
     }
 
+    /// Returns a reference to the underlying I/O stream wrapped by this stream.
+    ///
+    /// Care should be taken not to tamper with the stream of data to avoid
+    /// corrupting the stream of frames.
+    pub fn get_ref(&self) -> &T {
+        self.inner.get_ref()
+    }
+
+    /// Returns a mutable reference to the underlying I/O stream wrapped by this
+    /// stream.
+    ///
+    /// Care should be taken not to tamper with the stream of data to avoid
+    /// corrupting the stream of frames.
+    pub fn get_mut(&mut self) -> &mut T {
+        self.inner.get_mut()
+    }
+
     /// Attempt to pull out the next frame from the [`Framed`] this stream and
     /// from that update the stream's internal state.
     ///
