@@ -203,7 +203,11 @@ mod imp {
 }
 
 /// Websocket frame masking implementation using NEON.
-#[cfg(all(feature = "simd", target_feature = "neon"))]
+#[cfg(all(
+    feature = "simd",
+    target_feature = "neon",
+    any(target_arch = "aarch64", all(target_arch = "arm", feature = "nightly"))
+))]
 mod imp {
     #[cfg(target_arch = "aarch64")]
     use std::arch::aarch64::{uint8x16_t, veorq_u8, vld1q_u8};
@@ -335,8 +339,13 @@ mod imp {
     not(feature = "simd"),
     all(
         feature = "simd",
-        any(target_arch = "aarch64", target_arch = "arm"),
-        not(target_feature = "neon")
+        any(
+            all(target_arch = "aarch64", not(target_feature = "neon")),
+            all(
+                target_arch = "arm",
+                not(all(target_feature = "neon", feature = "nightly"))
+            )
+        )
     ),
     all(
         feature = "simd",

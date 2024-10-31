@@ -25,7 +25,7 @@ High performance, strict, tokio-util based WebSockets implementation.
 
 Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 
-- `simd` will enable AVX2, SSE2 or NEON accelerated masking and UTF-8 validation. Additionally enabling the `nightly` feature when using a nightly compiler will also enable AVX512 or AltiVec accelerated masking
+- `simd` will enable AVX2, SSE2 or NEON (on aarch64) accelerated masking and UTF-8 validation. Additionally enabling the `nightly` feature when using a nightly compiler will also enable AVX512, NEON (on 32-bit ARM) or AltiVec accelerated masking
 - `client` enables a tiny client implementation
 - `server` enables a tiny server implementation
 
