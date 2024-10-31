@@ -18,9 +18,6 @@ mod imp {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::{__m512i, _mm512_set1_epi32, _mm512_xor_si512};
 
-    /// AVX512 can operate on 512-bit input data.
-    const AVX512_ALIGNMENT: usize = 64;
-
     /// (Un-)masks input bytes with the framing key using AVX512.
     ///
     /// The input bytes may be further in the payload and therefore the offset
@@ -48,7 +45,6 @@ mod imp {
             }
 
             // Run fallback implementation on unaligned suffix data
-            offset = (offset + aligned_data.len() * AVX512_ALIGNMENT) & 3;
             super::fallback_frame(key, suffix, offset);
         }
     }
@@ -65,9 +61,6 @@ mod imp {
     use std::arch::x86::{__m256i, _mm256_set1_epi32, _mm256_xor_si256};
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::{__m256i, _mm256_set1_epi32, _mm256_xor_si256};
-
-    /// AVX2 can operate on 256-bit input data.
-    const AVX2_ALIGNMENT: usize = 32;
 
     /// (Un-)masks input bytes with the framing key using AVX2.
     ///
@@ -96,7 +89,6 @@ mod imp {
             }
 
             // Run fallback implementation on unaligned suffix data
-            offset = (offset + aligned_data.len() * AVX2_ALIGNMENT) & 3;
             super::fallback_frame(key, suffix, offset);
         }
     }
@@ -114,9 +106,6 @@ mod imp {
     use std::arch::x86::{__m128i, _mm_set1_epi32, _mm_xor_si128};
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::{__m128i, _mm_set1_epi32, _mm_xor_si128};
-
-    /// SSE2 can operate on 128-bit input data.
-    const SSE2_ALIGNMENT: usize = 16;
 
     /// (Un-)masks input bytes with the framing key using SSE2.
     ///
@@ -145,7 +134,6 @@ mod imp {
             }
 
             // Run fallback implementation on unaligned suffix data
-            offset = (offset + aligned_data.len() * SSE2_ALIGNMENT) & 3;
             super::fallback_frame(key, suffix, offset);
         }
     }
@@ -217,7 +205,6 @@ mod imp {
             dealloc(mem_ptr, layout);
 
             // Run fallback implementation on unaligned suffix data
-            offset = (offset + aligned_data.len() * NEON_ALIGNMENT) & 3;
             super::fallback_frame(key, suffix, offset);
         }
     }
@@ -277,7 +264,6 @@ mod imp {
             dealloc(mem_ptr, layout);
 
             // Run fallback implementation on unaligned suffix data
-            offset = (offset + aligned_data.len() * VSX_ALIGNMENT) & 3;
             super::fallback_frame(key, suffix, offset);
         }
     }
