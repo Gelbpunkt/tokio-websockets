@@ -13,6 +13,9 @@
 /// Websocket frame masking implementation using AVX512.
 #[cfg(all(feature = "simd", feature = "nightly", target_feature = "avx512f"))]
 mod imp {
+    #[cfg(target_arch = "x86")]
+    use std::arch::x86::{__m512i, _mm512_set1_epi32, _mm512_xor_si512};
+    #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::{__m512i, _mm512_set1_epi32, _mm512_xor_si512};
 
     /// AVX512 can operate on 512-bit input data.
@@ -58,6 +61,9 @@ mod imp {
     target_feature = "avx2"
 ))]
 mod imp {
+    #[cfg(target_arch = "x86")]
+    use std::arch::x86::{__m256i, _mm256_set1_epi32, _mm256_xor_si256};
+    #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::{__m256i, _mm256_set1_epi32, _mm256_xor_si256};
 
     /// AVX2 can operate on 256-bit input data.
@@ -104,6 +110,9 @@ mod imp {
     target_feature = "sse2"
 ))]
 mod imp {
+    #[cfg(target_arch = "x86")]
+    use std::arch::x86::{__m128i, _mm_set1_epi32, _mm_xor_si128};
+    #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::{__m128i, _mm_set1_epi32, _mm_xor_si128};
 
     /// SSE2 can operate on 128-bit input data.
@@ -294,6 +303,7 @@ mod imp {
     ),
     not(any(
         target_arch = "x86_64",
+        target_arch = "x86",
         target_arch = "aarch64",
         target_arch = "arm",
         target_arch = "powerpc64",
