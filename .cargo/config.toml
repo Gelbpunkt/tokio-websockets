@@ -24,4 +24,4 @@ rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
 rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
 
 [target.powerpc-unknown-linux-gnu]
-rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
+rustflags = ["-C", "target-feature=+altivec", "-C", "panic=abort", "-Z", "panic_abort_tests"]

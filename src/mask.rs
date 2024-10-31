@@ -5,6 +5,7 @@
 //!   - One AVX2-based implementation that masks 32 bytes per cycle
 //!   - One SSE2-based implementation that masks 16 bytes per cycle
 //!   - One NEON-based implementation that masks 16 bytes per cycle
+//!   - One AltiVec-based implementation that masks 16 bytes per cycle
 //!   - A fallback implementation without SIMD
 //!
 //! The SIMD implementations will only be used if the `simd` feature is active.
@@ -269,19 +270,22 @@ mod imp {
     }
 }
 
-/// Websocket frame masking implementation using VSX.
-#[cfg(all(feature = "simd", feature = "nightly", target_feature = "vsx"))]
+/// Websocket frame masking implementation using AltiVec.
+#[cfg(all(feature = "simd", feature = "nightly", target_feature = "altivec"))]
 mod imp {
+    #[cfg(target_arch = "powerpc")]
+    use std::arch::powerpc::{vec_ld, vec_xor, vector_unsigned_char};
+    #[cfg(target_arch = "powerpc64")]
+    use std::arch::powerpc64::{vec_ld, vec_xor, vector_unsigned_char};
     use std::{
         alloc::{alloc, dealloc, Layout},
-        arch::powerpc64::{vec_ld, vec_xor, vector_unsigned_char},
         ptr,
     };
 
-    /// VSX can operate on 128-bit input data.
+    /// AltiVec can operate on 128-bit input data.
     const VSX_ALIGNMENT: usize = 16;
 
-    /// (Un-)masks input bytes with the framing key using VSX.
+    /// (Un-)masks input bytes with the framing key using AltiVec.
     ///
     /// The input bytes may be further in the payload and therefore the offset
     /// into the payload must be specified.
@@ -337,7 +341,7 @@ mod imp {
     all(
         feature = "simd",
         any(target_arch = "powerpc64", target_arch = "powerpc"),
-        any(not(target_feature = "vsx"), not(feature = "nightly"))
+        any(not(target_feature = "altivec"), not(feature = "nightly"))
     ),
     not(any(
         target_arch = "x86_64",
