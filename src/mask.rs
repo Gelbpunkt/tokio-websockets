@@ -13,11 +13,7 @@
 /// Websocket frame masking implementation using AVX512.
 #[cfg(all(feature = "simd", feature = "nightly", target_feature = "avx512f"))]
 mod imp {
-    use std::{
-        alloc::{alloc, dealloc, Layout},
-        arch::x86_64::{__m512i, _mm512_load_si512, _mm512_xor_si512},
-        ptr,
-    };
+    use std::arch::x86_64::{__m512i, _mm512_set1_epi32, _mm512_xor_si512};
 
     /// AVX512 can operate on 512-bit input data.
     const AVX512_ALIGNMENT: usize = 64;
@@ -38,31 +34,15 @@ mod imp {
             super::fallback_frame(key, prefix, offset);
             offset = (offset + prefix.len()) & 3;
 
-            // Align the key so we can do an aligned load for the mask
-            let layout = Layout::from_size_align_unchecked(AVX512_ALIGNMENT, AVX512_ALIGNMENT);
-            let mem_ptr = alloc(layout);
+            if !aligned_data.is_empty() {
+                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
+                key_bytes.rotate_left(offset);
+                let mask = _mm512_set1_epi32(i32::from_le_bytes(key_bytes));
 
-            ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
-
-            for j in (4 - offset..AVX512_ALIGNMENT - offset).step_by(4) {
-                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+                for block in &mut *aligned_data {
+                    *block = _mm512_xor_si512(*block, mask);
+                }
             }
-
-            if offset != 0 {
-                ptr::copy_nonoverlapping(
-                    key.as_ptr(),
-                    mem_ptr.add(AVX512_ALIGNMENT - offset),
-                    offset,
-                );
-            }
-
-            let mask = _mm512_load_si512(mem_ptr.cast());
-
-            for block in &mut *aligned_data {
-                *block = _mm512_xor_si512(*block, mask);
-            }
-
-            dealloc(mem_ptr, layout);
 
             // Run fallback implementation on unaligned suffix data
             offset = (offset + aligned_data.len() * AVX512_ALIGNMENT) & 3;
@@ -78,11 +58,7 @@ mod imp {
     target_feature = "avx2"
 ))]
 mod imp {
-    use std::{
-        alloc::{alloc, dealloc, Layout},
-        arch::x86_64::{__m256i, _mm256_load_si256, _mm256_xor_si256},
-        ptr,
-    };
+    use std::arch::x86_64::{__m256i, _mm256_set1_epi32, _mm256_xor_si256};
 
     /// AVX2 can operate on 256-bit input data.
     const AVX2_ALIGNMENT: usize = 32;
@@ -103,31 +79,15 @@ mod imp {
             super::fallback_frame(key, prefix, offset);
             offset = (offset + prefix.len()) & 3;
 
-            // Align the key so we can do an aligned load for the mask
-            let layout = Layout::from_size_align_unchecked(AVX2_ALIGNMENT, AVX2_ALIGNMENT);
-            let mem_ptr = alloc(layout);
+            if !aligned_data.is_empty() {
+                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
+                key_bytes.rotate_left(offset);
+                let mask = _mm256_set1_epi32(i32::from_le_bytes(key_bytes));
 
-            ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
-
-            for j in (4 - offset..AVX2_ALIGNMENT - offset).step_by(4) {
-                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+                for block in &mut *aligned_data {
+                    *block = _mm256_xor_si256(*block, mask);
+                }
             }
-
-            if offset != 0 {
-                ptr::copy_nonoverlapping(
-                    key.as_ptr(),
-                    mem_ptr.add(AVX2_ALIGNMENT - offset),
-                    offset,
-                );
-            }
-
-            let mask = _mm256_load_si256(mem_ptr.cast());
-
-            for block in &mut *aligned_data {
-                *block = _mm256_xor_si256(*block, mask);
-            }
-
-            dealloc(mem_ptr, layout);
 
             // Run fallback implementation on unaligned suffix data
             offset = (offset + aligned_data.len() * AVX2_ALIGNMENT) & 3;
@@ -144,11 +104,7 @@ mod imp {
     target_feature = "sse2"
 ))]
 mod imp {
-    use std::{
-        alloc::{alloc, dealloc, Layout},
-        arch::x86_64::{__m128i, _mm_load_si128, _mm_xor_si128},
-        ptr,
-    };
+    use std::arch::x86_64::{__m128i, _mm_set1_epi32, _mm_xor_si128};
 
     /// SSE2 can operate on 128-bit input data.
     const SSE2_ALIGNMENT: usize = 16;
@@ -169,31 +125,15 @@ mod imp {
             super::fallback_frame(key, prefix, offset);
             offset = (offset + prefix.len()) & 3;
 
-            // Align the key so we can do an aligned load for the mask
-            let layout = Layout::from_size_align_unchecked(SSE2_ALIGNMENT, SSE2_ALIGNMENT);
-            let mem_ptr = alloc(layout);
+            if !aligned_data.is_empty() {
+                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
+                key_bytes.rotate_left(offset);
+                let mask = _mm_set1_epi32(i32::from_le_bytes(key_bytes));
 
-            ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
-
-            for j in (4 - offset..SSE2_ALIGNMENT - offset).step_by(4) {
-                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+                for block in &mut *aligned_data {
+                    *block = _mm_xor_si128(*block, mask);
+                }
             }
-
-            if offset != 0 {
-                ptr::copy_nonoverlapping(
-                    key.as_ptr(),
-                    mem_ptr.add(SSE2_ALIGNMENT - offset),
-                    offset,
-                );
-            }
-
-            let mask = _mm_load_si128(mem_ptr.cast());
-
-            for block in &mut *aligned_data {
-                *block = _mm_xor_si128(*block, mask);
-            }
-
-            dealloc(mem_ptr, layout);
 
             // Run fallback implementation on unaligned suffix data
             offset = (offset + aligned_data.len() * SSE2_ALIGNMENT) & 3;
