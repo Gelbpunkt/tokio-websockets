@@ -4,8 +4,10 @@
 //!     nightly rust)
 //!   - One AVX2-based implementation that masks 32 bytes per cycle
 //!   - One SSE2-based implementation that masks 16 bytes per cycle
-//!   - One NEON-based implementation that masks 16 bytes per cycle
-//!   - One AltiVec-based implementation that masks 16 bytes per cycle
+//!   - One NEON-based implementation that masks 16 bytes per cycle (requires
+//!     nightly rust on 32-bit ARM)
+//!   - One AltiVec-based implementation that masks 16 bytes per cycle (requires
+//!     nightly rust)
 //!   - A fallback implementation without SIMD
 //!
 //! The SIMD implementations will only be used if the `simd` feature is active.
@@ -147,16 +149,9 @@ mod imp {
 ))]
 mod imp {
     #[cfg(target_arch = "aarch64")]
-    use std::arch::aarch64::{uint8x16_t, veorq_u8, vld1q_u8};
+    use std::arch::aarch64::{uint8x16_t, veorq_u8, vld1q_dup_s32, vreinterpretq_u8_s32};
     #[cfg(target_arch = "arm")]
-    use std::arch::arm::{uint8x16_t, veorq_u8, vld1q_u8};
-    use std::{
-        alloc::{alloc, dealloc, Layout},
-        ptr,
-    };
-
-    /// NEON can operate on 128-bit input data.
-    const NEON_ALIGNMENT: usize = 16;
+    use std::arch::arm::{uint8x16_t, veorq_u8, vld1q_dup_s32, vreinterpretq_u8_s32};
 
     /// (Un-)masks input bytes with the framing key using NEON.
     ///
@@ -174,35 +169,17 @@ mod imp {
             super::fallback_frame(key, prefix, offset);
             offset = (offset + prefix.len()) & 3;
 
-            // vld1q_u8 has no alignment requirements whatsoever, ARM accepts unaligned
-            // pointers. However, it seems that on 32-bit ARM, alignment is an optional
-            // parameter in the instruction. It does not really hurt to align it to allow
-            // the compiler to generate the optimized 32-bit instructions just in case it
-            // matters.
-            let layout = Layout::from_size_align_unchecked(NEON_ALIGNMENT, NEON_ALIGNMENT);
-            let mem_ptr = alloc(layout);
+            if !aligned_data.is_empty() {
+                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
+                key_bytes.rotate_left(offset);
+                let mask = vreinterpretq_u8_s32(vld1q_dup_s32(
+                    &i32::from_ne_bytes(key_bytes) as *const i32
+                ));
 
-            ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
-
-            for j in (4 - offset..NEON_ALIGNMENT - offset).step_by(4) {
-                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+                for block in &mut *aligned_data {
+                    *block = veorq_u8(*block, mask);
+                }
             }
-
-            if offset != 0 {
-                ptr::copy_nonoverlapping(
-                    key.as_ptr(),
-                    mem_ptr.add(NEON_ALIGNMENT - offset),
-                    offset,
-                );
-            }
-
-            let mask = vld1q_u8(mem_ptr);
-
-            for block in &mut *aligned_data {
-                *block = veorq_u8(*block, mask);
-            }
-
-            dealloc(mem_ptr, layout);
 
             // Run fallback implementation on unaligned suffix data
             super::fallback_frame(key, suffix, offset);
@@ -214,16 +191,10 @@ mod imp {
 #[cfg(all(feature = "simd", feature = "nightly", target_feature = "altivec"))]
 mod imp {
     #[cfg(target_arch = "powerpc")]
-    use std::arch::powerpc::{vec_ld, vec_xor, vector_unsigned_char};
+    use std::arch::powerpc::{vec_splats, vec_xor, vector_unsigned_char};
     #[cfg(target_arch = "powerpc64")]
-    use std::arch::powerpc64::{vec_ld, vec_xor, vector_unsigned_char};
-    use std::{
-        alloc::{alloc, dealloc, Layout},
-        ptr,
-    };
-
-    /// AltiVec can operate on 128-bit input data.
-    const VSX_ALIGNMENT: usize = 16;
+    use std::arch::powerpc64::{vec_splats, vec_xor, vector_unsigned_char};
+    use std::mem::transmute;
 
     /// (Un-)masks input bytes with the framing key using AltiVec.
     ///
@@ -241,27 +212,17 @@ mod imp {
             super::fallback_frame(key, prefix, offset);
             offset = (offset + prefix.len()) & 3;
 
-            // Align the key so we can do an aligned load for the mask
-            let layout = Layout::from_size_align_unchecked(VSX_ALIGNMENT, VSX_ALIGNMENT);
-            let mem_ptr = alloc(layout);
+            if !aligned_data.is_empty() {
+                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
+                key_bytes.rotate_left(offset);
+                // SAFETY: 4x i32 to 16x u8 is safe
+                let mask: vector_unsigned_char =
+                    transmute(vec_splats(i32::from_ne_bytes(key_bytes)));
 
-            ptr::copy_nonoverlapping(key.as_ptr().add(offset), mem_ptr, 4 - offset);
-
-            for j in (4 - offset..VSX_ALIGNMENT - offset).step_by(4) {
-                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(j), 4);
+                for block in &mut *aligned_data {
+                    *block = vec_xor(*block, mask);
+                }
             }
-
-            if offset != 0 {
-                ptr::copy_nonoverlapping(key.as_ptr(), mem_ptr.add(VSX_ALIGNMENT - offset), offset);
-            }
-
-            let mask = vec_ld(0, mem_ptr.cast_const());
-
-            for block in &mut *aligned_data {
-                *block = vec_xor(*block, mask);
-            }
-
-            dealloc(mem_ptr, layout);
 
             // Run fallback implementation on unaligned suffix data
             super::fallback_frame(key, suffix, offset);
