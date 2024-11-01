@@ -240,7 +240,7 @@ where
                 let mut frame = frame;
                 let mut payload = BytesMut::from(frame.payload);
                 let mask = crate::rand::get_mask();
-                crate::mask::frame(&mask, &mut payload, 0);
+                crate::mask::frame(mask, &mut payload, 0);
                 frame.payload = Payload::from(payload);
 
                 (frame, Some(mask))

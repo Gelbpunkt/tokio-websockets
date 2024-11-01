@@ -186,7 +186,11 @@ impl Decoder for WebSocketProtocol {
                             let payload_masked = rest_of_payload
                                 .get_unchecked_mut(self.payload_processed..payload_available);
 
-                            mask::frame(masking_key, payload_masked, self.payload_processed & 3);
+                            mask::frame(
+                                (*masking_key).try_into().unwrap_unchecked(),
+                                payload_masked,
+                                self.payload_processed & 3,
+                            );
                         };
                     }
 
@@ -216,7 +220,11 @@ impl Decoder for WebSocketProtocol {
                     let payload_masked =
                         rest_of_payload.get_unchecked_mut(self.payload_processed..payload_length);
 
-                    mask::frame(masking_key, payload_masked, self.payload_processed & 3);
+                    mask::frame(
+                        (*masking_key).try_into().unwrap_unchecked(),
+                        payload_masked,
+                        self.payload_processed & 3,
+                    );
                 };
             }
 
