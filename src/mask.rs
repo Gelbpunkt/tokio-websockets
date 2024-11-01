@@ -28,18 +28,18 @@ mod imp {
     /// This will use a fallback implementation for less than 64 bytes. For
     /// sufficiently large inputs, it masks in chunks of 64 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
+    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<__m512i>();
 
             // Run fallback implementation on unaligned prefix data
             super::fallback_frame(key, prefix, offset);
-            offset = (offset + prefix.len()) & 3;
+            offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
-                key_bytes.rotate_left(offset);
-                let mask = _mm512_set1_epi32(i32::from_le_bytes(key_bytes));
+                key.rotate_left(offset);
+                offset = 0;
+                let mask = _mm512_set1_epi32(i32::from_le_bytes(key));
 
                 for block in &mut *aligned_data {
                     *block = _mm512_xor_si512(*block, mask);
@@ -72,18 +72,18 @@ mod imp {
     /// This will use a fallback implementation for less than 32 bytes. For
     /// sufficiently large inputs, it masks in chunks of 32 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
+    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<__m256i>();
 
             // Run fallback implementation on unaligned prefix data
             super::fallback_frame(key, prefix, offset);
-            offset = (offset + prefix.len()) & 3;
+            offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
-                key_bytes.rotate_left(offset);
-                let mask = _mm256_set1_epi32(i32::from_le_bytes(key_bytes));
+                key.rotate_left(offset);
+                offset = 0;
+                let mask = _mm256_set1_epi32(i32::from_le_bytes(key));
 
                 for block in &mut *aligned_data {
                     *block = _mm256_xor_si256(*block, mask);
@@ -117,18 +117,18 @@ mod imp {
     /// This will use a fallback implementation for less than 16 bytes. For
     /// sufficiently large inputs, it masks in chunks of 16 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
+    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<__m128i>();
 
             // Run fallback implementation on unaligned prefix data
             super::fallback_frame(key, prefix, offset);
-            offset = (offset + prefix.len()) & 3;
+            offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
-                key_bytes.rotate_left(offset);
-                let mask = _mm_set1_epi32(i32::from_le_bytes(key_bytes));
+                key.rotate_left(offset);
+                offset = 0;
+                let mask = _mm_set1_epi32(i32::from_le_bytes(key));
 
                 for block in &mut *aligned_data {
                     *block = _mm_xor_si128(*block, mask);
@@ -161,20 +161,19 @@ mod imp {
     /// This will use a fallback implementation for less than 16 bytes. For
     /// sufficiently large inputs, it masks in chunks of 16 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
+    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<uint8x16_t>();
 
             // Run fallback implementation on unaligned prefix data
             super::fallback_frame(key, prefix, offset);
-            offset = (offset + prefix.len()) & 3;
+            offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
-                key_bytes.rotate_left(offset);
-                let mask = vreinterpretq_u8_s32(vld1q_dup_s32(
-                    &i32::from_ne_bytes(key_bytes) as *const i32
-                ));
+                key.rotate_left(offset);
+                offset = 0;
+                let mask =
+                    vreinterpretq_u8_s32(vld1q_dup_s32(&i32::from_ne_bytes(key) as *const i32));
 
                 for block in &mut *aligned_data {
                     *block = veorq_u8(*block, mask);
@@ -204,20 +203,19 @@ mod imp {
     /// This will use a fallback implementation for less than 16 bytes. For
     /// sufficiently large inputs, it masks in chunks of 16 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(key: &[u8], input: &mut [u8], mut offset: usize) {
+    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<vector_unsigned_char>();
 
             // Run fallback implementation on unaligned prefix data
             super::fallback_frame(key, prefix, offset);
-            offset = (offset + prefix.len()) & 3;
+            offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                let mut key_bytes: [u8; 4] = key.try_into().unwrap_unchecked();
-                key_bytes.rotate_left(offset);
+                key.rotate_left(offset);
+                offset = 0;
                 // SAFETY: 4x i32 to 16x u8 is safe
-                let mask: vector_unsigned_char =
-                    transmute(vec_splats(i32::from_ne_bytes(key_bytes)));
+                let mask: vector_unsigned_char = transmute(vec_splats(i32::from_ne_bytes(key)));
 
                 for block in &mut *aligned_data {
                     *block = vec_xor(*block, mask);
@@ -263,7 +261,7 @@ mod imp {
     /// The input bytes may be further in the payload and therefore the offset
     /// into the payload must be specified.
     #[inline]
-    pub fn frame(key: &[u8], input: &mut [u8], offset: usize) {
+    pub fn frame(key: [u8; 4], input: &mut [u8], offset: usize) {
         super::fallback_frame(key, input, offset);
     }
 }
@@ -275,9 +273,9 @@ mod imp {
 ///
 /// This is used as the internal implementation in non-SIMD builds and as a
 /// fallback in SIMD builds.
-pub fn fallback_frame(key: &[u8], input: &mut [u8], offset: usize) {
+pub fn fallback_frame(key: [u8; 4], input: &mut [u8], offset: usize) {
     for (index, byte) in input.iter_mut().enumerate() {
-        *byte ^= key[(index + offset) & 3];
+        *byte ^= key[(index + offset) % key.len()];
     }
 }
 
@@ -295,8 +293,8 @@ fn test_mask() {
     let mut data = data[2..998].to_vec();
     let mut data_clone = data.clone();
     let key = get_mask();
-    frame(&key, &mut data, 0);
-    fallback_frame(&key, &mut data_clone, 0);
+    frame(key, &mut data, 0);
+    fallback_frame(key, &mut data_clone, 0);
 
     assert_eq!(&data, &data_clone);
 }
