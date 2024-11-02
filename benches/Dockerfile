@@ -4,7 +4,7 @@ FROM docker.io/library/alpine:edge AS builder
 # Update the system and install dependencies
 RUN apk update --no-cache && \
     apk upgrade --no-cache && \
-    apk add --no-cache curl clang18 llvm18 gcc g++ make git zlib-dev openssl-dev && \
+    apk add --no-cache curl clang19 llvm19 gcc g++ make git zlib-dev openssl-dev && \
     curl -sSf https://sh.rustup.rs | sh -s -- --profile minimal --component rust-src --default-toolchain nightly -y
 
 WORKDIR /build
