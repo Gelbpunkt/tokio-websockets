@@ -24,6 +24,8 @@ use std::{
     feature = "rustls-bring-your-own-connector"
 ))]
 use rustls_pki_types::ServerName;
+#[cfg(feature = "rustls-platform-verifier")]
+use rustls_platform_verifier::BuilderVerifierExt;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 #[cfg(all(
     any(
@@ -49,11 +51,12 @@ use tokio_rustls::rustls::crypto::ring;
     feature = "rustls-platform-verifier"
 ))]
 use tokio_rustls::rustls::crypto::CryptoProvider;
-#[cfg(all(
-    any(feature = "rustls-native-roots", feature = "rustls-webpki-roots"),
-    not(feature = "rustls-platform-verifier")
+#[cfg(any(
+    feature = "rustls-native-roots",
+    feature = "rustls-webpki-roots",
+    feature = "rustls-platform-verifier"
 ))]
-use tokio_rustls::rustls::{ClientConfig, RootCertStore};
+use tokio_rustls::rustls::ClientConfig;
 
 use crate::Error;
 
@@ -310,12 +313,15 @@ impl Connector {
     pub fn new_rustls_with_crypto_provider(provider: Arc<CryptoProvider>) -> Result<Self, Error> {
         // The rustls-platform-verifier changes the certificate verifier and is
         // therefore incompatible with the other two features
+        let config_builder =
+            ClientConfig::builder_with_provider(provider).with_safe_default_protocol_versions()?;
+
         #[cfg(feature = "rustls-platform-verifier")]
-        let config = rustls_platform_verifier::tls_config_with_provider(provider)?;
+        let config_builder = config_builder.with_platform_verifier();
 
         #[cfg(not(feature = "rustls-platform-verifier"))]
-        let config = {
-            let mut roots = RootCertStore::empty();
+        let config_builder = {
+            let mut roots = tokio_rustls::rustls::RootCertStore::empty();
 
             #[cfg(feature = "rustls-native-roots")]
             {
@@ -339,14 +345,12 @@ impl Connector {
                 roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
             };
 
-            ClientConfig::builder_with_provider(provider)
-                .with_safe_default_protocol_versions()?
-                .with_root_certificates(roots)
-                .with_no_client_auth()
+            config_builder.with_root_certificates(roots)
         };
 
-        let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
-        Ok(Self::Rustls(connector))
+        Ok(Self::Rustls(tokio_rustls::TlsConnector::from(Arc::new(
+            config_builder.with_no_client_auth(),
+        ))))
     }
 
     /// Wraps a given stream with a layer of TLS.
