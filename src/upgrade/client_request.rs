@@ -4,7 +4,7 @@ use bytes::{Buf, BytesMut};
 use httparse::Request;
 use tokio_util::codec::Decoder;
 
-use crate::{sha::digest, upgrade::Error, utf8::parse_str};
+use crate::{sha::digest, upgrade::Error};
 
 /// A static HTTP/1.1 101 Switching Protocols response up until the
 /// `Sec-WebSocket-Accept` header value.
@@ -88,7 +88,7 @@ impl ClientRequest {
 }
 
 /// A codec that implements a [`Decoder`] for HTTP/1.1 upgrade requests and
-/// yields a HTTP/1.1 response to reply with.
+/// yields the request and a HTTP/1.1 response to reply with.
 ///
 /// It does not implement an [`Encoder`].
 ///
@@ -97,7 +97,7 @@ pub struct Codec {}
 
 impl Decoder for Codec {
     type Error = crate::Error;
-    type Item = String;
+    type Item = (http::Request<()>, String);
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let mut headers = [httparse::EMPTY_HEADER; 64];
@@ -110,9 +110,38 @@ impl Decoder for Codec {
 
         let request_len = status.unwrap();
 
+        let mut builder = http::request::Builder::new();
+        if let Some(m) = request.method {
+            let method = http::method::Method::from_bytes(m.as_bytes())
+                .map_err(|e| Error::InvalidRequest(e.into()))?;
+            builder = builder.method(method);
+        }
+        if let Some(uri) = request.path {
+            builder = builder.uri(uri);
+        }
+        match request.version {
+            Some(0) => builder = builder.version(http::Version::HTTP_10),
+            Some(1) => builder = builder.version(http::Version::HTTP_11),
+            _ => Err(Error::Parsing(httparse::Error::Version))?,
+        }
+        for h in headers {
+            builder = builder.header(
+                h.name,
+                http::HeaderValue::from_bytes(&h.value)
+                    .map_err(|e| Error::InvalidRequest(e.into()))?,
+            );
+        }
+
+        let request = builder
+            .body(())
+            .map_err(|e| Error::InvalidRequest(e.into()))?;
+
         let ws_accept = ClientRequest::parse(|name| {
-            let h = headers.iter().find(|h| h.name.eq_ignore_ascii_case(name))?;
-            parse_str(h.value).ok()
+            request
+                .headers()
+                .get(name)
+                .map(|h| h.to_str().ok())
+                .flatten()
         })?
         .ws_accept();
 
@@ -124,6 +153,6 @@ impl Decoder for Codec {
         resp.push_str(&ws_accept);
         resp.push_str("\r\n\r\n");
 
-        Ok(Some(resp))
+        Ok(Some((request, resp)))
     }
 }

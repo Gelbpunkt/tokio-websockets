@@ -27,6 +27,9 @@ pub enum Error {
     UnsupportedWebSocketVersion,
     /// Failed to parse client request or server response.
     Parsing(httparse::Error),
+    /// Failed to convert request to a http request.
+    #[cfg(feature = "server")]
+    InvalidRequest(http::Error),
     /// Server did not return a HTTP Switching Protocols response.
     DidNotSwitchProtocols(u16),
     /// Server returned a `Sec-WebSocket-Accept` that is not compatible with the
@@ -45,6 +48,8 @@ impl fmt::Display for Error {
             Error::ConnectionNotUpgrade => f.write_str("connection header value was not upgrade"),
             Error::UnsupportedWebSocketVersion => f.write_str("unsupported WebSocket version"),
             Error::Parsing(e) => e.fmt(f),
+            #[cfg(feature = "server")]
+            Error::InvalidRequest(e) => e.fmt(f),
             Error::DidNotSwitchProtocols(status) => {
                 f.write_str("expected HTTP 101 Switching Protocols, got status code ")?;
                 f.write_fmt(format_args!("{status}"))
@@ -64,6 +69,7 @@ impl std::error::Error for Error {
             | Error::DidNotSwitchProtocols(_)
             | Error::WrongWebSocketAccept => None,
             Error::Parsing(e) => Some(e),
+            Error::InvalidRequest(e) => Some(e),
         }
     }
 }
