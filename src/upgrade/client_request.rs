@@ -125,6 +125,9 @@ impl Decoder for Codec {
             _ => Err(Error::Parsing(httparse::Error::Version))?,
         }
         for h in headers {
+            if h.name.is_empty() {
+                continue;
+            }
             builder = builder.header(
                 h.name,
                 http::HeaderValue::from_bytes(h.value)
