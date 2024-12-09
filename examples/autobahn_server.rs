@@ -19,7 +19,7 @@ async fn accept_connection(stream: TcpStream) {
 }
 
 async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
-    let mut ws_stream = ServerBuilder::new()
+    let (_request, mut ws_stream) = ServerBuilder::new()
         .limits(Limits::unlimited())
         .accept(stream)
         .await?;
