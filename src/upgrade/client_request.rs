@@ -127,23 +127,16 @@ impl Decoder for Codec {
         for h in headers {
             builder = builder.header(
                 h.name,
-                http::HeaderValue::from_bytes(&h.value)
+                http::HeaderValue::from_bytes(h.value)
                     .map_err(|e| Error::InvalidRequest(e.into()))?,
             );
         }
 
-        let request = builder
-            .body(())
-            .map_err(|e| Error::InvalidRequest(e.into()))?;
+        let request = builder.body(()).map_err(Error::InvalidRequest)?;
 
-        let ws_accept = ClientRequest::parse(|name| {
-            request
-                .headers()
-                .get(name)
-                .map(|h| h.to_str().ok())
-                .flatten()
-        })?
-        .ws_accept();
+        let ws_accept =
+            ClientRequest::parse(|name| request.headers().get(name).and_then(|h| h.to_str().ok()))?
+                .ws_accept();
 
         src.advance(request_len);
 

@@ -69,6 +69,7 @@ impl std::error::Error for Error {
             | Error::DidNotSwitchProtocols(_)
             | Error::WrongWebSocketAccept => None,
             Error::Parsing(e) => Some(e),
+            #[cfg(feature = "server")]
             Error::InvalidRequest(e) => Some(e),
         }
     }
