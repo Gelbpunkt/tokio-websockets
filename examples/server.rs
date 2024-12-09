@@ -8,7 +8,7 @@ async fn main() -> Result<(), Error> {
 
     loop {
         let (conn, _) = listener.accept().await?;
-        let mut server = ServerBuilder::new().accept(conn).await?;
+        let (_request, mut server) = ServerBuilder::new().accept(conn).await?;
 
         while let Some(Ok(item)) = server.next().await {
             println!("Received: {item:?}");

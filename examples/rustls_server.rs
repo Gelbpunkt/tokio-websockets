@@ -48,7 +48,7 @@ async fn main() -> io::Result<()> {
         let fut = async move {
             let stream = acceptor.accept(stream).await?;
 
-            let mut ws = tokio_websockets::ServerBuilder::new()
+            let (_request, mut ws) = tokio_websockets::ServerBuilder::new()
                 .accept(stream)
                 .await?;
 
