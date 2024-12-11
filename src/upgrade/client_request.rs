@@ -140,9 +140,9 @@ impl Decoder for Codec {
             header_map.insert(name, value);
         }
 
-        builder.headers_mut().replace(&mut header_map);
-
-        let request = builder.body(()).map_err(Error::InvalidRequest)?;
+        // You have to build the request before you can assign headers: https://github.com/hyperium/http/issues/91
+        let mut request = builder.body(()).map_err(Error::InvalidRequest)?;
+        *request.headers_mut() = header_map;
 
         let ws_accept =
             ClientRequest::parse(|name| request.headers().get(name).and_then(|h| h.to_str().ok()))?
