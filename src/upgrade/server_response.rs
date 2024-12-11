@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
-use http::{header::HeaderName, HeaderValue, StatusCode, Version};
+use http::{header::HeaderName, HeaderValue, StatusCode};
 use httparse::{Header, Response};
 use tokio_util::codec::Decoder;
 
