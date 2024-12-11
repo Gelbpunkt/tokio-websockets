@@ -79,7 +79,12 @@ impl Decoder for Codec {
         let mut parsed_response = http::Response::new(());
         *parsed_response.status_mut() =
             StatusCode::from_u16(code).map_err(|_| Error::Parsing(httparse::Error::Status))?;
-        *parsed_response.version_mut() = Version::HTTP_11;
+
+        match response.version {
+            Some(0) => *parsed_response.version_mut() = http::Version::HTTP_10,
+            Some(1) => *parsed_response.version_mut() = http::Version::HTTP_11,
+            _ => Err(Error::Parsing(httparse::Error::Version))?,
+        }
 
         let header_map = parsed_response.headers_mut();
 

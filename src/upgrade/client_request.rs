@@ -1,4 +1,6 @@
 //! A [`Codec`] to parse client HTTP Upgrade handshakes and validate them.
+use std::str::FromStr;
+
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
 use httparse::Request;
@@ -116,24 +118,29 @@ impl Decoder for Codec {
                 .map_err(|e| Error::InvalidRequest(e.into()))?;
             builder = builder.method(method);
         }
+
         if let Some(uri) = request.path {
             builder = builder.uri(uri);
         }
+
         match request.version {
             Some(0) => builder = builder.version(http::Version::HTTP_10),
             Some(1) => builder = builder.version(http::Version::HTTP_11),
             _ => Err(Error::Parsing(httparse::Error::Version))?,
         }
-        for h in headers {
-            if h.name.is_empty() {
-                continue;
-            }
-            builder = builder.header(
-                h.name,
-                http::HeaderValue::from_bytes(h.value)
-                    .map_err(|e| Error::InvalidRequest(e.into()))?,
-            );
+
+        let mut header_map = http::HeaderMap::with_capacity(request.headers.len());
+
+        for header in request.headers {
+            let name = http::HeaderName::from_str(header.name)
+                .map_err(|_| Error::Parsing(httparse::Error::HeaderName))?;
+            let value = http::HeaderValue::from_bytes(header.value)
+                .map_err(|_| Error::Parsing(httparse::Error::HeaderValue))?;
+
+            header_map.insert(name, value);
         }
+
+        builder.headers_mut().replace(&mut header_map);
 
         let request = builder.body(()).map_err(Error::InvalidRequest)?;
 
