@@ -11,7 +11,10 @@ use std::{future::poll_fn, io, pin::Pin, str::FromStr};
 
 use base64::{engine::general_purpose, Engine};
 use futures_core::Stream;
-use http::{header::HeaderName, HeaderMap, HeaderValue, Uri};
+use http::{
+    header::{self, HeaderName},
+    HeaderMap, HeaderValue, Uri,
+};
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
@@ -24,6 +27,15 @@ use crate::{
     upgrade::{self, server_response},
     Connector, Error, MaybeTlsStream, WebSocketStream,
 };
+
+/// List of headers added by the request builder to not duplicate them.
+static SKIPPED_HEADERS: [HeaderName; 5] = [
+    header::HOST,
+    header::UPGRADE,
+    header::CONNECTION,
+    header::SEC_WEBSOCKET_KEY,
+    header::SEC_WEBSOCKET_VERSION,
+];
 
 /// Generates a new, random 16-byte WebSocket key and encodes it as base64.
 pub(crate) fn make_key() -> [u8; 24] {
@@ -88,6 +100,9 @@ fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
     buf.extend_from_slice(b"\r\nSec-WebSocket-Version: 13\r\n");
 
     for (name, value) in headers {
+        if SKIPPED_HEADERS.contains(name) {
+            continue;
+        }
         buf.extend_from_slice(name.as_str().as_bytes());
         buf.extend_from_slice(b": ");
         buf.extend_from_slice(value.as_bytes());
