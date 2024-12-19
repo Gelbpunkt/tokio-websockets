@@ -28,15 +28,6 @@ use crate::{
     Connector, Error, MaybeTlsStream, WebSocketStream,
 };
 
-/// List of headers added by the request builder to not duplicate them.
-static SKIPPED_HEADERS: [HeaderName; 5] = [
-    header::HOST,
-    header::UPGRADE,
-    header::CONNECTION,
-    header::SEC_WEBSOCKET_KEY,
-    header::SEC_WEBSOCKET_VERSION,
-];
-
 /// Generates a new, random 16-byte WebSocket key and encodes it as base64.
 pub(crate) fn make_key() -> [u8; 24] {
     let mut key_base64 = [0; 24];
@@ -100,9 +91,6 @@ fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
     buf.extend_from_slice(b"\r\nSec-WebSocket-Version: 13\r\n");
 
     for (name, value) in headers {
-        if SKIPPED_HEADERS.contains(name) {
-            continue;
-        }
         buf.extend_from_slice(name.as_str().as_bytes());
         buf.extend_from_slice(b": ");
         buf.extend_from_slice(value.as_bytes());
@@ -165,6 +153,22 @@ impl Builder<'_> {
 }
 
 impl<'a, R: Resolver> Builder<'a, R> {
+    /// List of headers added by the client which will cause an error
+    /// if added by the user:
+    ///
+    /// - `host`
+    /// - `upgrade`
+    /// - `connection`
+    /// - `sec-websocket-key`
+    /// - `sec_websocket_version`
+    pub const DISALLOWED_HEADERS: &'static [HeaderName] = &[
+        header::HOST,
+        header::UPGRADE,
+        header::CONNECTION,
+        header::SEC_WEBSOCKET_KEY,
+        header::SEC_WEBSOCKET_VERSION,
+    ];
+
     /// Sets the [`Uri`] to connect to. This URI must use the `ws` or `wss`
     /// schemes.
     ///
@@ -233,11 +237,19 @@ impl<'a, R: Resolver> Builder<'a, R> {
     }
 
     /// Adds an extra HTTP header to the handshake request.
+    ///
+    /// Headers added by the client are not allowed,
+    /// see. [`DISALLOWED_HEADERS`].
+    ///
+    /// [`DISALLOWED_HEADERS`]: Self::DISALLOWED_HEADERS
     #[must_use]
-    pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Self {
+    pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Result<Self, Error> {
+        if Self::DISALLOWED_HEADERS.contains(&name) {
+            return Err(Error::DisallowedHeader);
+        }
         self.headers.insert(name, value);
 
-        self
+        Ok(self)
     }
 
     /// Establishes a connection to the WebSocket server. This requires a URI to
