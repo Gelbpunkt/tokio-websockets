@@ -238,11 +238,13 @@ impl<'a, R: Resolver> Builder<'a, R> {
 
     /// Adds an extra HTTP header to the handshake request.
     ///
-    /// Headers added by the client are not allowed,
-    /// see. [`DISALLOWED_HEADERS`].
+    /// # Errors
     ///
+    /// Returns [`Error::DisallowedHeader`] if the header is in
+    /// the [`DISALLOWED_HEADERS`] list.
+    ///
+    /// [`Error::DisallowedHeader`]: Error::DisallowedHeader
     /// [`DISALLOWED_HEADERS`]: Self::DISALLOWED_HEADERS
-    #[must_use]
     pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Result<Self, Error> {
         if Self::DISALLOWED_HEADERS.contains(&name) {
             return Err(Error::DisallowedHeader);
