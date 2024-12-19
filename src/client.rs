@@ -117,12 +117,12 @@ pub struct Builder<'a, R: Resolver = resolver::Gai> {
     headers: HeaderMap,
 }
 
-impl Builder<'_> {
+impl<'a, R: Resolver> Builder<'a, R> {
     /// Creates a [`Builder`] with all defaults that is not configured to
     /// connect to any server.
     #[must_use]
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Builder<'a, resolver::Gai> {
+        Builder {
             uri: None,
             connector: None,
             resolver: resolver::Gai,
@@ -137,11 +137,27 @@ impl Builder<'_> {
     ///
     /// This method never fails as the URI has already been parsed.
     #[must_use]
-    pub fn from_uri(uri: Uri) -> Self {
-        Self {
+    pub fn from_uri(uri: Uri) -> Builder<'a, resolver::Gai> {
+        Builder {
             uri: Some(uri),
             connector: None,
             resolver: resolver::Gai,
+            config: Config::default(),
+            limits: Limits::default(),
+            headers: HeaderMap::new(),
+        }
+    }
+
+    /// Creates a [`Builder`] with all defaults that is configured use a
+    /// specific [resolver].
+    ///
+    /// [resolver]: Resolver
+    #[must_use]
+    pub fn with_resovler(resolver: R) -> Builder<'a, R> {
+        Builder {
+            uri: None,
+            connector: None,
+            resolver,
             config: Config::default(),
             limits: Limits::default(),
             headers: HeaderMap::new(),
