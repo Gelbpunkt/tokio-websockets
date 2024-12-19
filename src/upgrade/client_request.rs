@@ -1,10 +1,12 @@
 //! A [`Codec`] to parse client HTTP Upgrade handshakes and validate them.
+use std::str::FromStr;
+
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bytes::{Buf, BytesMut};
 use httparse::Request;
 use tokio_util::codec::Decoder;
 
-use crate::{sha::digest, upgrade::Error, utf8::parse_str};
+use crate::{sha::digest, upgrade::Error};
 
 /// A static HTTP/1.1 101 Switching Protocols response up until the
 /// `Sec-WebSocket-Accept` header value.
@@ -88,7 +90,7 @@ impl ClientRequest {
 }
 
 /// A codec that implements a [`Decoder`] for HTTP/1.1 upgrade requests and
-/// yields a HTTP/1.1 response to reply with.
+/// yields the request and a HTTP/1.1 response to reply with.
 ///
 /// It does not implement an [`Encoder`].
 ///
@@ -97,7 +99,7 @@ pub struct Codec {}
 
 impl Decoder for Codec {
     type Error = crate::Error;
-    type Item = String;
+    type Item = (http::Request<()>, String);
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let mut headers = [httparse::EMPTY_HEADER; 64];
@@ -110,11 +112,43 @@ impl Decoder for Codec {
 
         let request_len = status.unwrap();
 
-        let ws_accept = ClientRequest::parse(|name| {
-            let h = headers.iter().find(|h| h.name.eq_ignore_ascii_case(name))?;
-            parse_str(h.value).ok()
-        })?
-        .ws_accept();
+        let mut builder = http::request::Builder::new();
+        if let Some(m) = request.method {
+            let method =
+                http::method::Method::from_bytes(m.as_bytes()).expect("httparse method is valid");
+            builder = builder.method(method);
+        }
+
+        if let Some(uri) = request.path {
+            builder = builder.uri(uri);
+        }
+
+        match request.version {
+            Some(0) => builder = builder.version(http::Version::HTTP_10),
+            Some(1) => builder = builder.version(http::Version::HTTP_11),
+            _ => Err(Error::Parsing(httparse::Error::Version))?,
+        }
+
+        let mut header_map = http::HeaderMap::with_capacity(request.headers.len());
+
+        for header in request.headers {
+            let name = http::HeaderName::from_str(header.name)
+                .map_err(|_| Error::Parsing(httparse::Error::HeaderName))?;
+            let value = http::HeaderValue::from_bytes(header.value)
+                .map_err(|_| Error::Parsing(httparse::Error::HeaderValue))?;
+
+            header_map.insert(name, value);
+        }
+
+        // You have to build the request before you can assign headers: https://github.com/hyperium/http/issues/91
+        let mut request = builder
+            .body(())
+            .expect("httparse sees the request as valid");
+        *request.headers_mut() = header_map;
+
+        let ws_accept =
+            ClientRequest::parse(|name| request.headers().get(name).and_then(|h| h.to_str().ok()))?
+                .ws_accept();
 
         src.advance(request_len);
 
@@ -124,6 +158,6 @@ impl Decoder for Codec {
         resp.push_str(&ws_accept);
         resp.push_str("\r\n\r\n");
 
-        Ok(Some(resp))
+        Ok(Some((request, resp)))
     }
 }

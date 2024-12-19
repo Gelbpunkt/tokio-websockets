@@ -70,18 +70,16 @@ impl Builder {
     pub async fn accept<S: AsyncRead + AsyncWrite + Unpin>(
         &self,
         stream: S,
-    ) -> Result<WebSocketStream<S>, Error> {
+    ) -> Result<(http::Request<()>, WebSocketStream<S>), Error> {
         let mut framed = FramedRead::new(stream, client_request::Codec {});
         let reply = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx)).await;
 
         match reply {
-            Some(Ok(response)) => {
+            Some(Ok((request, response))) => {
                 framed.get_mut().write_all(response.as_bytes()).await?;
-                Ok(WebSocketStream::from_framed(
-                    framed,
-                    Role::Server,
-                    self.config,
-                    self.limits,
+                Ok((
+                    request,
+                    WebSocketStream::from_framed(framed, Role::Server, self.config, self.limits),
                 ))
             }
             Some(Err(e)) => {
