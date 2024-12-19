@@ -114,8 +114,8 @@ impl Decoder for Codec {
 
         let mut builder = http::request::Builder::new();
         if let Some(m) = request.method {
-            let method = http::method::Method::from_bytes(m.as_bytes())
-                .map_err(|e| Error::InvalidRequest(e.into()))?;
+            let method =
+                http::method::Method::from_bytes(m.as_bytes()).expect("httparse method is valid");
             builder = builder.method(method);
         }
 
@@ -141,7 +141,9 @@ impl Decoder for Codec {
         }
 
         // You have to build the request before you can assign headers: https://github.com/hyperium/http/issues/91
-        let mut request = builder.body(()).map_err(Error::InvalidRequest)?;
+        let mut request = builder
+            .body(())
+            .expect("httparse sees the request as valid");
         *request.headers_mut() = header_map;
 
         let ws_accept =
