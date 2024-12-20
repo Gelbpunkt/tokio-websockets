@@ -45,7 +45,6 @@ impl fmt::Display for Error {
             Error::ConnectionNotUpgrade => f.write_str("connection header value was not upgrade"),
             Error::UnsupportedWebSocketVersion => f.write_str("unsupported WebSocket version"),
             Error::Parsing(e) => e.fmt(f),
-            #[cfg(feature = "server")]
             Error::DidNotSwitchProtocols(status) => {
                 f.write_str("expected HTTP 101 Switching Protocols, got status code ")?;
                 f.write_fmt(format_args!("{status}"))
