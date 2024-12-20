@@ -14,7 +14,7 @@ async fn run() -> Result<(), Error> {
         let (conn, _) = listener.accept().await?;
 
         tokio::spawn(tokio::task::unconstrained(async move {
-            let mut server = unsafe {
+            let (_request, mut server) = unsafe {
                 ServerBuilder::new()
                     .config(Config::default().frame_size(usize::MAX))
                     .limits(Limits::unlimited())
