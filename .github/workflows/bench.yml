@@ -1,0 +1,28 @@
+name: Relative benchmarks
+
+on: [push, pull_request]
+
+env:
+  CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
+  OPENSSL_VERSION: 3.3.2
+
+jobs:
+  run-benchmarks:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build . -f tokio-websockets/benches/Dockerfile -t benches_image
+      - name: Run Docker image
+        run: |
+          docker run -v ./benches:/benches benches_image
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: benches/results/
