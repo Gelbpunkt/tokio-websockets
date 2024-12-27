@@ -17,7 +17,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build . -f tokio-websockets/benches/Dockerfile -t benches_image
+          docker build . -f benches/Dockerfile -t benches_image
       - name: Run Docker image
         run: |
           docker run -v ./benches:/benches benches_image
