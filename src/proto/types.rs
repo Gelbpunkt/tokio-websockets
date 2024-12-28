@@ -389,14 +389,19 @@ impl Message {
     }
 
     /// Create a new close message. If an non-empty reason is specified, a
-    /// [`CloseCode`] must be specified for it to be included. The reason
-    /// cannot exceed 123 bytes.
+    /// [`CloseCode`] must be specified for it to be included.
+    ///
+    /// # Panics
+    /// If `code` is present and the `reason` exceeds 123 bytes,
+    /// the protocol-imposed limit.
     #[must_use]
     pub fn close(code: Option<CloseCode>, reason: &str) -> Self {
         let mut payload = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
 
         if let Some(code) = code {
             payload.put_u16(code.into());
+
+            assert!(reason.len() <= 123);
 
             payload.extend_from_slice(reason.as_bytes());
         }
@@ -407,18 +412,28 @@ impl Message {
         }
     }
 
-    /// Create a new ping message. The payload cannot exceed 125 bytes.
+    /// Create a new ping message.
+    ///
+    /// # Panics
+    /// If the payload exceeds 125 bytes, the protocol-imposed limit.
     #[must_use]
     pub fn ping<P: Into<Payload>>(payload: P) -> Self {
+        let payload = payload.into();
+        assert!(payload.len() <= 125);
         Self {
             opcode: OpCode::Ping,
-            payload: payload.into(),
+            payload,
         }
     }
 
-    /// Create a new pong message. The payload cannot exceed 125 bytes.
+    /// Create a new pong message.
+    ///
+    /// # Panics
+    /// If the payload exceeds 125 bytes, the protocol-imposed limit.
     #[must_use]
     pub fn pong<P: Into<Payload>>(payload: P) -> Self {
+        let payload = payload.into();
+        assert!(payload.len() <= 125);
         Self {
             opcode: OpCode::Pong,
             payload: payload.into(),
