@@ -32,9 +32,21 @@ impl From<ArbitraryMessage> for Message {
         match message {
             ArbitraryMessage::Binary(payload) => Message::binary(payload),
             ArbitraryMessage::Text(payload) => Message::text(payload),
-            ArbitraryMessage::Ping(payload) => Message::ping(payload),
-            ArbitraryMessage::Pong(payload) => Message::pong(payload),
-            ArbitraryMessage::Close(code, reason) => {
+            ArbitraryMessage::Ping(mut payload) => {
+                payload.truncate(125);
+                Message::ping(payload)
+            },
+            ArbitraryMessage::Pong(mut payload) => {
+                payload.truncate(125);
+                Message::pong(payload)
+            },
+            ArbitraryMessage::Close(code, mut reason) => {
+                for len in (119..=123).rev() {
+                    if reason.is_char_boundary(len) {
+                        reason.truncate(len);
+                        break;
+                    }
+                }
                 Message::close(CloseCode::try_from(code).ok(), &reason)
             }
         }
