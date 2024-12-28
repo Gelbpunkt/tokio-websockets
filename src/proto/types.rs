@@ -402,7 +402,6 @@ impl Message {
             payload.put_u16(code.into());
 
             assert!(reason.len() <= 123);
-
             payload.extend_from_slice(reason.as_bytes());
         }
 
@@ -436,7 +435,7 @@ impl Message {
         assert!(payload.len() <= 125);
         Self {
             opcode: OpCode::Pong,
-            payload: payload.into(),
+            payload,
         }
     }
 
