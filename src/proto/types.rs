@@ -389,7 +389,8 @@ impl Message {
     }
 
     /// Create a new close message. If an non-empty reason is specified, a
-    /// [`CloseCode`] must be specified for it to be included.
+    /// [`CloseCode`] must be specified for it to be included. The reason
+    /// cannot exceed 123 bytes.
     #[must_use]
     pub fn close(code: Option<CloseCode>, reason: &str) -> Self {
         let mut payload = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
@@ -406,7 +407,7 @@ impl Message {
         }
     }
 
-    /// Create a new ping message.
+    /// Create a new ping message. The payload cannot exceed 125 bytes.
     #[must_use]
     pub fn ping<P: Into<Payload>>(payload: P) -> Self {
         Self {
@@ -415,7 +416,7 @@ impl Message {
         }
     }
 
-    /// Create a new pong message.
+    /// Create a new pong message. The payload cannot exceed 125 bytes.
     #[must_use]
     pub fn pong<P: Into<Payload>>(payload: P) -> Self {
         Self {
@@ -690,7 +691,7 @@ impl Frame {
 
     /// Encode the frame head into `out`, returning how many bytes were written.
     pub fn encode(&self, out: &mut [u8; 10]) -> u8 {
-        out[0] = u8::from(self.is_final) << 7 | u8::from(self.opcode);
+        out[0] = (u8::from(self.is_final) << 7) | u8::from(self.opcode);
         if u16::try_from(self.payload.len()).is_err() {
             out[1] = 127;
             let len = u64::try_from(self.payload.len()).unwrap();

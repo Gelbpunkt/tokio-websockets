@@ -99,3 +99,33 @@ impl Builder {
         WebSocketStream::from_raw_stream(stream, Role::Server, self.config, self.limits)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use futures_sink::Sink;
+    use futures_util::SinkExt;
+
+    use super::Builder;
+    use crate::{CloseCode, Message};
+
+    #[tokio::test]
+    async fn control_payload_limit_send() {
+        for n in [124, 125, 126] {
+            for message in [
+                Message::ping(vec![0; n]),
+                Message::pong(vec![0; n]),
+                Message::close(
+                    Some(CloseCode::NORMAL_CLOSURE),
+                    &String::from("a").repeat(n - 2),
+                ),
+            ] {
+                let stream = Builder::new().serve(tokio::io::empty());
+                tokio::pin!(stream);
+
+                let err = stream.as_mut().start_send(message.clone()).err();
+                assert_eq!(err.is_some(), n > 125, "{n} {err:?} {message:?}");
+                stream.as_mut().flush().await.unwrap();
+            }
+        }
+    }
+}
