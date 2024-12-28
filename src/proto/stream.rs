@@ -340,7 +340,14 @@ where
             return Err(Error::AlreadyClosed);
         }
 
-        if item.opcode.is_control() || item.payload.len() <= self.config.frame_size {
+        let is_control = item.opcode.is_control();
+        if is_control || item.payload.len() <= self.config.frame_size {
+            if is_control && item.payload.len() > 125 {
+                return Err(Error::PayloadTooLong {
+                    len: item.payload.len(),
+                    max_len: 125,
+                });
+            }
             let frame: Frame = item.into();
             self.queue_frame(frame);
         } else {

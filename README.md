@@ -69,7 +69,7 @@ async fn main() -> Result<(), Error> {
 
   tokio::spawn(async move {
     while let Ok((stream, _)) = listener.accept().await {
-      let mut ws_stream = ServerBuilder::new()
+      let (_request, mut ws_stream) = ServerBuilder::new()
         .accept(stream)
         .await?;
 
