@@ -395,6 +395,7 @@ impl Message {
     /// If `code` is present and the `reason` exceeds 123 bytes,
     /// the protocol-imposed limit.
     #[must_use]
+    #[track_caller]
     pub fn close(code: Option<CloseCode>, reason: &str) -> Self {
         let mut payload = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
 
@@ -416,6 +417,7 @@ impl Message {
     /// # Panics
     /// If the payload exceeds 125 bytes, the protocol-imposed limit.
     #[must_use]
+    #[track_caller]
     pub fn ping<P: Into<Payload>>(payload: P) -> Self {
         let payload = payload.into();
         assert!(payload.len() <= 125);
@@ -430,6 +432,7 @@ impl Message {
     /// # Panics
     /// If the payload exceeds 125 bytes, the protocol-imposed limit.
     #[must_use]
+    #[track_caller]
     pub fn pong<P: Into<Payload>>(payload: P) -> Self {
         let payload = payload.into();
         assert!(payload.len() <= 125);
