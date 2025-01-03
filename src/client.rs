@@ -59,6 +59,22 @@ fn default_port(uri: &Uri) -> Option<u16> {
     }
 }
 
+/// List of headers added by the client which will cause an error
+/// if added by the user:
+///
+/// - `host`
+/// - `upgrade`
+/// - `connection`
+/// - `sec-websocket-key`
+/// - `sec-websocket-version`
+pub const DISALLOWED_HEADERS: &[HeaderName] = &[
+    header::HOST,
+    header::UPGRADE,
+    header::CONNECTION,
+    header::SEC_WEBSOCKET_KEY,
+    header::SEC_WEBSOCKET_VERSION,
+];
+
 /// Builds a HTTP/1.1 Upgrade request for a URI with extra headers and a
 /// WebSocket key.
 fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
@@ -153,22 +169,6 @@ impl Builder<'_> {
 }
 
 impl<'a, R: Resolver> Builder<'a, R> {
-    /// List of headers added by the client which will cause an error
-    /// if added by the user:
-    ///
-    /// - `host`
-    /// - `upgrade`
-    /// - `connection`
-    /// - `sec-websocket-key`
-    /// - `sec_websocket_version`
-    pub const DISALLOWED_HEADERS: &'static [HeaderName] = &[
-        header::HOST,
-        header::UPGRADE,
-        header::CONNECTION,
-        header::SEC_WEBSOCKET_KEY,
-        header::SEC_WEBSOCKET_VERSION,
-    ];
-
     /// Sets the [`Uri`] to connect to. This URI must use the `ws` or `wss`
     /// schemes.
     ///
@@ -242,11 +242,8 @@ impl<'a, R: Resolver> Builder<'a, R> {
     ///
     /// Returns [`Error::DisallowedHeader`] if the header is in
     /// the [`DISALLOWED_HEADERS`] list.
-    ///
-    /// [`Error::DisallowedHeader`]: Error::DisallowedHeader
-    /// [`DISALLOWED_HEADERS`]: Self::DISALLOWED_HEADERS
     pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Result<Self, Error> {
-        if Self::DISALLOWED_HEADERS.contains(&name) {
+        if DISALLOWED_HEADERS.contains(&name) {
             return Err(Error::DisallowedHeader);
         }
         self.headers.insert(name, value);
