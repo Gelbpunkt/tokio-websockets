@@ -67,7 +67,7 @@ fn default_port(uri: &Uri) -> Option<u16> {
 /// - `connection`
 /// - `sec-websocket-key`
 /// - `sec-websocket-version`
-pub const DISALLOWED_HEADERS: &'static [HeaderName] = &[
+pub const DISALLOWED_HEADERS: &[HeaderName] = &[
     header::HOST,
     header::UPGRADE,
     header::CONNECTION,
