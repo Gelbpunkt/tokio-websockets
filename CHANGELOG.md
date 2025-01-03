@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2025-01-03
+
+### Added
+
+- The SIMD masking code now supports AltiVec on PowerPC targets (nightly only)
+- `WebSocketStream::{get_ref, get_mut}` allow access to the underlying I/O
+- `client::DISALLOWED_HEADERS` is a list of headers that may not be added via `ClientBuilder::add_header`
+- `CloseCode::is_reserved` returns whether the close code is reserved (i.e. may not be sent over the wire)
+
+### Changed
+
+- **[breaking]** `ServerBuilder::accept` now returns the client's HTTP request alongside the websocket stream in a tuple
+- **[breaking]** `ClientBuilder::add_header` now returns a `Result` and errors when adding a disallowed header
+- **[breaking]** `Message::close` will now panic when the close code is reserved or the reason exceeds 123 bytes
+- **[breaking]** `Message::{ping, pong}` will now panic when the payload exceeds 125 bytes
+- `rustls-platform-verifier` was updated to 0.5
+- The SIMD masking code is now more efficient
+
+### Fixed
+
+- Fixed compilation with SIMD on 32-bit x86 targets
+- 32-bit ARM NEON is unstable in rustc and now correctly gated behind the `nightly` feature
+
 ## [0.10.1] - 2024-09-13
 
 ### Added
