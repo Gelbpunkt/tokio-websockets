@@ -245,7 +245,7 @@ impl Decoder for WebSocketProtocol {
                         .try_into()
                         .unwrap_unchecked()
                 }))?;
-                if !code.is_sendable() {
+                if code.is_reserved() {
                     return Err(Error::Protocol(ProtocolError::InvalidCloseCode));
                 }
 
