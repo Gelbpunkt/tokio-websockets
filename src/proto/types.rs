@@ -116,6 +116,7 @@ impl CloseCode {
 
 impl CloseCode {
     /// Whether the close code is allowed to be sent over the wire.
+    #[must_use]
     pub fn is_sendable(self) -> bool {
         match self.0.get() {
             1004 | 1005 | 1006 | 1015 => false,
