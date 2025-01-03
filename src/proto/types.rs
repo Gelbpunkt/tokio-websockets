@@ -394,8 +394,8 @@ impl Message {
     ///
     /// # Panics
     /// - If the `code` is reserved so it cannot be sent.
-    /// - If `code` is present and the `reason` exceeds 123 bytes,
-    ///   the protocol-imposed limit.
+    /// - If `code` is present and the `reason` exceeds 123 bytes, the
+    ///   protocol-imposed limit.
     #[must_use]
     #[track_caller]
     pub fn close(code: Option<CloseCode>, reason: &str) -> Self {
