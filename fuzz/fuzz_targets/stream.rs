@@ -9,11 +9,11 @@ use std::{
     num::NonZeroUsize,
     pin::Pin,
     sync::{Arc, Mutex},
-    task::{Context, Poll}
+    task::{Context, Poll},
 };
 
 use arbitrary::Arbitrary;
-use futures::{pin_mut, FutureExt, stream::StreamExt, SinkExt};
+use futures::{pin_mut, stream::StreamExt, FutureExt, SinkExt};
 use libfuzzer_sys::fuzz_target;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_websockets::{CloseCode, Config, Limits, Message, WebSocketStream};
@@ -35,11 +35,11 @@ impl From<ArbitraryMessage> for Message {
             ArbitraryMessage::Ping(mut payload) => {
                 payload.truncate(125);
                 Message::ping(payload)
-            },
+            }
             ArbitraryMessage::Pong(mut payload) => {
                 payload.truncate(125);
                 Message::pong(payload)
-            },
+            }
             ArbitraryMessage::Close(code, mut reason) => {
                 for len in (119..=123).rev() {
                     if reason.is_char_boundary(len) {
@@ -47,7 +47,12 @@ impl From<ArbitraryMessage> for Message {
                         break;
                     }
                 }
-                Message::close(CloseCode::try_from(code).ok(), &reason)
+                Message::close(
+                    CloseCode::try_from(code)
+                        .ok()
+                        .filter(|code| code.is_sendable()),
+                    &reason,
+                )
             }
         }
     }
@@ -131,7 +136,12 @@ impl Future for PollLimiter {
     }
 }
 
-fn new_stream(server: bool, config: Config, limits: Limits, stream: DeterministicStream) -> WebSocketStream<DeterministicStream> {
+fn new_stream(
+    server: bool,
+    config: Config,
+    limits: Limits,
+    stream: DeterministicStream,
+) -> WebSocketStream<DeterministicStream> {
     if server {
         tokio_websockets::ServerBuilder::new()
             .config(config)
@@ -165,29 +175,23 @@ fn fuzz(
             data_written: Arc::clone(&data_written),
             io_behaviors,
             eof: true,
-        }
+        },
     );
 
     futures::executor::block_on(async move {
         for operation in operations {
             let future: Pin<Box<dyn Future<Output = ()>>> = match operation.kind {
-                OperationKind::Read => {
-                    Box::pin(ws.next().map(|_| ()))
-                }
-                OperationKind::Write(message) => {
-                    Box::pin(ws.feed(message.into()).map(|_| ()))
-                }
-                OperationKind::Flush => {
-                    Box::pin(ws.flush().map(|_| ()))
-                }
-                OperationKind::Close => {
-                    Box::pin(ws.close().map(|_| ()))
-                }
+                OperationKind::Read => Box::pin(ws.next().map(|_| ())),
+                OperationKind::Write(message) => Box::pin(ws.feed(message.into()).map(|_| ())),
+                OperationKind::Flush => Box::pin(ws.flush().map(|_| ())),
+                OperationKind::Close => Box::pin(ws.close().map(|_| ())),
             };
 
-            let limit = PollLimiter{remaining_polls: operation.max_polls};
+            let limit = PollLimiter {
+                remaining_polls: operation.max_polls,
+            };
             pin_mut!(limit);
-            tokio::select!{
+            tokio::select! {
                 biased;
                 _ = limit => {}
                 _ = future => {}
@@ -197,23 +201,28 @@ fn fuzz(
 
     let data_written = std::mem::take(&mut *data_written.lock().unwrap());
 
-    // As a sanity check, make sure `data_written` is prefixed with 0 or more *valid* messages,
-    // possibly followed by an incomplete *valid* message.
-    let mut sanity_check = new_stream(!server, Default::default(), Default::default(),
-        DeterministicStream{
+    // As a sanity check, make sure `data_written` is prefixed with 0 or more
+    // *valid* messages, possibly followed by an incomplete *valid* message.
+    let mut sanity_check = new_stream(
+        !server,
+        Default::default(),
+        Default::default(),
+        DeterministicStream {
             data_to_read: data_written.clone(),
             data_written: Default::default(),
             io_behaviors: Vec::new(),
             // Allow an incomplete message at the end.
             eof: false,
-        }
+        },
     );
 
     futures::executor::block_on(async move {
         loop {
-            let limit = PollLimiter{remaining_polls: Some(1)};
+            let limit = PollLimiter {
+                remaining_polls: Some(1),
+            };
             pin_mut!(limit);
-            tokio::select!{
+            tokio::select! {
                 biased;
                 _ = limit => {
                     // Pending means EOF; remaining message, if any, is incomplete.
@@ -255,9 +264,7 @@ impl AsyncRead for DeterministicStream {
                 self.data_to_read = remainder;
                 Poll::Ready(Ok(()))
             }
-            IoBehavior::Error => {
-                Poll::Ready(Err(io::Error::new(io::ErrorKind::BrokenPipe, "???")))
-            }
+            IoBehavior::Error => Poll::Ready(Err(io::Error::new(io::ErrorKind::BrokenPipe, "???"))),
             IoBehavior::Pending => {
                 cx.waker().wake_by_ref();
                 Poll::Pending
@@ -275,12 +282,13 @@ impl AsyncWrite for DeterministicStream {
         match self.io_behaviors.pop().unwrap_or_default() {
             IoBehavior::Limit(limit) => {
                 let amount = buf.len().min(limit);
-                self.data_written.lock().unwrap().extend_from_slice(&buf[..amount]);
+                self.data_written
+                    .lock()
+                    .unwrap()
+                    .extend_from_slice(&buf[..amount]);
                 Poll::Ready(Ok(amount))
             }
-            IoBehavior::Error => {
-                Poll::Ready(Err(io::Error::new(io::ErrorKind::BrokenPipe, "???")))
-            }
+            IoBehavior::Error => Poll::Ready(Err(io::Error::new(io::ErrorKind::BrokenPipe, "???"))),
             IoBehavior::Pending => {
                 cx.waker().wake_by_ref();
                 Poll::Pending
@@ -290,12 +298,8 @@ impl AsyncWrite for DeterministicStream {
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         match self.io_behaviors.pop().unwrap_or_default() {
-            IoBehavior::Limit(_) => {
-                Poll::Ready(Ok(()))
-            }
-            IoBehavior::Error => {
-                Poll::Ready(Err(io::Error::new(io::ErrorKind::BrokenPipe, "???")))
-            }
+            IoBehavior::Limit(_) => Poll::Ready(Ok(())),
+            IoBehavior::Error => Poll::Ready(Err(io::Error::new(io::ErrorKind::BrokenPipe, "???"))),
             IoBehavior::Pending => {
                 cx.waker().wake_by_ref();
                 Poll::Pending
@@ -303,17 +307,16 @@ impl AsyncWrite for DeterministicStream {
         }
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), io::Error>> {
         match self.io_behaviors.pop().unwrap_or_default() {
-            IoBehavior::Limit(_) => {
-                Poll::Ready(Ok(()))
-            }
-            IoBehavior::Error => {
-                Poll::Ready(Err(io::Error::new(
-                    io::ErrorKind::Unsupported,
-                    "unsupported",
-                )))
-            }
+            IoBehavior::Limit(_) => Poll::Ready(Ok(())),
+            IoBehavior::Error => Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "unsupported",
+            ))),
             IoBehavior::Pending => {
                 cx.waker().wake_by_ref();
                 Poll::Pending

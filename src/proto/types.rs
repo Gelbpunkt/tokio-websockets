@@ -116,7 +116,7 @@ impl CloseCode {
 
 impl CloseCode {
     /// Whether the close code is allowed to be sent over the wire.
-    pub(super) fn is_sendable(self) -> bool {
+    pub fn is_sendable(self) -> bool {
         match self.0.get() {
             1004 | 1005 | 1006 | 1015 => false,
             1000..=4999 => true,
@@ -400,6 +400,7 @@ impl Message {
         let mut payload = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
 
         if let Some(code) = code {
+            assert!(code.is_sendable());
             payload.put_u16(code.into());
 
             assert!(reason.len() <= 123);
