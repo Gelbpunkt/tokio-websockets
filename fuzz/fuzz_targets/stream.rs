@@ -50,7 +50,7 @@ impl From<ArbitraryMessage> for Message {
                 Message::close(
                     CloseCode::try_from(code)
                         .ok()
-                        .filter(|code| code.is_sendable()),
+                        .filter(|code| !code.is_reserved()),
                     &reason,
                 )
             }

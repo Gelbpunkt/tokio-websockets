@@ -115,12 +115,12 @@ impl CloseCode {
 }
 
 impl CloseCode {
-    /// Whether the close code is allowed to be sent over the wire.
+    /// Whether the close code is reserved and cannot be sent over the wire.
     #[must_use]
-    pub fn is_sendable(self) -> bool {
+    pub fn is_reserved(self) -> bool {
         match self.0.get() {
-            1004 | 1005 | 1006 | 1015 => false,
-            1000..=4999 => true,
+            1004 | 1005 | 1006 | 1015 => true,
+            1000..=4999 => false,
             // SAFETY: `TryFrom` is the only way to acquire self and it errors for these values
             0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
         }
@@ -393,7 +393,8 @@ impl Message {
     /// [`CloseCode`] must be specified for it to be included.
     ///
     /// # Panics
-    /// If `code` is present and the `reason` exceeds 123 bytes,
+    /// - If the `code` is reserved so it cannot be sent.
+    /// - If `code` is present and the `reason` exceeds 123 bytes,
     /// the protocol-imposed limit.
     #[must_use]
     #[track_caller]
@@ -401,7 +402,7 @@ impl Message {
         let mut payload = BytesMut::with_capacity((2 + reason.len()) * usize::from(code.is_some()));
 
         if let Some(code) = code {
-            assert!(code.is_sendable());
+            assert!(!code.is_reserved());
             payload.put_u16(code.into());
 
             assert!(reason.len() <= 123);
