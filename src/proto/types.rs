@@ -233,10 +233,7 @@ impl From<Payload> for Bytes {
 
 impl From<Payload> for BytesMut {
     fn from(value: Payload) -> Self {
-        match value.data.try_into_mut() {
-            Ok(b) => b,
-            Err(b) => b.into(),
-        }
+        value.data.into()
     }
 }
 
