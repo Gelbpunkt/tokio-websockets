@@ -28,7 +28,7 @@ mod imp {
     /// This will use a fallback implementation for less than 64 bytes. For
     /// sufficiently large inputs, it masks in chunks of 64 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    pub fn frame(key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<__m512i>();
 
@@ -37,9 +37,12 @@ mod imp {
             offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                key.rotate_left(offset);
-                offset = 0;
-                let mask = _mm512_set1_epi32(i32::from_le_bytes(key));
+                #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+                let mask = _mm512_set1_epi32(
+                    i32::from_be_bytes(key)
+                        .rotate_left(offset as u32 * u8::BITS)
+                        .to_be(),
+                );
 
                 for block in &mut *aligned_data {
                     *block = _mm512_xor_si512(*block, mask);
@@ -72,7 +75,7 @@ mod imp {
     /// This will use a fallback implementation for less than 32 bytes. For
     /// sufficiently large inputs, it masks in chunks of 32 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    pub fn frame(key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<__m256i>();
 
@@ -81,9 +84,12 @@ mod imp {
             offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                key.rotate_left(offset);
-                offset = 0;
-                let mask = _mm256_set1_epi32(i32::from_le_bytes(key));
+                #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+                let mask = _mm256_set1_epi32(
+                    i32::from_be_bytes(key)
+                        .rotate_left(offset as u32 * u8::BITS)
+                        .to_be(),
+                );
 
                 for block in &mut *aligned_data {
                     *block = _mm256_xor_si256(*block, mask);
@@ -117,7 +123,7 @@ mod imp {
     /// This will use a fallback implementation for less than 16 bytes. For
     /// sufficiently large inputs, it masks in chunks of 16 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    pub fn frame(key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<__m128i>();
 
@@ -126,9 +132,12 @@ mod imp {
             offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                key.rotate_left(offset);
-                offset = 0;
-                let mask = _mm_set1_epi32(i32::from_le_bytes(key));
+                #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+                let mask = _mm_set1_epi32(
+                    i32::from_be_bytes(key)
+                        .rotate_left(offset as u32 * u8::BITS)
+                        .to_be(),
+                );
 
                 for block in &mut *aligned_data {
                     *block = _mm_xor_si128(*block, mask);
@@ -161,7 +170,7 @@ mod imp {
     /// This will use a fallback implementation for less than 16 bytes. For
     /// sufficiently large inputs, it masks in chunks of 16 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    pub fn frame(key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<uint8x16_t>();
 
@@ -170,10 +179,12 @@ mod imp {
             offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                key.rotate_left(offset);
-                offset = 0;
-                let mask =
-                    vreinterpretq_u8_s32(vld1q_dup_s32(&i32::from_ne_bytes(key) as *const i32));
+                #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+                let mask = vreinterpretq_u8_s32(vld1q_dup_s32(
+                    &i32::from_be_bytes(key)
+                        .rotate_left(offset as u32 * u8::BITS)
+                        .to_be() as *const i32,
+                ));
 
                 for block in &mut *aligned_data {
                     *block = veorq_u8(*block, mask);
@@ -203,7 +214,7 @@ mod imp {
     /// This will use a fallback implementation for less than 16 bytes. For
     /// sufficiently large inputs, it masks in chunks of 16 bytes per
     /// instruction, applying the fallback method on all remaining data.
-    pub fn frame(mut key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    pub fn frame(key: [u8; 4], input: &mut [u8], mut offset: usize) {
         unsafe {
             let (prefix, aligned_data, suffix) = input.align_to_mut::<vector_unsigned_char>();
 
@@ -212,10 +223,13 @@ mod imp {
             offset = (offset + prefix.len()) % key.len();
 
             if !aligned_data.is_empty() {
-                key.rotate_left(offset);
-                offset = 0;
                 // SAFETY: 4x i32 to 16x u8 is safe
-                let mask: vector_unsigned_char = transmute(vec_splats(i32::from_ne_bytes(key)));
+                #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+                let mask: vector_unsigned_char = transmute(vec_splats(
+                    i32::from_be_bytes(key)
+                        .rotate_left(offset as u32 * u8::BITS)
+                        .to_be(),
+                ));
 
                 for block in &mut *aligned_data {
                     *block = vec_xor(*block, mask);
