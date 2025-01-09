@@ -114,9 +114,13 @@ required-features = ["server"]
 features = ["client", "aws_lc_rs", "ring", "fastrand", "getrandom", "rand", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
 rustdoc-args = ["--cfg", "docsrs"]
 
+[profile.dev]
+panic = "abort"
+
 [profile.release]
 codegen-units = 1
 debug = false
 incremental = false
 lto = true
 opt-level = 3
+panic = "abort"
