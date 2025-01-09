@@ -35,13 +35,6 @@ jobs:
         run: |
           cargo build --release --example autobahn_client --example autobahn_server --features client,fastrand,server,sha1_smol
 
-      - name: Build tokio-tungstenite
-        run: |
-          git clone https://github.com/snapview/tokio-tungstenite.git
-          cd tokio-tungstenite
-          cargo build --release --examples
-          cd ..
-
       - name: Run testsuite
         run: |
           ./scripts/autobahn_client_ci.sh
