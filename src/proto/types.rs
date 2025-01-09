@@ -1,7 +1,5 @@
 //! Types required for the WebSocket protocol implementation.
-use std::{
-    cell::UnsafeCell, fmt, hint::unreachable_unchecked, mem::replace, num::NonZeroU16, ops::Deref,
-};
+use std::{fmt, hint::unreachable_unchecked, mem::replace, num::NonZeroU16, ops::Deref};
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -145,25 +143,22 @@ impl TryFrom<u16> for CloseCode {
     }
 }
 
-/// The websocket message payload storage. Internally implemented as a smart
-/// wrapper around [`Bytes`] and [`BytesMut`].
+/// The websocket message payload storage.
 ///
-/// Payloads can be created by using the `From<T>` implementations. All of them
-/// use [`BytesMut`] under the hood, except when created using [`From<Bytes>`]
-/// with a reference counter greater than one or when using a static reference.
+/// Payloads can be created by using the `From<T>` implementations.
 ///
-/// Sending the payloads is zero-copy, except when sending a payload backed by
-/// [`Bytes`] as a client to a server. The use of [`BytesMut`] as the backing
-/// storage where cheaply possible is recommended to ensure zero-copy sending.
+/// Sending the payloads is zero-copy, except when sending a payload created
+/// from a static slice or when the payload buffer is not unique.
 ///
 /// All conversions to other types are zero-cost, except [`Into<BytesMut>`] if
 /// the backing type is [`Bytes`] with a reference counter greater than one.
 ///
 /// [`From<Bytes>`]: #impl-From<Bytes>-for-Payload
 /// [`Into<BytesMut>`]: #impl-From<Payload>-for-BytesMut
+#[derive(Clone)]
 pub struct Payload {
     /// The raw payload data.
-    data: UnsafeCell<PayloadStorage>,
+    data: Bytes,
     /// Whether the payload data was validated to be valid UTF-8.
     utf8_validated: bool,
 }
@@ -172,7 +167,7 @@ impl Payload {
     /// Creates a new shared `Payload` from a static slice.
     const fn from_static(bytes: &'static [u8]) -> Self {
         Self {
-            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(bytes))),
+            data: Bytes::from_static(bytes),
             utf8_validated: false,
         }
     }
@@ -185,10 +180,7 @@ impl Payload {
     /// Shortens the buffer, keeping the first `len` bytes and dropping the
     /// rest.
     pub(super) fn truncate(&mut self, len: usize) {
-        match self.data.get_mut() {
-            PayloadStorage::Unique(b) => b.truncate(len),
-            PayloadStorage::Shared(b) => b.truncate(len),
-        }
+        self.data.truncate(len);
     }
 
     /// Splits the buffer into two at the given index.
@@ -198,51 +190,8 @@ impl Payload {
         // split a utf8 codepoint), we set it to false.
         self.utf8_validated = false;
         Self {
-            data: UnsafeCell::new(match self.data.get_mut() {
-                PayloadStorage::Unique(b) => PayloadStorage::Unique(b.split_to(at)),
-                PayloadStorage::Shared(b) => PayloadStorage::Shared(b.split_to(at)),
-            }),
+            data: self.data.split_to(at),
             utf8_validated: false,
-        }
-    }
-
-    /// Converts the payload's internal representation to [`Bytes`].
-    fn as_bytes(&self) -> &Bytes {
-        if let PayloadStorage::Shared(bytes) = self.as_ref() {
-            bytes
-        } else {
-            // SAFETY: No concurrent access is possible as Payload is !Sync and
-            // `0` is not read again before it's overwritten.
-            unsafe {
-                let payload = self.data.get().read();
-                let bytes = match payload {
-                    PayloadStorage::Unique(p) => p.freeze(),
-                    PayloadStorage::Shared(_) => unreachable_unchecked(),
-                };
-                self.data.get().write(PayloadStorage::Shared(bytes));
-            }
-            match self.as_ref() {
-                // SAFETY: We just wrote `Shared` into `value`
-                PayloadStorage::Unique(_) => unsafe { unreachable_unchecked() },
-                PayloadStorage::Shared(p) => p,
-            }
-        }
-    }
-}
-
-impl AsRef<PayloadStorage> for Payload {
-    fn as_ref(&self) -> &PayloadStorage {
-        // SAFETY: No outstanding mutable references exists.
-        unsafe { &*self.data.get() }
-    }
-}
-
-impl Clone for Payload {
-    fn clone(&self) -> Self {
-        let bytes = self.as_bytes();
-        Self {
-            data: UnsafeCell::new(PayloadStorage::Shared(bytes.clone())),
-            utf8_validated: self.utf8_validated,
         }
     }
 }
@@ -251,30 +200,21 @@ impl Deref for Payload {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        match self.as_ref() {
-            PayloadStorage::Unique(b) => b,
-            PayloadStorage::Shared(b) => b,
-        }
+        &self.data
     }
 }
 
 impl fmt::Debug for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Payload").field(self.as_ref()).finish()
+        f.debug_tuple("Payload").field(&self.data).finish()
     }
 }
 
 impl From<Bytes> for Payload {
     fn from(value: Bytes) -> Self {
-        match value.try_into_mut() {
-            Ok(value) => Self {
-                data: UnsafeCell::new(PayloadStorage::Unique(value)),
-                utf8_validated: false,
-            },
-            Err(value) => Self {
-                data: UnsafeCell::new(PayloadStorage::Shared(value)),
-                utf8_validated: false,
-            },
+        Self {
+            data: value,
+            utf8_validated: false,
         }
     }
 }
@@ -282,7 +222,7 @@ impl From<Bytes> for Payload {
 impl From<BytesMut> for Payload {
     fn from(value: BytesMut) -> Self {
         Self {
-            data: UnsafeCell::new(PayloadStorage::Unique(value)),
+            data: value.freeze(),
             utf8_validated: false,
         }
     }
@@ -290,18 +230,15 @@ impl From<BytesMut> for Payload {
 
 impl From<Payload> for Bytes {
     fn from(value: Payload) -> Self {
-        match value.data.into_inner() {
-            PayloadStorage::Unique(p) => p.freeze(),
-            PayloadStorage::Shared(p) => p,
-        }
+        value.data
     }
 }
 
 impl From<Payload> for BytesMut {
     fn from(value: Payload) -> Self {
-        match value.data.into_inner() {
-            PayloadStorage::Unique(p) => p,
-            PayloadStorage::Shared(p) => p.into(),
+        match value.data.try_into_mut() {
+            Ok(b) => b,
+            Err(b) => b.into(),
         }
     }
 }
@@ -312,7 +249,7 @@ impl From<Vec<u8>> for Payload {
         // Vec, effectively allowing us to use BytesMut::from_vec which isn't
         // exposed in bytes. See https://github.com/tokio-rs/bytes/issues/723 for details.
         Self {
-            data: UnsafeCell::new(PayloadStorage::Unique(BytesMut::from_iter(value))),
+            data: BytesMut::from_iter(value).freeze(),
             utf8_validated: false,
         }
     }
@@ -322,9 +259,7 @@ impl From<String> for Payload {
     fn from(value: String) -> Self {
         // See From<Vec<u8>> impl for reasoning behind this.
         Self {
-            data: UnsafeCell::new(PayloadStorage::Unique(BytesMut::from_iter(
-                value.into_bytes(),
-            ))),
+            data: BytesMut::from_iter(value.into_bytes()).freeze(),
             utf8_validated: true,
         }
     }
@@ -333,7 +268,7 @@ impl From<String> for Payload {
 impl From<&'static [u8]> for Payload {
     fn from(value: &'static [u8]) -> Self {
         Self {
-            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(value))),
+            data: Bytes::from_static(value),
             utf8_validated: false,
         }
     }
@@ -342,19 +277,10 @@ impl From<&'static [u8]> for Payload {
 impl From<&'static str> for Payload {
     fn from(value: &'static str) -> Self {
         Self {
-            data: UnsafeCell::new(PayloadStorage::Shared(Bytes::from_static(value.as_bytes()))),
+            data: Bytes::from_static(value.as_bytes()),
             utf8_validated: true,
         }
     }
-}
-
-/// [`Payload`] backend.
-#[derive(Debug)]
-enum PayloadStorage {
-    /// Unique data.
-    Unique(BytesMut),
-    /// Shared data.
-    Shared(Bytes),
 }
 
 /// A WebSocket message. This is cheaply clonable and uses [`Payload`] as the
