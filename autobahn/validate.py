@@ -6,10 +6,7 @@ CLIENTS = os.sep.join([AUTOBAHN_DIR, "reports", "clients", "index.json"])
 SERVERS = os.sep.join([AUTOBAHN_DIR, "reports", "servers", "index.json"])
 
 def validate_report_json(json):
-    for (client, cases) in json.items():
-        if "tokio-websockets" not in client:
-            continue # We do not care about other libraries' results
-
+    for (_client, cases) in json.items():
         allowed_behavior = ("OK", "INFORMATIONAL", "UNIMPLEMENTED")
 
         for (report, result) in cases.items():
