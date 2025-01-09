@@ -147,13 +147,10 @@ impl TryFrom<u16> for CloseCode {
 ///
 /// Payloads can be created by using the `From<T>` implementations.
 ///
-/// Sending the payloads is zero-copy, except when sending a payload created
-/// from a static slice or when the payload buffer is not unique.
+/// Sending the payloads or calling [`Into<BytesMut>`] is zero-copy, except when
+/// sending a payload created from a static slice or when the payload buffer is
+/// not unique. All conversions to other types are zero-cost.
 ///
-/// All conversions to other types are zero-cost, except [`Into<BytesMut>`] if
-/// the backing type is [`Bytes`] with a reference counter greater than one.
-///
-/// [`From<Bytes>`]: #impl-From<Bytes>-for-Payload
 /// [`Into<BytesMut>`]: #impl-From<Payload>-for-BytesMut
 #[derive(Clone)]
 pub struct Payload {
