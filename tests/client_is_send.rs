@@ -1,3 +1,4 @@
+#![cfg(all(feature = "client", feature = "server"))]
 use tokio::net::TcpListener;
 use tokio_websockets::{ClientBuilder, ServerBuilder};
 
