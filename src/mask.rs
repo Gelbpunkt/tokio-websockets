@@ -44,7 +44,7 @@ mod imp {
                         .to_be(),
                 );
 
-                for block in &mut *aligned_data {
+                for block in aligned_data {
                     *block = _mm512_xor_si512(*block, mask);
                 }
             }
@@ -91,7 +91,7 @@ mod imp {
                         .to_be(),
                 );
 
-                for block in &mut *aligned_data {
+                for block in aligned_data {
                     *block = _mm256_xor_si256(*block, mask);
                 }
             }
@@ -139,7 +139,7 @@ mod imp {
                         .to_be(),
                 );
 
-                for block in &mut *aligned_data {
+                for block in aligned_data {
                     *block = _mm_xor_si128(*block, mask);
                 }
             }
@@ -186,7 +186,7 @@ mod imp {
                         .to_be() as *const i32,
                 ));
 
-                for block in &mut *aligned_data {
+                for block in aligned_data {
                     *block = veorq_u8(*block, mask);
                 }
             }
@@ -231,7 +231,7 @@ mod imp {
                         .to_be(),
                 ));
 
-                for block in &mut *aligned_data {
+                for block in aligned_data {
                     *block = vec_xor(*block, mask);
                 }
             }
@@ -280,6 +280,24 @@ mod imp {
     }
 }
 
+/// (Un-)masks input bytes with the framing key, one byte at once.
+///
+/// See [`fallback_frame`] for more details.
+fn one_byte_at_once(key: [u8; 4], input: &mut [u8], offset: usize) {
+    // This lets the compiler unroll the loop partially compared to adding the
+    // offset in the loop. The assembly is more readable this way and easier to
+    // reason about, performance wise it's roundabout the same because the compiler
+    // otherwise generates a garbled mess of special cases.
+    #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+    let key = i32::from_be_bytes(key)
+        .rotate_left(offset as u32 * u8::BITS)
+        .to_be_bytes();
+
+    for (index, byte) in input.iter_mut().enumerate() {
+        *byte ^= key[index % key.len()];
+    }
+}
+
 /// (Un-)masks input bytes with the framing key.
 ///
 /// The input bytes may be further in the payload and therefore the offset into
@@ -287,10 +305,29 @@ mod imp {
 ///
 /// This is used as the internal implementation in non-SIMD builds and as a
 /// fallback in SIMD builds.
-pub fn fallback_frame(key: [u8; 4], input: &mut [u8], offset: usize) {
-    for (index, byte) in input.iter_mut().enumerate() {
-        *byte ^= key[(index + offset) % key.len()];
+fn fallback_frame(key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    let (prefix, aligned_data, suffix) = unsafe { input.align_to_mut::<u64>() };
+
+    // Run fallback implementation on unaligned prefix data
+    one_byte_at_once(key, prefix, offset);
+    offset = (offset + prefix.len()) % key.len();
+
+    if !aligned_data.is_empty() {
+        #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+        let masking_key = u64::from(
+            u32::from_be_bytes(key)
+                .rotate_left(offset as u32 * u8::BITS)
+                .to_be(),
+        );
+        let mask = (masking_key << u32::BITS) | masking_key;
+
+        for block in aligned_data {
+            *block ^= mask;
+        }
     }
+
+    // Run fallback implementation on unaligned suffix data
+    one_byte_at_once(key, suffix, offset);
 }
 
 pub use imp::frame;
@@ -308,7 +345,7 @@ fn test_mask() {
     let mut data_clone = data.clone();
     let key = get_mask();
     frame(key, &mut data, 0);
-    fallback_frame(key, &mut data_clone, 0);
+    one_byte_at_once(key, &mut data_clone, 0);
 
     assert_eq!(&data, &data_clone);
 }
