@@ -80,12 +80,6 @@ pub struct WebSocketStream<T> {
     pending_bytes: usize,
 }
 
-// SAFETY: The only !Sync field in `WebSocketStream` is `frame_queue`.
-// `frame_queue` must be used with exclusive, mutable access, which is
-// currently the case. It is only used in methods that take `&mut self`
-// and not borrowed in the methods.
-unsafe impl<T> Sync for WebSocketStream<T> {}
-
 impl<T> WebSocketStream<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
