@@ -16,21 +16,123 @@ jobs:
         uses: codespell-project/actions-codespell@v2
 
   run-tests:
-    name: Run tests
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Provided by GitHub, 4-core, 16GB RAM
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            apt-install: lld
+          - runner: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            apt-arch-setup: i386
+            apt-install: bindgen lld crossbuild-essential-i386 libssl-dev:i386 openssl:i386
+          # Also provided by GitHub, 4-core, 16GB RAM
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            apt-install: lld
+          - runner: ubuntu-24.04-arm
+            target: armv7-unknown-linux-gnueabihf
+            apt-arch-setup: armhf
+            apt-install: bindgen lld crossbuild-essential-armhf libssl-dev:armhf openssl:armhf
+          # Also provided by GitHub, 4-core, 16GB RAM
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            choco-install: ninja openssl
+          - runner: windows-latest
+            target: x86_64-pc-windows-gnu
+            choco-install: ninja openssl
+          # Also provided by GitHub, 4-core, 14GB RAM
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            brew-install: go
+          # Also provided by GitHub, 3-core, 7GB RAM
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            brew-install: go
+          # Selfhosted, 6-core, 8GB RAM, Neoverse N1
+          - runner: aarch64-musl
+            target: aarch64-unknown-linux-musl
+          # Selfhosted, 8-core, 16GB RAM, SpacemiT M1
+          #- runner: riscv64
+          #  target: riscv64gc-unknown-linux-gnu
+          # Provided by IBM, 2-core, 8GB RAM, IBM z15
+          - runner: s390x-gnu
+            target: s390x-unknown-linux-gnu
+
+    name: Run tests (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.target }}
+      PKG_CONFIG_PATH_i686_unknown_linux_gnu: /usr/lib/i686-linux-gnu/pkgconfig
+      PKG_CONFIG_PATH_armv7_unknown_linux_gnueabihf: /usr/lib/arm-linux-gnueabihf/pkgconfig
+      PKG_CONFIG_SYSROOT_DIR:
+      X86_64_PC_WINDOWS_MSVC_OPENSSL_LIB_DIR: C:\Program Files\OpenSSL-Win64
+      X86_64_PC_WINDOWS_GNU_OPENSSL_LIB_DIR: C:\Program Files\OpenSSL-Win64
 
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
+      - name: Set up apt for cross architecture packages
+        if: ${{ matrix.apt-arch-setup != '' }}
+        run: |
+          sudo dpkg --add-architecture ${{ matrix.apt-arch-setup }}
+          sudo apt update -y
+
+      - name: Install apt dependencies
+        if: ${{ matrix.apt-install != '' }}
+        run: |
+          sudo apt install -y --no-install-recommends ${{ matrix.apt-install }}
+
+      - name: Install choco dependencies
+        if: ${{ matrix.choco-install != '' }}
+        run: |
+          choco install -y ${{ matrix.choco-install }}
+
+      - uses: ilammy/setup-nasm@v1
+        if: ${{ matrix.choco-install != '' }} # Aka on Windows
+
+      - name: Install brew dependencies
+        if: ${{ matrix.brew-install != '' }}
+        run: |
+          brew update
+          echo "${{ matrix.brew-install}}" | xargs -n 1 brew install
+
       - name: Install nightly toolchain
+        if: ${{ !contains(matrix.target, 'musl') }}
         uses: dtolnay/rust-toolchain@master
         with:
+          targets: ${{ matrix.target }}
           toolchain: nightly
           components: rust-src
 
+      - name: Install nightly toolchain (musl)
+        if: ${{ contains(matrix.target, 'musl') }}
+        run: |
+          wget https://dl.musl.rs/nightly/rust-nightly-${{ matrix.target }}.tar.xz -O rust.tar.xz
+          tar xf rust.tar.xz
+          cd rust-nightly-${{ matrix.target }}
+          doas ./install.sh
+          cd ..
+          wget https://dl.musl.rs/nightly/rust-src-nightly.tar.xz
+          tar xf rust-src-nightly.tar.xz
+          cd rust-src-nightly
+          doas ./install.sh
+
+      # aws-lc uses CMAKE_LINKER in its CMake rules, which cannot properly be set from Rust code
+      # so it falls back to ld, which cannot cross-link.
+      # Our musl targets run on Chimera Linux, which already uses LLD.
+      - name: Use LLD as /usr/bin/ld
+        if: ${{ contains(matrix.target, 'gnu') && !contains(matrix.target, 'windows') }}
+        run: |
+          sudo rm /usr/bin/ld
+          sudo ln -s /usr/bin/ld.lld /usr/bin/ld
+
       - name: Use MSRV-specific .cargo/config.toml
         run: |
+          rm .cargo/config.toml
           mv .cargo/config.toml.msrv .cargo/config.toml
 
       - name: Add problem matchers
@@ -211,8 +313,21 @@ jobs:
             --group-features server,sha1_smol
 
   msrv:
-    name: Feature powerset (MSRV)
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Provided by GitHub
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          # Also provided by GitHub
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+
+    name: Feature powerset (MSRV) (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.target }}
 
     steps:
       - name: Checkout sources
@@ -222,11 +337,6 @@ jobs:
         run: |
           mv .cargo/config.toml.msrv .cargo/config.toml
 
-      - name: Install GCC for aarch64-linux-gnu
-        run: |
-          sudo apt update -y
-          sudo apt install -y gcc-aarch64-linux-gnu
-
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -235,17 +345,16 @@ jobs:
       - name: Get latest compatible dependencies for MSRV
         run: CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo update
 
+      - name: Install 1.79.0 toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.79.0
+
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-hack
           locked: false
-
-      - name: Install 1.79.0 toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.79.0
-          targets: aarch64-unknown-linux-gnu
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
@@ -253,40 +362,9 @@ jobs:
       - name: Add problem matchers
         run: echo "::add-matcher::.github/rust.json"
 
-      - name: Check powerset on x86_64
+      - name: Check powerset
         run: |
           cargo hack check \
-            --feature-powerset \
-            --no-dev-deps \
-            --exclude-features aws-lc-rs,rustls-tls12,nightly \
-            --group-features client,fastrand,sha1_smol \
-            --group-features server,sha1_smol
-
-      - name: Install cached cross-compiled OpenSSL
-        id: cache-openssl
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/aarch64-linux-gnu
-          key: ${{ runner.os }}-openssl-${{ env.OPENSSL_VERSION }}
-
-      - name: Cross-compile and install OpenSSL
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        env:
-          CROSS_COMPILE: aarch64-linux-gnu-
-        run: |
-          wget https://github.com/openssl/openssl/releases/download/openssl-${{ env.OPENSSL_VERSION }}/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
-          tar xzf openssl-${{ env.OPENSSL_VERSION }}.tar.gz
-          cd openssl-${{ env.OPENSSL_VERSION }}
-          ./Configure linux-aarch64 --cross-compile-prefix=aarch64-linux-gnu- --prefix=${{ github.workspace }}/aarch64-linux-gnu
-          make -j$(nproc)
-          make install
-
-      - name: Check powerset on aarch64
-        env:
-          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR: ${{ github.workspace }}/aarch64-linux-gnu
-        run: |
-          cargo hack check \
-            --target aarch64-unknown-linux-gnu \
             --feature-powerset \
             --no-dev-deps \
             --exclude-features aws-lc-rs,rustls-tls12,nightly \
