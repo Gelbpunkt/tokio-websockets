@@ -6,6 +6,7 @@ env:
   CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
 
 jobs:
+  # We only run autobahn on x86_64 because autobahn's images only support x86_64
   autobahn:
     name: Run autobahn testsuite
     runs-on: ubuntu-latest
