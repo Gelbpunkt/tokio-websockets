@@ -63,6 +63,7 @@ rustls-native-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-n
 rustls-platform-verifier = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-platform-verifier"]
 rustls-bring-your-own-connector = ["dep:rustls-pki-types", "dep:tokio-rustls"]
 rustls-tls12 = ["tokio-rustls?/tls12"]
+simd = [] # No effect, deprecated
 nightly = ["simdutf8/aarch64_neon_prefetch"]
 
 [dev-dependencies]
