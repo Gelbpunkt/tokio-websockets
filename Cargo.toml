@@ -114,6 +114,9 @@ required-features = ["server"]
 features = ["client", "aws_lc_rs", "ring", "fastrand", "getrandom", "rand", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
 rustdoc-args = ["--cfg", "docsrs"]
 
+[patch.crates-io]
+aws-lc-rs = { git = "https://github.com/justsmth/aws-lc-rs.git", branch = "fix-s390x-fips" }
+
 [profile.dev]
 panic = "abort"
 
