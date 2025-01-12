@@ -4,20 +4,6 @@ use futures_util::{SinkExt, StreamExt};
 use http::Uri;
 use tokio_websockets::{ClientBuilder, Connector, Error, Limits};
 
-#[cfg(feature = "simd")]
-macro_rules! agent {
-    () => {
-        "tokio-websockets-simd"
-    };
-}
-
-#[cfg(not(feature = "simd"))]
-macro_rules! agent {
-    () => {
-        "tokio-websockets"
-    };
-}
-
 async fn get_case_count() -> Result<u32, Error> {
     let uri = Uri::from_static("ws://localhost:9001/getCaseCount");
     let (mut stream, _) = ClientBuilder::from_uri(uri)
@@ -32,8 +18,7 @@ async fn get_case_count() -> Result<u32, Error> {
 }
 
 async fn update_reports() -> Result<(), Error> {
-    let uri_str = concat!("ws://localhost:9001/updateReports?agent=", agent!());
-    let uri = Uri::from_static(uri_str);
+    let uri = Uri::from_static("ws://localhost:9001/updateReports?agent=tokio-websockets");
     let (mut stream, _) = ClientBuilder::from_uri(uri)
         .connector(&Connector::Plain)
         .connect()
@@ -48,9 +33,8 @@ async fn run_test(case: u32) -> Result<(), Error> {
     println!("Running test case {case}");
 
     let uri = Uri::from_str(&format!(
-        "ws://localhost:9001/runCase?case={}&agent={}",
+        "ws://localhost:9001/runCase?case={}&agent=tokio-websockets",
         case,
-        agent!()
     ))
     .unwrap();
 
