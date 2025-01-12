@@ -4,10 +4,6 @@
         {
             "agent": "tokio-websockets",
             "url": "ws://127.0.0.1:9006"
-        },
-        {
-            "agent": "tokio-websockets-simd",
-            "url": "ws://127.0.0.1:9004"
         }
     ],
     "cases": ["*"],

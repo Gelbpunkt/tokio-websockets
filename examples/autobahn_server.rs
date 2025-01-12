@@ -4,11 +4,6 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_websockets::{Error, Limits, ServerBuilder};
 
-#[cfg(feature = "simd")]
-const PORT: u16 = 9004;
-#[cfg(not(feature = "simd"))]
-const PORT: u16 = 9006;
-
 async fn accept_connection(stream: TcpStream) {
     if let Err(e) = handle_connection(stream).await {
         match e {
@@ -37,7 +32,7 @@ async fn handle_connection(stream: TcpStream) -> Result<(), Error> {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let addr: SocketAddr = ([127, 0, 0, 1], PORT).into();
+    let addr: SocketAddr = ([127, 0, 0, 1], 9006).into();
     let listener = TcpListener::bind(&addr).await.expect("Can't listen");
 
     println!("Listening on: {addr}");

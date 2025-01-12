@@ -14,6 +14,9 @@ license = "MIT"
 bytes = "1.7"
 futures-core = "0.3"
 futures-sink = "0.3"
+# We enable aarch64_neon feature because it is MSRV-gated but ours is higher than 1.59
+simdutf8 = { version = "0.1", default-features = false, features = ["std", "aarch64_neon"] }
+
 tokio = "1"
 # tokio-util 0.7.3 is the first to depend on tracing without default features, otherwise minvers break
 tokio-util = { version = "0.7.3", features = ["codec", "io"] }
@@ -27,9 +30,6 @@ getrandom = { version = "0.2", default-features = false, optional = true }
 rand = { version = "0.8", default-features = false, features = ["std", "std_rng"], optional = true }
 
 # SIMD
-# We enable aarch64_neon feature because it is MSRV-gated but ours is higher than 1.59
-simdutf8 = { version = "0.1", default-features = false, features = ["std", "aarch64_neon"], optional = true }
-
 # Client
 base64 = { version = "0.22", optional = true }
 http = { version = "1", default-features = false, features = ["std"], optional = true }
@@ -57,14 +57,13 @@ aws-lc-rs = ["aws_lc_rs"] # Alias because Cargo features commonly use `-`
 fips = ["aws_lc_rs", "aws-lc-rs?/fips", "tokio-rustls?/fips"]
 ring = ["dep:ring", "tokio-rustls?/ring"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
-simd = ["dep:simdutf8"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots"]
 rustls-native-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-native-certs"]
 rustls-platform-verifier = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-platform-verifier"]
 rustls-bring-your-own-connector = ["dep:rustls-pki-types", "dep:tokio-rustls"]
 rustls-tls12 = ["tokio-rustls?/tls12"]
-nightly = ["simdutf8?/aarch64_neon_prefetch"]
+nightly = ["simdutf8/aarch64_neon_prefetch"]
 
 [dev-dependencies]
 futures-util = { version = "0.3.14", default-features = false, features = ["sink"] }

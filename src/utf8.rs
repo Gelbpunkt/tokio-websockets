@@ -1,30 +1,7 @@
-//! UTF-8 validation and parsing helpers that abstract over [`simdutf8`] if the
-//! `simd` feature is enabled, otherwise fall back to [`std`] equivalents.
+//! UTF-8 validation and parsing helpers that abstract over [`simdutf8`].
 use std::hint::unreachable_unchecked;
 
 use crate::proto::ProtocolError;
-
-/// Checks if the passed byte sequence is valid UTF-8 and returns an error if it
-/// isn't.
-#[cfg(feature = "simd")]
-const FROM_UTF8_BASIC: for<'a> fn(&'a [u8]) -> Result<&'a str, simdutf8::basic::Utf8Error> =
-    simdutf8::basic::from_utf8;
-/// Checks if the passed byte sequence is valid UTF-8 and returns an error with
-/// additional information if it isn't.
-#[cfg(feature = "simd")]
-const FROM_UTF8_COMPAT: for<'a> fn(&'a [u8]) -> Result<&'a str, simdutf8::compat::Utf8Error> =
-    simdutf8::compat::from_utf8;
-
-/// Checks if the passed byte sequence is valid UTF-8 and returns an error if it
-/// isn't.
-#[cfg(not(feature = "simd"))]
-const FROM_UTF8_BASIC: for<'a> fn(&'a [u8]) -> Result<&'a str, std::str::Utf8Error> =
-    std::str::from_utf8;
-/// Checks if the passed byte sequence is valid UTF-8 and returns an error with
-/// additional information if it isn't.
-#[cfg(not(feature = "simd"))]
-const FROM_UTF8_COMPAT: for<'a> fn(&'a [u8]) -> Result<&'a str, std::str::Utf8Error> =
-    std::str::from_utf8;
 
 /// Converts a slice of bytes to a string slice. This will use SIMD acceleration
 /// if the `simd` crate feature is enabled.
@@ -34,7 +11,7 @@ const FROM_UTF8_COMPAT: for<'a> fn(&'a [u8]) -> Result<&'a str, std::str::Utf8Er
 /// Returns a [`ProtocolError`] if the input is invalid UTF-8.
 #[inline]
 pub fn parse_str(input: &[u8]) -> Result<&str, ProtocolError> {
-    FROM_UTF8_BASIC(input).map_err(|_| ProtocolError::InvalidUtf8)
+    simdutf8::basic::from_utf8(input).map_err(|_| ProtocolError::InvalidUtf8)
 }
 
 /// A streaming UTF-8 validator.
@@ -112,7 +89,7 @@ impl Validator {
 
             // If we know that the codepoint is complete, we can use the basic variant
             if available_bytes >= missing_bytes {
-                if FROM_UTF8_BASIC(unsafe {
+                if simdutf8::basic::from_utf8(unsafe {
                     self.partial_codepoint
                         .get_unchecked(..codepoint_len_after_copy)
                 })
@@ -121,7 +98,7 @@ impl Validator {
                     return Err(ProtocolError::InvalidUtf8);
                 }
             } else {
-                match FROM_UTF8_COMPAT(unsafe {
+                match simdutf8::compat::from_utf8(unsafe {
                     self.partial_codepoint
                         .get_unchecked(..codepoint_len_after_copy)
                 }) {
@@ -150,12 +127,12 @@ impl Validator {
         if is_complete {
             self.reset();
 
-            match FROM_UTF8_BASIC(remaining_bytes) {
+            match simdutf8::basic::from_utf8(remaining_bytes) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(ProtocolError::InvalidUtf8),
             }
         } else {
-            match FROM_UTF8_COMPAT(remaining_bytes) {
+            match simdutf8::compat::from_utf8(remaining_bytes) {
                 Ok(_) => Ok(()),
                 Err(utf8_error) if utf8_error.error_len().is_some() => {
                     Err(ProtocolError::InvalidUtf8)
