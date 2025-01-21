@@ -5,5 +5,5 @@ reorder_impl_items = true
 comment_width = 80
 wrap_comments = true
 normalize_comments = true
-imports_granularity = "crate"
+imports_granularity = "Crate"
 group_imports = "StdExternalCrate"
