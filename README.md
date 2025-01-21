@@ -26,7 +26,7 @@ High performance, strict, tokio-util based WebSockets implementation.
 Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 
 - The `simd` feature flag is deprecated and has no effect. SIMD support is detected at runtime now rather than opting in at compile time
-- The `nightly` feature when using a nightly compiler will enable AVX512, NEON (on 32-bit ARM) or AltiVec accelerated masking
+- The `nightly` feature flag is deprecated and has no effect. tokio-websockets automatically detects whether a nightly compiler compatible with the crate is in use and enables features accordingly
 - `client` enables a tiny client implementation
 - `server` enables a tiny server implementation
 

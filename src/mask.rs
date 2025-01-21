@@ -21,7 +21,7 @@
 /// This will use a fallback implementation for less than 64 bytes. For
 /// sufficiently large inputs, it masks in chunks of 64 bytes per
 /// instruction, applying the fallback method on all remaining data.
-#[cfg(all(feature = "nightly", any(target_arch = "x86", target_arch = "x86_64")))]
+#[cfg(all(nightly, any(target_arch = "x86", target_arch = "x86_64")))]
 #[target_feature(enable = "avx512f")]
 unsafe fn frame_avx512(key: [u8; 4], input: &mut [u8], mut offset: usize) {
     #[cfg(target_arch = "x86")]
@@ -144,7 +144,7 @@ unsafe fn frame_sse2(key: [u8; 4], input: &mut [u8], mut offset: usize) {
 /// This will use a fallback implementation for less than 16 bytes. For
 /// sufficiently large inputs, it masks in chunks of 16 bytes per
 /// instruction, applying the fallback method on all remaining data.
-#[cfg(any(all(feature = "nightly", target_arch = "arm"), target_arch = "aarch64"))]
+#[cfg(any(all(nightly, target_arch = "arm"), target_arch = "aarch64"))]
 #[target_feature(enable = "neon")]
 unsafe fn frame_neon(key: [u8; 4], input: &mut [u8], mut offset: usize) {
     #[cfg(target_arch = "aarch64")]
@@ -185,10 +185,7 @@ unsafe fn frame_neon(key: [u8; 4], input: &mut [u8], mut offset: usize) {
 /// This will use a fallback implementation for less than 16 bytes. For
 /// sufficiently large inputs, it masks in chunks of 16 bytes per
 /// instruction, applying the fallback method on all remaining data.
-#[cfg(all(
-    feature = "nightly",
-    any(target_arch = "powerpc", target_arch = "powerpc64")
-))]
+#[cfg(all(nightly, any(target_arch = "powerpc", target_arch = "powerpc64")))]
 #[target_feature(enable = "altivec")]
 unsafe fn frame_altivec(key: [u8; 4], input: &mut [u8], mut offset: usize) {
     #[cfg(target_arch = "powerpc")]
@@ -283,7 +280,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8], offset: usize) {
     {
         use std::arch::is_x86_feature_detected;
 
-        #[cfg(feature = "nightly")]
+        #[cfg(nightly)]
         if is_x86_feature_detected!("avx512f") {
             return unsafe { frame_avx512(key, input, offset) };
         }
@@ -295,7 +292,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8], offset: usize) {
         }
     }
 
-    #[cfg(all(feature = "nightly", target_arch = "arm"))]
+    #[cfg(all(nightly, target_arch = "arm"))]
     {
         use std::arch::is_arm_feature_detected;
 
@@ -313,7 +310,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8], offset: usize) {
         }
     }
 
-    #[cfg(all(feature = "nightly", target_arch = "powerpc"))]
+    #[cfg(all(nightly, target_arch = "powerpc"))]
     {
         use std::arch::is_powerpc_feature_detected;
 
@@ -322,7 +319,7 @@ pub fn frame(key: [u8; 4], input: &mut [u8], offset: usize) {
         }
     }
 
-    #[cfg(all(feature = "nightly", target_arch = "powerpc64"))]
+    #[cfg(all(nightly, target_arch = "powerpc64"))]
     {
         use std::arch::is_powerpc64_feature_detected;
 

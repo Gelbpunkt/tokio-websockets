@@ -8,12 +8,12 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // Required for AVX512 until stable
 #![cfg_attr(
-    all(feature = "nightly", any(target_arch = "x86_64", target_arch = "x86")),
+    all(nightly, any(target_arch = "x86_64", target_arch = "x86")),
     feature(stdarch_x86_avx512, avx512_target_feature)
 )]
 // Required for NEON on 32-bit ARM until stable
 #![cfg_attr(
-    all(feature = "nightly", target_arch = "arm"),
+    all(nightly, target_arch = "arm"),
     feature(
         stdarch_arm_neon_intrinsics,
         stdarch_arm_feature_detection,
@@ -22,10 +22,7 @@
 )]
 // Required for VSX until stable
 #![cfg_attr(
-    all(
-        feature = "nightly",
-        any(target_arch = "powerpc64", target_arch = "powerpc")
-    ),
+    all(nightly, any(target_arch = "powerpc64", target_arch = "powerpc")),
     feature(
         stdarch_powerpc,
         stdarch_powerpc_feature_detection,

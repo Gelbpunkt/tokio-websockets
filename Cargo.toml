@@ -63,8 +63,8 @@ rustls-native-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-n
 rustls-platform-verifier = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-platform-verifier"]
 rustls-bring-your-own-connector = ["dep:rustls-pki-types", "dep:tokio-rustls"]
 rustls-tls12 = ["tokio-rustls?/tls12"]
+nightly = [] # No effect, deprecated
 simd = [] # No effect, deprecated
-nightly = ["simdutf8/aarch64_neon_prefetch"]
 
 [dev-dependencies]
 futures-util = { version = "0.3.14", default-features = false, features = ["sink"] }
@@ -111,8 +111,11 @@ required-features = ["server"]
 
 [package.metadata.docs.rs]
 # aws_lc_rs' fips mode can't be built in docs.rs
-features = ["client", "aws_lc_rs", "ring", "fastrand", "getrandom", "rand", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
+features = ["client", "aws_lc_rs", "ring", "fastrand", "getrandom", "rand", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12"]
 rustdoc-args = ["--cfg", "docsrs"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nightly)'] }
 
 [profile.dev]
 panic = "abort"
