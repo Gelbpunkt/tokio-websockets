@@ -28,14 +28,14 @@ mod imp {
     /// Generate a random 16-byte WebSocket key.
     pub fn get_key() -> [u8; 16] {
         let mut bytes = [0; 16];
-        getrandom::getrandom(&mut bytes).expect("Failed to get random bytes, consider using `rand` or `fastrand` instead of `getrandom` if this persists");
+        getrandom::fill(&mut bytes).expect("Failed to get random bytes, consider using `rand` or `fastrand` instead of `getrandom` if this persists");
         bytes
     }
 
     /// Generate a random 4-byte WebSocket mask.
     pub fn get_mask() -> [u8; 4] {
         let mut bytes = [0; 4];
-        getrandom::getrandom(&mut bytes).expect("Failed to get random bytes, consider using `rand` or `fastrand` instead of `getrandom` if this persists");
+        getrandom::fill(&mut bytes).expect("Failed to get random bytes, consider using `rand` or `fastrand` instead of `getrandom` if this persists");
         bytes
     }
 }
@@ -43,7 +43,6 @@ mod imp {
 /// Random numbers generation utilities using [`rand`].
 #[cfg(feature = "rand")]
 mod imp {
-
     use rand::RngCore;
 
     /// Generate a random 16-byte WebSocket key.
