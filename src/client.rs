@@ -33,12 +33,9 @@ pub(crate) fn make_key() -> [u8; 24] {
     let mut key_base64 = [0; 24];
     let key_bytes = crate::rand::get_key();
 
-    // SAFETY: We know that 16 bytes will be 24 bytes base64-encoded
-    unsafe {
-        general_purpose::STANDARD
-            .encode_slice(key_bytes, &mut key_base64)
-            .unwrap_unchecked()
-    };
+    general_purpose::STANDARD
+        .encode_slice(key_bytes, &mut key_base64)
+        .unwrap();
 
     key_base64
 }

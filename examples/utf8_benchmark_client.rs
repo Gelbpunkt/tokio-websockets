@@ -108,9 +108,9 @@ fn main() -> io::Result<()> {
                 panic!("should never happen");
             }
 
-            let last_byte_read = unsafe { buf.get_unchecked(n - 1) };
+            let last_byte_read = buf[n - 1];
 
-            if *last_byte_read == DELIMITER as u8 {
+            if last_byte_read == DELIMITER as u8 {
                 break;
             }
         }

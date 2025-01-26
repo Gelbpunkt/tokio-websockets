@@ -4,7 +4,6 @@
 //! parameter.
 use std::{
     collections::VecDeque,
-    hint::unreachable_unchecked,
     io,
     mem::{replace, take},
     pin::Pin,
@@ -227,11 +226,9 @@ where
 
                     self.queue_frame(frame);
                 }
-                // SAFETY: match statement at the start of the method ensures that this is not the
-                // case
-                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => unsafe {
-                    unreachable_unchecked()
-                },
+                StreamState::ClosedByPeer | StreamState::CloseAcknowledged => {
+                    debug_assert!(false, "unexpected StreamState");
+                }
                 StreamState::ClosedByUs => {
                     self.state = StreamState::CloseAcknowledged;
                 }

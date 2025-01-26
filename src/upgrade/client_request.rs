@@ -20,8 +20,7 @@ fn contains_ignore_ascii_case(mut haystack: &[u8], needle: &[u8]) -> bool {
     }
 
     while haystack.len() >= needle.len() {
-        // SAFETY: needle.len() will always be equal to or less than haystack.len()
-        if unsafe { haystack.get_unchecked(..needle.len()) }.eq_ignore_ascii_case(needle) {
+        if haystack[..needle.len()].eq_ignore_ascii_case(needle) {
             return true;
         }
 
