@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2025-01-26
+
+### Changed
+
+- The size of several structs has been slightly decreased, reducing memory usage
+- The SIMD algorithms have been improved and support for them is now detected at runtime. The `simd` feature flag is deprecated
+- `getrandom` was updated to 0.3
+
+### Fixed
+
+- Fixed an issue where a pending `poll_flush` call by a writer would stall infinitely if `poll_next` was called at the same time (see [#92](https://github.com/Gelbpunkt/tokio-websockets/issues/92))
+
 ## [0.11.0] - 2025-01-03
 
 ### Added
