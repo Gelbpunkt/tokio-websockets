@@ -34,9 +34,17 @@ struct EncodedFrame {
     /// Length of the header.
     header_len: u8,
     /// Mask that the payload was masked with.
-    mask: Option<[u8; 4]>,
+    mask: [u8; 4],
     /// Potentially masked message payload, ready for writing to the I/O.
     payload: Payload,
+}
+
+impl EncodedFrame {
+    /// Whether or not this frame is masked.
+    #[inline]
+    fn is_masked(&self) -> bool {
+        self.header[1] >> 7 != 0
+    }
 }
 
 /// A WebSocket stream that full messages can be read from and written to.
@@ -228,7 +236,9 @@ where
             self.state = StreamState::ClosedByUs;
         }
 
-        let (frame, mask): (Frame, Option<[u8; 4]>) = if self.inner.decoder().role == Role::Client {
+        let is_client = self.inner.decoder().role == Role::Client;
+
+        let (frame, mask): (Frame, [u8; 4]) = if is_client {
             #[cfg(feature = "client")]
             {
                 let mut frame = frame;
@@ -237,7 +247,7 @@ where
                 crate::mask::frame(mask, &mut payload, 0);
                 frame.payload = Payload::from(payload);
 
-                (frame, Some(mask))
+                (frame, mask)
             }
             #[cfg(not(feature = "client"))]
             {
@@ -249,15 +259,15 @@ where
                 unsafe { std::hint::unreachable_unchecked() }
             }
         } else {
-            (frame, None)
+            (frame, [0, 0, 0, 0])
         };
 
         let header_len = frame.encode(&mut self.header_buf);
-        if mask.is_some() {
+        if is_client {
             self.header_buf[1] |= 1 << 7;
         }
         self.pending_bytes +=
-            header_len as usize + (u8::from(mask.is_some()) * 4) as usize + frame.payload.len();
+            header_len as usize + (u8::from(is_client) * 4) as usize + frame.payload.len();
         self.frame_queue.push_back(EncodedFrame {
             header: self.header_buf,
             header_len,
@@ -361,9 +371,8 @@ where
             let mut buf = frame_header
                 .chain(
                     frame
-                        .mask
-                        .as_ref()
-                        .map(<[u8; 4]>::as_slice)
+                        .is_masked()
+                        .then_some(frame.mask.as_slice())
                         .unwrap_or_default(),
                 )
                 .chain(&*frame.payload);
