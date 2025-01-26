@@ -78,6 +78,10 @@ pub struct WebSocketStream<T> {
     bytes_written: usize,
     /// Total amount of bytes remaining to be sent in the frame queue.
     pending_bytes: usize,
+
+    /// Whether a task is currently actively polling
+    /// [`WebSocketStream::poll_flush`] until completion.
+    flush_in_progress: bool,
 }
 
 impl<T> WebSocketStream<T>
@@ -97,6 +101,7 @@ where
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
             pending_bytes: 0,
+            flush_in_progress: false,
         }
     }
 
@@ -119,6 +124,7 @@ where
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
             pending_bytes: 0,
+            flush_in_progress: false,
         }
     }
 
@@ -161,8 +167,13 @@ where
             return Poll::Ready(None);
         }
 
-        // If there are pending items, try to flush the sink
-        if !self.frame_queue.is_empty() {
+        // If there are pending items, try to flush the sink.
+        // Futures only store a single waker. If we use poll_flush(cx) here, the stored
+        // waker (i.e. usually that of the write task) is replaced with our waker (i.e.
+        // that of the read task) and our write task may never get woken up again. We
+        // circumvent this by not calling poll_flush at all if poll_flush is polled by
+        // another task at the moment.
+        if !self.frame_queue.is_empty() && !self.flush_in_progress {
             _ = self.as_mut().poll_flush(cx)?;
         }
 
@@ -355,6 +366,7 @@ where
         let io = this.inner.get_mut();
         let bytes_written = &mut this.bytes_written;
         let pending_bytes = &mut this.pending_bytes;
+        let flush_in_progress = &mut this.flush_in_progress;
 
         while let Some(frame) = frame_queue.front() {
             let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len as usize) };
@@ -370,9 +382,20 @@ where
             buf.advance(*bytes_written);
 
             while buf.has_remaining() {
-                let n = ready!(poll_write_buf(Pin::new(io), cx, &mut buf))?;
+                let n = match poll_write_buf(Pin::new(io), cx, &mut buf) {
+                    Poll::Ready(Ok(n)) => n,
+                    Poll::Ready(Err(e)) => {
+                        *flush_in_progress = false;
+                        return Poll::Ready(Err(Error::Io(e)));
+                    }
+                    Poll::Pending => {
+                        *flush_in_progress = true;
+                        return Poll::Pending;
+                    }
+                };
 
                 if n == 0 {
+                    *flush_in_progress = false;
                     return Poll::Ready(Err(Error::Io(io::ErrorKind::WriteZero.into())));
                 }
 
@@ -384,9 +407,20 @@ where
             *bytes_written = 0;
         }
 
-        ready!(Pin::new(io).poll_flush(cx))?;
-
-        Poll::Ready(Ok(()))
+        match Pin::new(io).poll_flush(cx) {
+            Poll::Ready(Ok(())) => {
+                *flush_in_progress = false;
+                Poll::Ready(Ok(()))
+            }
+            Poll::Ready(Err(e)) => {
+                *flush_in_progress = false;
+                Poll::Ready(Err(Error::Io(e)))
+            }
+            Poll::Pending => {
+                *flush_in_progress = true;
+                Poll::Pending
+            }
+        }
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
