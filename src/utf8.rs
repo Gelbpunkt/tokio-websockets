@@ -4,7 +4,7 @@ use std::hint::unreachable_unchecked;
 use crate::proto::ProtocolError;
 
 /// Converts a slice of bytes to a string slice. This will use SIMD acceleration
-/// if the `simd` crate feature is enabled.
+/// if available.
 ///
 /// # Errors
 ///
