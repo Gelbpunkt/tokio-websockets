@@ -4,14 +4,9 @@ It is a bit tricky to benchmark WebSocket libraries, since you're going to be li
 
 ## Environment
 
-I run these benchmarks irregularly on my main system (CPU: `AMD Ryzen 9 7950X`, RAM: `32GB`). The kernel version last used is:
+The benchmarks are run irregularly on a bunch of different systems to get a rough idea for the scaling of the library on different hardware. All hardware is bare-metal, not virtualized.
 
-```
-$ uname -a
-Linux ceres 6.7.0-0.rc3.20231129gt18d46e76.329.vanilla.fc39.x86_64 #1 SMP PREEMPT_DYNAMIC Wed Nov 29 06:20:06 UTC 2023 x86_64 GNU/Linux
-```
-
-and the benchmarks are run in a podman container based on Alpine Linux Edge.
+All benchmarks are run in a podman container based on Chimera Linux.
 
 ## Methodology
 
@@ -22,7 +17,6 @@ In order to bottleneck faster, we're also using a single-threaded runtime.
 The following libraries are compared (in alphabetical order):
 
 * fastwebsockets ([unsound and not thread-safe](https://github.com/denoland/fastwebsockets/issues/42), *non-strict* spec compliance)
-* rust-websocket (uses EOL tokio 0.1, *non-strict* spec compliance)
 * tokio-tungstenite (*non-strict* spec compliance)
 * tokio-websockets (*strict* spec compliance)
 * uWebSockets (*non-strict* spec compliance)
@@ -31,22 +25,70 @@ The benchmarking script was taken from [fastwebsockets](https://github.com/denol
 
 ## Results
 
-### 10 connections, 1024 byte payloads
+### AMD Ryzen 9 7950X, Linux 6.13.5
 
-![10 Connections, 1024 byte payloads](./results/10-1024-chart.svg)
+This target uses AVX2 to emulate AVX512 in hardware.
 
-### 10 connections, 16384 byte payloads
+<details>
 
-![10 Connections, 16384 byte payloads](./results/10-16384-chart.svg)
+<summary>Expand results</summary>
 
-### 100 connections, 20 byte payloads
+#### 10 connections, 1024 byte payloads
 
-![100 Connections, 20 byte payloads](./results/100-20-chart.svg)
+![10 Connections, 1024 byte payloads](./results/x86_64-avx2/10-1024-chart.png)
 
-### 200 connections, 16384 byte payloads
+#### 10 connections, 16384 byte payloads
 
-![200 Connections, 16384 byte payloads](./results/200-16384-chart.svg)
+![10 Connections, 16384 byte payloads](./results/x86_64-avx2/10-16384-chart.png)
 
-### 500 connections, 16384 byte payloads
+#### 100 connections, 0 byte payloads
 
-![500 Connections, 16384 byte payloads](./results/500-16384-chart.svg)
+![100 Connections, 0 byte payloads](./results/x86_64-avx2/100-0-chart.png)
+
+#### 100 connections, 20 byte payloads
+
+![100 Connections, 20 byte payloads](./results/x86_64-avx2/100-20-chart.png)
+
+#### 200 connections, 16384 byte payloads
+
+![200 Connections, 16384 byte payloads](./results/x86_64-avx2/200-16384-chart.png)
+
+#### 500 connections, 16384 byte payloads
+
+![500 Connections, 16384 byte payloads](./results/x86_64-avx2/500-16384-chart.png)
+
+</details>
+
+### Rockchip RK3588S2, Linux 6.1.48
+
+This target uses NEON.
+
+<details>
+
+<summary>Expand results</summary>
+
+#### 10 connections, 1024 byte payloads
+
+![10 Connections, 1024 byte payloads](./results/aarch64-neon/10-1024-chart.png)
+
+#### 10 connections, 16384 byte payloads
+
+![10 Connections, 16384 byte payloads](./results/aarch64-neon/10-16384-chart.png)
+
+#### 100 connections, 0 byte payloads
+
+![100 Connections, 0 byte payloads](./results/aarch64-neon/100-0-chart.png)
+
+#### 100 connections, 20 byte payloads
+
+![100 Connections, 20 byte payloads](./results/aarch64-neon/100-20-chart.png)
+
+#### 200 connections, 16384 byte payloads
+
+![200 Connections, 16384 byte payloads](./results/aarch64-neon/200-16384-chart.png)
+
+#### 500 connections, 16384 byte payloads
+
+![500 Connections, 16384 byte payloads](./results/aarch64-neon/500-16384-chart.png)
+
+</details>
