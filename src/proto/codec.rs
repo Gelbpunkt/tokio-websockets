@@ -6,7 +6,6 @@
 //! [`WebSocketStream`].
 //!
 //! [`WebSocketStream`]: super::WebSocketStream
-use std::hint::unreachable_unchecked;
 
 use bytes::{Buf, BytesMut};
 use tokio_util::codec::Decoder;
@@ -130,10 +129,9 @@ impl Decoder for WebSocketProtocol {
             if payload_length == 126 {
                 ensure_buffer_has_space!(src, offset + 2);
                 // SAFETY: The ensure_buffer_has_space call has validated this
-                // A conversion from two u8s to a u16 cannot fail
-                payload_length = u16::from_be_bytes(unsafe {
-                    src.get_unchecked(2..4).try_into().unwrap_unchecked()
-                }) as usize;
+                payload_length =
+                    u16::from_be_bytes(unsafe { src.get_unchecked(2..4).try_into().unwrap() })
+                        as usize;
                 if payload_length <= 125 {
                     return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
                 }
@@ -142,16 +140,15 @@ impl Decoder for WebSocketProtocol {
                 ensure_buffer_has_space!(src, offset + 8);
                 // SAFETY: The ensure_buffer_has_space call has validated this
                 // A conversion from 8 u8s to a u64 cannot fail
-                payload_length = u64::from_be_bytes(unsafe {
-                    src.get_unchecked(2..10).try_into().unwrap_unchecked()
-                }) as usize;
+                payload_length =
+                    u64::from_be_bytes(unsafe { src.get_unchecked(2..10).try_into().unwrap() })
+                        as usize;
                 if u16::try_from(payload_length).is_ok() {
                     return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
                 }
                 offset = 10;
             } else {
-                // SAFETY: Constructed from 7 bits so the max value is 127
-                unsafe { unreachable_unchecked() }
+                debug_assert!(false, "7 bit value expected to be <= 127");
             }
         }
 

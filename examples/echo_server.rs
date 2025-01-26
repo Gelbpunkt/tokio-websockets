@@ -14,18 +14,16 @@ async fn run() -> Result<(), Error> {
         let (conn, _) = listener.accept().await?;
 
         tokio::spawn(tokio::task::unconstrained(async move {
-            let (_request, mut server) = unsafe {
-                ServerBuilder::new()
-                    .config(Config::default().frame_size(usize::MAX))
-                    .limits(Limits::unlimited())
-                    .accept(conn)
-                    .await
-                    .unwrap_unchecked()
-            };
+            let (_request, mut server) = ServerBuilder::new()
+                .config(Config::default().frame_size(usize::MAX))
+                .limits(Limits::unlimited())
+                .accept(conn)
+                .await
+                .unwrap();
 
             while let Some(Ok(item)) = server.next().await {
                 if item.is_text() || item.is_binary() {
-                    unsafe { server.send(item).await.unwrap_unchecked() };
+                    server.send(item).await.unwrap();
                 }
             }
         }));
@@ -33,12 +31,10 @@ async fn run() -> Result<(), Error> {
 }
 
 fn main() -> Result<(), Error> {
-    let rt = unsafe {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_io()
-            .build()
-            .unwrap_unchecked()
-    };
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .build()
+        .unwrap();
 
     rt.block_on(run())
 }

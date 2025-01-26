@@ -1,5 +1,5 @@
 //! Types required for the WebSocket protocol implementation.
-use std::{fmt, hint::unreachable_unchecked, mem::replace, num::NonZeroU16, ops::Deref};
+use std::{fmt, mem::replace, num::NonZeroU16, ops::Deref};
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -118,8 +118,14 @@ impl CloseCode {
     /// Returns `None` if `code` is not a valid `CloseCode`
     const fn try_from_u16(code: u16) -> Option<Self> {
         match code {
-            // SAFETY: We just checked that the value is non-zero
-            1000..=1015 | 3000..=4999 => Some(Self(unsafe { NonZeroU16::new_unchecked(code) })),
+            1000..=1015 | 3000..=4999 => {
+                // FIXME: replace with `Some(Self(NonZeroU16::new(code).unwrap()))`
+                // once MSRV is bumped to 1.83
+                match NonZeroU16::new(code) {
+                    Some(code) => Some(Self(code)),
+                    None => unreachable!(),
+                }
+            }
             0..=999 | 1016..=2999 | 5000..=u16::MAX => None,
         }
     }
@@ -142,8 +148,11 @@ impl CloseCode {
         match self.0.get() {
             1004 | 1005 | 1006 | 1015 => true,
             1000..=4999 => false,
-            // SAFETY: `TryFrom` is the only way to acquire self and it errors for these values
-            0..=999 | 5000..=u16::MAX => unsafe { unreachable_unchecked() },
+            // `TryFrom` is the only way to acquire self and it errors for these values
+            0..=999 | 5000..=u16::MAX => {
+                debug_assert!(false, "unexpected CloseCode");
+                false
+            }
         }
     }
 }
@@ -666,8 +675,7 @@ impl Frame {
             out[1] = u8::try_from(self.payload.len()).expect("checked by previous branch");
             &mut out[2..6]
         };
-        // SAFETY: All ranges are exactly 4 bytes long
-        unsafe { mask_slice.try_into().unwrap_unchecked() }
+        mask_slice.try_into().unwrap()
     }
 }
 
