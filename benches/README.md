@@ -22,7 +22,6 @@ In order to bottleneck faster, we're also using a single-threaded runtime.
 The following libraries are compared (in alphabetical order):
 
 * fastwebsockets ([unsound and not thread-safe](https://github.com/denoland/fastwebsockets/issues/42), *non-strict* spec compliance)
-* rust-websocket (uses EOL tokio 0.1, *non-strict* spec compliance)
 * tokio-tungstenite (*non-strict* spec compliance)
 * tokio-websockets (*strict* spec compliance)
 * uWebSockets (*non-strict* spec compliance)
