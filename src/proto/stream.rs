@@ -18,10 +18,10 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::{codec::FramedRead, io::poll_write_buf};
 
 #[cfg(any(feature = "client", feature = "server"))]
-use super::types::Limits;
+use super::types::{Limits, Role};
 use super::{
     codec::WebSocketProtocol,
-    types::{Frame, Message, OpCode, Payload, Role, StreamState},
+    types::{Frame, Message, OpCode, Payload, StreamState},
     Config,
 };
 use crate::{CloseCode, Error};
@@ -249,41 +249,28 @@ where
     }
 
     /// Masks and queues a frame for sending when [`poll_flush`] gets called.
-    fn queue_frame(&mut self, frame: Frame) {
+    fn queue_frame(
+        &mut self,
+        #[cfg_attr(not(feature = "client"), allow(unused_mut))] mut frame: Frame,
+    ) {
         if frame.opcode == OpCode::Close && self.state != StreamState::ClosedByPeer {
             self.state = StreamState::ClosedByUs;
         }
 
-        let is_client = self.inner.decoder().role == Role::Client;
+        #[cfg_attr(not(feature = "client"), allow(unused_variables))]
+        let mask = frame.encode(&mut self.header_buf);
 
-        let (frame, mask): (Frame, [u8; 4]) = if is_client {
-            #[cfg(feature = "client")]
-            {
-                let mut frame = frame;
+        #[cfg(feature = "client")]
+        {
+            if self.inner.decoder().role == Role::Client {
                 let mut payload = BytesMut::from(frame.payload);
-                let mask = crate::rand::get_mask();
-                crate::mask::frame(mask, &mut payload, 0);
+                crate::rand::get_mask(mask);
+                crate::mask::frame(*mask, &mut payload, 0);
                 frame.payload = Payload::from(payload);
-
-                (frame, mask)
+                self.header_buf[1] |= 1 << 7;
             }
-            #[cfg(not(feature = "client"))]
-            {
-                // SAFETY: This allows for making the dependency on random generators
-                // only required for clients, servers can avoid it entirely.
-                // Since it is not possible to create a stream with client role
-                // without the client builder (and that is locked behind the client feature),
-                // this branch is impossible to reach.
-                unsafe { std::hint::unreachable_unchecked() }
-            }
-        } else {
-            (frame, [0, 0, 0, 0])
-        };
-
-        frame.encode(&mut self.header_buf, mask);
-        if is_client {
-            self.header_buf[1] |= 1 << 7;
         }
+
         let item = EncodedFrame {
             header: self.header_buf,
             payload: frame.payload,
