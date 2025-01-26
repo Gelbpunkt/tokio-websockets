@@ -345,9 +345,10 @@ fn test_mask() {
     // Mess around with the data to ensure we have unaligned input
     let mut data = data[2..998].to_vec();
     let mut data_clone = data.clone();
-    let key = get_mask();
-    frame(key, &mut data, 0);
-    one_byte_at_once(key, &mut data_clone, 0);
+    let mut mask = [0; 4];
+    get_mask(&mut mask);
+    frame(mask, &mut data, 0);
+    one_byte_at_once(mask, &mut data_clone, 0);
 
     assert_eq!(&data, &data_clone);
 }

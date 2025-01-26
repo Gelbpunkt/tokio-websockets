@@ -16,8 +16,8 @@ mod imp {
     }
 
     /// Generate a random 4-byte WebSocket mask.
-    pub fn get_mask() -> [u8; 4] {
-        fastrand::u32(..).to_ne_bytes()
+    pub fn get_mask(dst: &mut [u8; 4]) {
+        fastrand::fill(dst);
     }
 }
 
@@ -33,10 +33,8 @@ mod imp {
     }
 
     /// Generate a random 4-byte WebSocket mask.
-    pub fn get_mask() -> [u8; 4] {
-        let mut bytes = [0; 4];
-        getrandom::fill(&mut bytes).expect("Failed to get random bytes, consider using `rand` or `fastrand` instead of `getrandom` if this persists");
-        bytes
+    pub fn get_mask(dst: &mut [u8; 4]) {
+        getrandom::fill(dst).expect("Failed to get random bytes, consider using `rand` or `fastrand` instead of `getrandom` if this persists");
     }
 }
 
@@ -53,10 +51,8 @@ mod imp {
     }
 
     /// Generate a random 4-byte WebSocket mask.
-    pub fn get_mask() -> [u8; 4] {
-        let mut bytes = [0; 4];
-        rand::thread_rng().fill_bytes(&mut bytes);
-        bytes
+    pub fn get_mask(dst: &mut [u8; 4]) {
+        rand::thread_rng().fill_bytes(dst);
     }
 }
 
