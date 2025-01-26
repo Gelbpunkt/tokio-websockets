@@ -31,8 +31,6 @@ use crate::{CloseCode, Error};
 struct EncodedFrame {
     /// Encoded frame header.
     header: [u8; 10],
-    /// Length of the header.
-    header_len: u8,
     /// Mask that the payload was masked with.
     mask: [u8; 4],
     /// Potentially masked message payload, ready for writing to the I/O.
@@ -44,6 +42,16 @@ impl EncodedFrame {
     #[inline]
     fn is_masked(&self) -> bool {
         self.header[1] >> 7 != 0
+    }
+
+    /// Returns the length of the header in bytes.
+    #[inline]
+    fn header_len(&self) -> usize {
+        match self.header[1] & 127 {
+            127 => 10,
+            126 => 4,
+            _ => 2,
+        }
     }
 }
 
@@ -273,18 +281,18 @@ where
             (frame, [0, 0, 0, 0])
         };
 
-        let header_len = frame.encode(&mut self.header_buf);
+        frame.encode(&mut self.header_buf);
         if is_client {
             self.header_buf[1] |= 1 << 7;
         }
-        self.pending_bytes +=
-            header_len as usize + (u8::from(is_client) * 4) as usize + frame.payload.len();
-        self.frame_queue.push_back(EncodedFrame {
+        let item = EncodedFrame {
             header: self.header_buf,
-            header_len,
             mask,
             payload: frame.payload,
-        });
+        };
+        self.pending_bytes +=
+            item.header_len() + (u8::from(is_client) * 4) as usize + item.payload.len();
+        self.frame_queue.push_back(item);
     }
 }
 
@@ -379,7 +387,7 @@ where
         let flush_in_progress = &mut this.flush_in_progress;
 
         while let Some(frame) = frame_queue.front() {
-            let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len as usize) };
+            let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len()) };
             let mut buf = frame_header
                 .chain(
                     frame

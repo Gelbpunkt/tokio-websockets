@@ -629,22 +629,19 @@ impl Frame {
         payload: Payload::from_static(&CloseCode::NORMAL_CLOSURE.0.get().to_be_bytes()),
     };
 
-    /// Encode the frame head into `out`, returning how many bytes were written.
-    pub fn encode(&self, out: &mut [u8; 10]) -> u8 {
+    /// Encode the frame head into `out`.
+    pub fn encode(&self, out: &mut [u8; 10]) {
         out[0] = (u8::from(self.is_final) << 7) | u8::from(self.opcode);
         if u16::try_from(self.payload.len()).is_err() {
             out[1] = 127;
             let len = u64::try_from(self.payload.len()).unwrap();
             out[2..10].copy_from_slice(&len.to_be_bytes());
-            10
         } else if self.payload.len() > 125 {
             out[1] = 126;
             let len = u16::try_from(self.payload.len()).expect("checked by previous branch");
             out[2..4].copy_from_slice(&len.to_be_bytes());
-            4
         } else {
             out[1] = u8::try_from(self.payload.len()).expect("checked by previous branch");
-            2
         }
     }
 }
