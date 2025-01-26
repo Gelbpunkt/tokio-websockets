@@ -29,10 +29,8 @@ use crate::{CloseCode, Error};
 /// Helper struct for storing a frame header, the header size and payload.
 #[derive(Debug)]
 struct EncodedFrame {
-    /// Encoded frame header.
-    header: [u8; 10],
-    /// Mask that the payload was masked with.
-    mask: [u8; 4],
+    /// Encoded frame header and mask.
+    header: [u8; 14],
     /// Potentially masked message payload, ready for writing to the I/O.
     payload: Payload,
 }
@@ -44,13 +42,14 @@ impl EncodedFrame {
         self.header[1] >> 7 != 0
     }
 
-    /// Returns the length of the header in bytes.
+    /// Returns the length of the combined header and mask in bytes.
     #[inline]
     fn header_len(&self) -> usize {
+        let mask_bytes = self.is_masked().then_some(4).unwrap_or_default();
         match self.header[1] & 127 {
-            127 => 10,
-            126 => 4,
-            _ => 2,
+            127 => 10 + mask_bytes,
+            126 => 4 + mask_bytes,
+            _ => 2 + mask_bytes,
         }
     }
 }
@@ -86,7 +85,7 @@ pub struct WebSocketStream<T> {
     partial_opcode: OpCode,
 
     /// Buffer that outgoing frame headers are formatted into.
-    header_buf: [u8; 10],
+    header_buf: [u8; 14],
 
     /// Queue of outgoing frames to send.
     frame_queue: VecDeque<EncodedFrame>,
@@ -109,7 +108,7 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            header_buf: [0; 10],
+            header_buf: [0; 14],
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
             pending_bytes: 0,
@@ -131,7 +130,7 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            header_buf: [0; 10],
+            header_buf: [0; 14],
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
             pending_bytes: 0,
@@ -270,17 +269,15 @@ where
             (frame, [0, 0, 0, 0])
         };
 
-        frame.encode(&mut self.header_buf);
+        frame.encode(&mut self.header_buf, mask);
         if is_client {
             self.header_buf[1] |= 1 << 7;
         }
         let item = EncodedFrame {
             header: self.header_buf,
-            mask,
             payload: frame.payload,
         };
-        self.pending_bytes +=
-            item.header_len() + (u8::from(is_client) * 4) as usize + item.payload.len();
+        self.pending_bytes += item.header_len() + item.payload.len();
         self.frame_queue.push_back(item);
     }
 }
@@ -376,14 +373,7 @@ where
 
         while let Some(frame) = frame_queue.front() {
             let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len()) };
-            let mut buf = frame_header
-                .chain(
-                    frame
-                        .is_masked()
-                        .then_some(frame.mask.as_slice())
-                        .unwrap_or_default(),
-                )
-                .chain(&*frame.payload);
+            let mut buf = frame_header.chain(&*frame.payload);
             buf.advance(*bytes_written);
 
             while buf.has_remaining() {
