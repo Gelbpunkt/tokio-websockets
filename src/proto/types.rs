@@ -72,47 +72,70 @@ pub struct CloseCode(NonZeroU16);
 impl CloseCode {
     /// Normal closure, meaning that the purpose for which the connection was
     /// established has been fulfilled.
-    pub const NORMAL_CLOSURE: Self = Self(unsafe { NonZeroU16::new_unchecked(1000) });
+    pub const NORMAL_CLOSURE: Self = Self::constant(1000);
     /// Endpoint is "going away", such as a server going down or a browser
     /// having navigated away from a page.
-    pub const GOING_AWAY: Self = Self(unsafe { NonZeroU16::new_unchecked(1001) });
+    pub const GOING_AWAY: Self = Self::constant(1001);
     /// Endpoint is terminating the connection due to a protocol error.
-    pub const PROTOCOL_ERROR: Self = Self(unsafe { NonZeroU16::new_unchecked(1002) });
+    pub const PROTOCOL_ERROR: Self = Self::constant(1002);
     /// Endpoint is terminating the connection because it has received a type of
     /// data it cannot accept.
-    pub const UNSUPPORTED_DATA: Self = Self(unsafe { NonZeroU16::new_unchecked(1003) });
+    pub const UNSUPPORTED_DATA: Self = Self::constant(1003);
     /// No status code was actually present.
-    pub const NO_STATUS_RECEIVED: Self = Self(unsafe { NonZeroU16::new_unchecked(1005) });
+    pub const NO_STATUS_RECEIVED: Self = Self::constant(1005);
     /// Endpoint is terminating the connection because it has received data
     /// within a message that was not consistent with the type of the message.
-    pub const INVALID_FRAME_PAYLOAD_DATA: Self = Self(unsafe { NonZeroU16::new_unchecked(1007) });
+    pub const INVALID_FRAME_PAYLOAD_DATA: Self = Self::constant(1007);
     /// Endpoint is terminating the connection because it has received a message
     /// that violates its policy.
-    pub const POLICY_VIOLATION: Self = Self(unsafe { NonZeroU16::new_unchecked(1008) });
+    pub const POLICY_VIOLATION: Self = Self::constant(1008);
     /// Endpoint is terminating the connection because it has received a message
     /// that is too big for it to process.
-    pub const MESSAGE_TOO_BIG: Self = Self(unsafe { NonZeroU16::new_unchecked(1009) });
+    pub const MESSAGE_TOO_BIG: Self = Self::constant(1009);
     /// Client is terminating the connection because it has expected the server
     /// to negotiate one or more extension, but the server didn't return them in
     /// the response message of the WebSocket handshake.
-    pub const MANDATORY_EXTENSION: Self = Self(unsafe { NonZeroU16::new_unchecked(1010) });
+    pub const MANDATORY_EXTENSION: Self = Self::constant(1010);
     /// Server is terminating the connection because it encountered an
     /// unexpected condition that prevented it from fulfilling the request.
-    pub const INTERNAL_SERVER_ERROR: Self = Self(unsafe { NonZeroU16::new_unchecked(1011) });
+    pub const INTERNAL_SERVER_ERROR: Self = Self::constant(1011);
     /// Service is restarted. A client may reconnect, and if it choses to do,
     /// should reconnect using a randomized delay of 5--30s.
-    pub const SERVICE_RESTART: Self = Self(unsafe { NonZeroU16::new_unchecked(1012) });
+    pub const SERVICE_RESTART: Self = Self::constant(1012);
     /// Service is experiencing overload. A client should only connect to a
     /// different IP (when there are multiple for the target) or reconnect to
     /// the same IP upon user action.
-    pub const SERVICE_OVERLOAD: Self = Self(unsafe { NonZeroU16::new_unchecked(1013) });
+    pub const SERVICE_OVERLOAD: Self = Self::constant(1013);
     /// The server was acting as a gateway or proxy and received an invalid
     /// response from the upstream server. This is similar to the HTTP 502
     /// status code.
-    pub const BAD_GATEWAY: Self = Self(unsafe { NonZeroU16::new_unchecked(1014) });
+    pub const BAD_GATEWAY: Self = Self::constant(1014);
 }
 
 impl CloseCode {
+    /// Try to construct [`CloseCode`] from `u16`
+    ///
+    /// Returns `None` if `code` is not a valid `CloseCode`
+    const fn try_from_u16(code: u16) -> Option<Self> {
+        match code {
+            // SAFETY: We just checked that the value is non-zero
+            1000..=1015 | 3000..=4999 => Some(Self(unsafe { NonZeroU16::new_unchecked(code) })),
+            0..=999 | 1016..=2999 | 5000..=u16::MAX => None,
+        }
+    }
+
+    /// Try to construct [`CloseCode`] from `u16`
+    ///
+    /// Panics if `code` is not a valid `CloseCode`
+    const fn constant(code: u16) -> Self {
+        // FIXME: replace with `Self::try_from_u16(code).unwrap()`
+        // once MSRV is bumped to 1.83
+        match Self::try_from_u16(code) {
+            Some(code) => code,
+            None => unreachable!(),
+        }
+    }
+
     /// Whether the close code is reserved and cannot be sent over the wire.
     #[must_use]
     pub fn is_reserved(self) -> bool {
@@ -135,11 +158,7 @@ impl TryFrom<u16> for CloseCode {
     type Error = ProtocolError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            // SAFETY: We just checked that the value is non-zero
-            1000..=1015 | 3000..=4999 => Ok(Self(unsafe { NonZeroU16::new_unchecked(value) })),
-            0..=999 | 1016..=2999 | 5000..=u16::MAX => Err(ProtocolError::InvalidCloseCode),
-        }
+        Self::try_from_u16(value).ok_or(ProtocolError::InvalidCloseCode)
     }
 }
 
