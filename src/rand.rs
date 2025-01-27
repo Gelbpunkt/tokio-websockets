@@ -41,18 +41,16 @@ mod imp {
 /// Random numbers generation utilities using [`rand`].
 #[cfg(feature = "rand")]
 mod imp {
-    use rand::RngCore;
-
     /// Generate a random 16-byte WebSocket key.
     pub fn get_key() -> [u8; 16] {
         let mut bytes = [0; 16];
-        rand::thread_rng().fill_bytes(&mut bytes);
+        rand::fill(&mut bytes);
         bytes
     }
 
     /// Generate a random 4-byte WebSocket mask.
     pub fn get_mask(dst: &mut [u8; 4]) {
-        rand::thread_rng().fill_bytes(dst);
+        rand::fill(dst);
     }
 }
 
