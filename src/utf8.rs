@@ -84,8 +84,8 @@ impl Validator {
             unsafe {
                 self.partial_codepoint
                     .get_unchecked_mut(self.partial_codepoint_len..codepoint_len_after_copy)
-                    .copy_from_slice(input.get_unchecked(..bytes_to_copy));
             }
+            .copy_from_slice(&input[..bytes_to_copy]);
 
             // If we know that the codepoint is complete, we can use the basic variant
             if available_bytes >= missing_bytes {
@@ -120,7 +120,7 @@ impl Validator {
 
             self.reset();
 
-            unsafe { input.get_unchecked(bytes_to_copy..) }
+            &input[bytes_to_copy..]
         };
 
         // Validate the entire rest of the input
