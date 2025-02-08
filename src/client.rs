@@ -94,7 +94,7 @@ fn build_request(uri: &Uri, key: &[u8], headers: &HeaderMap) -> Vec<u8> {
         buf.extend_from_slice(b"Host: ");
         buf.extend_from_slice(host.as_bytes());
 
-        if let Some(port) = default_port(uri) {
+        if let Some(port) = uri.port_u16() {
             buf.extend_from_slice(b":");
             buf.extend_from_slice(port.to_string().as_bytes());
         }
