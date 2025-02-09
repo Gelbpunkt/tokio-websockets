@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2025-02-09
+
+### Changed
+
+- `rand` was updated to 0.9
+- Reduced the amount of unsafe code
+
+### Fixed
+
+- The `Host` header no longer unconditionally includes a port anymore, which is more in line with the RFC and fixes interacting with some webservers
+
 ## [0.11.1] - 2025-01-26
 
 ### Changed
