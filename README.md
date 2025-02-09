@@ -3,6 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/tokio-websockets.svg?maxAge=2592000)](https://crates.io/crates/tokio-websockets)
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/Gelbpunkt/tokio-websockets/ci.yml)
 [![Documentation](https://img.shields.io/docsrs/tokio-websockets)](https://docs.rs/tokio-websockets)
+[![Chat](https://dcbadge.limes.pink/api/server/https://discord.gg/RduHx2QtZT?style=flat)](https://discord.gg/RduHx2QtZT)
 
 High performance, strict, tokio-util based WebSockets implementation.
 
