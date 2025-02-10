@@ -97,7 +97,6 @@ def create_chart(title, results, filename):
     plt.title(title)
     plt.xlabel("WebSocket Implementations", labelpad=20)
     plt.ylabel("Messages per Second (Avg)", labelpad=20)
-    plt.xticks(ha="right")
     plt.tight_layout()
     plt.savefig(filename)
     plt.close()
