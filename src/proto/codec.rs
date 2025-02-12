@@ -54,12 +54,14 @@ impl WebSocketProtocol {
     }
 }
 
-/// Macro that returns `Ok(None)` early and reserves missing capacity if buf is
-/// not large enough.
-macro_rules! ensure_buffer_has_space {
-    ($buf:expr, $space:expr) => {
-        if $buf.len() < $space {
-            $buf.reserve(MAX_FRAME_HEADER_SIZE - $space);
+/// Macro that gets a range of a buffer. It returns `Ok(None)` and reserves
+/// missing capacity of the buffer if it is too small.
+macro_rules! get_buf_if_space {
+    ($buf:expr, $range:expr) => {
+        if let Some(cont) = $buf.get($range) {
+            cont
+        } else {
+            $buf.reserve(MAX_FRAME_HEADER_SIZE - $range.len());
 
             return Ok(None);
         }
@@ -73,24 +75,20 @@ impl Decoder for WebSocketProtocol {
     #[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Opcode and payload length must be present
-        ensure_buffer_has_space!(src, 2);
-
-        // SAFETY: The ensure_buffer_has_space call has validated this
-        let fin_and_rsv = unsafe { src.get_unchecked(0) };
-        let payload_len_1 = unsafe { src.get_unchecked(1) };
+        let first_two_bytes = get_buf_if_space!(src, 0..2);
 
         // Bit 0
-        let fin = fin_and_rsv >> 7 != 0;
+        let fin = first_two_bytes[0] >> 7 != 0;
 
         // Bits 1-3
-        let rsv = fin_and_rsv & 0x70;
+        let rsv = first_two_bytes[0] & 0x70;
 
         if rsv != 0 {
             return Err(Error::Protocol(ProtocolError::InvalidRsv));
         }
 
         // Bits 4-7
-        let opcode = OpCode::try_from(fin_and_rsv & 0xF)?;
+        let opcode = OpCode::try_from(first_two_bytes[0] & 0xF)?;
 
         if opcode.is_control() {
             if !fin {
@@ -105,7 +103,7 @@ impl Decoder for WebSocketProtocol {
         }
 
         // Bit 0
-        let mask = payload_len_1 >> 7 != 0;
+        let mask = first_two_bytes[1] >> 7 != 0;
 
         if mask && self.role == Role::Client {
             return Err(Error::Protocol(ProtocolError::UnexpectedMaskedFrame));
@@ -114,7 +112,7 @@ impl Decoder for WebSocketProtocol {
         }
 
         // Bits 1-7
-        let mut payload_length = (payload_len_1 & 127) as usize;
+        let mut payload_length = (first_two_bytes[1] & 127) as usize;
 
         let mut offset = 2;
 
@@ -127,22 +125,17 @@ impl Decoder for WebSocketProtocol {
             }
 
             if payload_length == 126 {
-                ensure_buffer_has_space!(src, offset + 2);
-                // SAFETY: The ensure_buffer_has_space call has validated this
+                // A conversion from 2 u8s to a u16 cannot fail
                 payload_length =
-                    u16::from_be_bytes(unsafe { src.get_unchecked(2..4).try_into().unwrap() })
-                        as usize;
+                    u16::from_be_bytes(get_buf_if_space!(src, 2..4).try_into().unwrap()) as usize;
                 if payload_length <= 125 {
                     return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
                 }
                 offset = 4;
             } else if payload_length == 127 {
-                ensure_buffer_has_space!(src, offset + 8);
-                // SAFETY: The ensure_buffer_has_space call has validated this
                 // A conversion from 8 u8s to a u64 cannot fail
                 payload_length =
-                    u64::from_be_bytes(unsafe { src.get_unchecked(2..10).try_into().unwrap() })
-                        as usize;
+                    u64::from_be_bytes(get_buf_if_space!(src, 2..10).try_into().unwrap()) as usize;
                 if u16::try_from(payload_length).is_ok() {
                     return Err(Error::Protocol(ProtocolError::InvalidPayloadLength));
                 }
@@ -162,8 +155,8 @@ impl Decoder for WebSocketProtocol {
         // There could be a mask here, but we only load it later,
         // so just increase the offset to calculate the available data
         if mask {
+            let _ = get_buf_if_space!(src, offset..offset + 4);
             offset += 4;
-            ensure_buffer_has_space!(src, offset);
         }
 
         if payload_length != 0 {
