@@ -177,7 +177,7 @@ impl Decoder for WebSocketProtocol {
                                 .get_unchecked_mut(self.payload_processed..payload_available);
 
                             mask::frame(
-                                (*masking_key).try_into().unwrap_unchecked(),
+                                (*masking_key).try_into().unwrap(),
                                 payload_masked,
                                 self.payload_processed & 3,
                             );
@@ -211,7 +211,7 @@ impl Decoder for WebSocketProtocol {
                         rest_of_payload.get_unchecked_mut(self.payload_processed..payload_length);
 
                     mask::frame(
-                        (*masking_key).try_into().unwrap_unchecked(),
+                        (*masking_key).try_into().unwrap(),
                         payload_masked,
                         self.payload_processed & 3,
                     );
@@ -231,9 +231,7 @@ impl Decoder for WebSocketProtocol {
                 // a length of 1
                 // A conversion from two u8s to a u16 cannot fail
                 let code = CloseCode::try_from(u16::from_be_bytes(unsafe {
-                    src.get_unchecked(offset..offset + 2)
-                        .try_into()
-                        .unwrap_unchecked()
+                    src.get_unchecked(offset..offset + 2).try_into().unwrap()
                 }))?;
                 if code.is_reserved() {
                     return Err(Error::Protocol(ProtocolError::InvalidCloseCode));
