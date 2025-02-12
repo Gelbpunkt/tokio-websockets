@@ -103,11 +103,11 @@ impl Decoder for WebSocketProtocol {
         }
 
         // Bit 0
-        let mask = first_two_bytes[1] >> 7 != 0;
+        let masked = first_two_bytes[1] >> 7 != 0;
 
-        if mask && self.role == Role::Client {
+        if masked && self.role == Role::Client {
             return Err(Error::Protocol(ProtocolError::UnexpectedMaskedFrame));
-        } else if !mask && self.role == Role::Server {
+        } else if !masked && self.role == Role::Server {
             return Err(Error::Protocol(ProtocolError::UnexpectedUnmaskedFrame));
         }
 
@@ -152,12 +152,14 @@ impl Decoder for WebSocketProtocol {
             });
         }
 
-        // There could be a mask here, but we only load it later,
-        // so just increase the offset to calculate the available data
-        if mask {
-            let _ = get_buf_if_space!(src, offset..offset + 4);
+        let mask = if masked {
             offset += 4;
-        }
+            get_buf_if_space!(src, offset - 4..offset)
+                .try_into()
+                .unwrap()
+        } else {
+            [0; 4]
+        };
 
         if payload_length != 0 {
             let is_text = opcode == OpCode::Text
@@ -166,20 +168,14 @@ impl Decoder for WebSocketProtocol {
             let payload_available = (src.len() - offset).min(payload_length);
             let is_complete = payload_available == payload_length;
 
-            if (is_complete || is_text) && mask {
-                unsafe {
-                    let (masking_key, rest_of_payload) = src
-                        .get_unchecked_mut(offset - 4..)
-                        .split_at_mut_unchecked(4);
-                    let payload_masked = rest_of_payload
-                        .get_unchecked_mut(self.payload_processed..payload_available);
-
-                    mask::frame(
-                        (*masking_key).try_into().unwrap(),
-                        payload_masked,
-                        self.payload_processed % 4,
-                    );
+            if (is_complete || is_text) && masked {
+                let masked_payload = unsafe {
+                    src.get_unchecked_mut(
+                        offset + self.payload_processed..offset + payload_available,
+                    )
                 };
+
+                mask::frame(mask, masked_payload, self.payload_processed % 4);
             }
 
             if is_text {
