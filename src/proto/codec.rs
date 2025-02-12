@@ -163,70 +163,46 @@ impl Decoder for WebSocketProtocol {
             let is_text = opcode == OpCode::Text
                 || (opcode == OpCode::Continuation
                     && self.fragmented_message_opcode == OpCode::Text);
-            let payload_available = src.len() - offset;
+            let payload_available = (src.len() - offset).min(payload_length);
+            let is_complete = payload_available == payload_length;
 
-            if payload_length > payload_available {
-                // Validate partial frame payload data
-                if is_text {
-                    if mask {
-                        unsafe {
-                            let (masking_key, rest_of_payload) = src
-                                .get_unchecked_mut(offset - 4..)
-                                .split_at_mut_unchecked(4);
-                            let payload_masked = rest_of_payload
-                                .get_unchecked_mut(self.payload_processed..payload_available);
-
-                            mask::frame(
-                                (*masking_key).try_into().unwrap(),
-                                payload_masked,
-                                self.payload_processed & 3,
-                            );
-                        };
-                    }
-
-                    // SAFETY: self.payload_data_validated <= payload_available
-                    self.validator.feed(
-                        unsafe {
-                            src.get_unchecked(
-                                offset + self.payload_processed..offset + payload_available,
-                            )
-                        },
-                        false,
-                    )?;
-
-                    self.payload_processed = payload_available;
-                }
-
-                src.reserve(payload_length - payload_available);
-
-                return Ok(None);
-            }
-
-            if mask {
+            if (is_complete || is_text) && mask {
                 unsafe {
                     let (masking_key, rest_of_payload) = src
                         .get_unchecked_mut(offset - 4..)
                         .split_at_mut_unchecked(4);
-                    let payload_masked =
-                        rest_of_payload.get_unchecked_mut(self.payload_processed..payload_length);
+                    let payload_masked = rest_of_payload
+                        .get_unchecked_mut(self.payload_processed..payload_available);
 
                     mask::frame(
                         (*masking_key).try_into().unwrap(),
                         payload_masked,
-                        self.payload_processed & 3,
+                        self.payload_processed % 4,
                     );
                 };
             }
 
             if is_text {
-                // SAFETY: self.payload_data_validated <= payload_length
+                // SAFETY: self.payload_processed <= payload_length
                 self.validator.feed(
                     unsafe {
-                        src.get_unchecked(offset + self.payload_processed..offset + payload_length)
+                        src.get_unchecked(
+                            offset + self.payload_processed..offset + payload_available,
+                        )
                     },
-                    fin,
+                    is_complete && fin,
                 )?;
-            } else if opcode == OpCode::Close {
+
+                self.payload_processed = payload_available;
+            }
+
+            if !is_complete {
+                src.reserve(payload_length - payload_available);
+
+                return Ok(None);
+            }
+
+            if opcode == OpCode::Close {
                 // SAFETY: Close frames with a non-zero payload length are validated to not have
                 // a length of 1
                 // A conversion from two u8s to a u16 cannot fail
