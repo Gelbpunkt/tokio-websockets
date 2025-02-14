@@ -418,7 +418,7 @@ where
         if self.state == StreamState::Active {
             self.queue_frame(Frame::DEFAULT_CLOSE);
         }
-        while ready!(self.as_mut().poll_next(cx)).is_some() {}
+        while ready!(self.as_mut().poll_next(cx)).is_some_and(|r| r.is_ok()) {}
 
         ready!(self.as_mut().poll_flush(cx))?;
         Pin::new(self.inner.get_mut())
