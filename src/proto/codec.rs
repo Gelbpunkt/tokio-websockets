@@ -168,26 +168,16 @@ impl Decoder for WebSocketProtocol {
             let payload_available = (src.len() - offset).min(payload_length);
             let is_complete = payload_available == payload_length;
 
-            if (is_complete || is_text) && masked {
-                let masked_payload = unsafe {
-                    src.get_unchecked_mut(
-                        offset + self.payload_processed..offset + payload_available,
-                    )
-                };
+            // SAFETY: self.payload_processed <= payload_length
+            let payload = unsafe {
+                src.get_unchecked_mut(offset + self.payload_processed..offset + payload_available)
+            };
 
-                mask::frame(mask, masked_payload, self.payload_processed % 4);
+            if masked && (is_complete || is_text) {
+                mask::frame(mask, payload, self.payload_processed % 4);
             }
-
             if is_text {
-                // SAFETY: self.payload_processed <= payload_length
-                self.validator.feed(
-                    unsafe {
-                        src.get_unchecked(
-                            offset + self.payload_processed..offset + payload_available,
-                        )
-                    },
-                    is_complete && fin,
-                )?;
+                self.validator.feed(payload, is_complete && fin)?;
 
                 self.payload_processed = payload_available;
             }
