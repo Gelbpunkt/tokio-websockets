@@ -194,7 +194,7 @@ where
         let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
             Some(Ok(frame)) => frame,
             Some(Err(e)) => {
-                if self.state == StreamState::ClosedByUs {
+                if matches!(e, Error::Io(_)) || self.state == StreamState::ClosedByUs {
                     self.state = StreamState::CloseAcknowledged;
                 } else {
                     self.state = StreamState::ClosedByPeer;
@@ -377,6 +377,7 @@ where
                     Poll::Ready(Ok(n)) => n,
                     Poll::Ready(Err(e)) => {
                         *flush_in_progress = false;
+                        this.state = StreamState::CloseAcknowledged;
                         return Poll::Ready(Err(Error::Io(e)));
                     }
                     Poll::Pending => {
@@ -387,6 +388,7 @@ where
 
                 if n == 0 {
                     *flush_in_progress = false;
+                    this.state = StreamState::CloseAcknowledged;
                     return Poll::Ready(Err(Error::Io(io::ErrorKind::WriteZero.into())));
                 }
 
@@ -405,6 +407,7 @@ where
             }
             Poll::Ready(Err(e)) => {
                 *flush_in_progress = false;
+                this.state = StreamState::CloseAcknowledged;
                 Poll::Ready(Err(Error::Io(e)))
             }
             Poll::Pending => {
@@ -418,7 +421,7 @@ where
         if self.state == StreamState::Active {
             self.queue_frame(Frame::DEFAULT_CLOSE);
         }
-        while ready!(self.as_mut().poll_next(cx)).is_some_and(|r| r.is_ok()) {}
+        while ready!(self.as_mut().poll_next(cx)).is_some() {}
 
         ready!(self.as_mut().poll_flush(cx))?;
         Pin::new(self.inner.get_mut())
