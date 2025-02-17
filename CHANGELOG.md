@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.3] - 2025-02-17
+
+### Fixed
+
+- In cases where the underlying I/O was failed but data remained to be sent, a call to `poll_close` the WebSocket stream would block indefinitely, this is now properly handled by returning `None` from `poll_next` after I/O errors
+
 ## [0.11.2] - 2025-02-09
 
 ### Changed
