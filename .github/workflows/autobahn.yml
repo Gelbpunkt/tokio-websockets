@@ -1,6 +1,6 @@
 name: Run autobahn testsuite
 
-on: [push, pull_request]
+on: [push]
 
 env:
   CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
