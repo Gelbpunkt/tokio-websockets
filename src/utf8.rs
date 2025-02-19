@@ -74,8 +74,7 @@ impl Validator {
                 return Ok(());
             }
 
-            let complete_codepoint_len = self.complete_codepoint_len();
-            let missing_bytes = complete_codepoint_len - self.partial_codepoint_len;
+            let missing_bytes = self.complete_codepoint_len() - self.partial_codepoint_len;
             let bytes_to_copy = available_bytes.min(missing_bytes);
             let codepoint_len_after_copy = self.partial_codepoint_len + bytes_to_copy;
 
