@@ -232,6 +232,9 @@ jobs:
         with:
           toolchain: nightly
 
+      - name: Get latest compatible dependencies for MSRV
+        run: CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo update
+
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v3
         with:
