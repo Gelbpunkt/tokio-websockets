@@ -17,11 +17,11 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::{codec::FramedRead, io::poll_write_buf};
 
 #[cfg(any(feature = "client", feature = "server"))]
-use super::types::{Limits, Role};
+use super::types::Role;
 use super::{
     codec::WebSocketProtocol,
     types::{Frame, Message, OpCode, Payload, StreamState},
-    Config,
+    Config, Limits,
 };
 use crate::{CloseCode, Error};
 
@@ -157,6 +157,16 @@ where
     /// corrupting the stream of frames.
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.get_mut()
+    }
+
+    /// Returns a reference to the inner websocket limits.
+    pub fn limits(&self) -> &Limits {
+        &self.inner.decoder().limits
+    }
+
+    /// Returns a mutable reference to the inner websocket limits.
+    pub fn limits_mut(&mut self) -> &mut Limits {
+        &mut self.inner.decoder_mut().limits
     }
 
     /// Attempt to pull out the next frame from the [`Framed`] this stream and
