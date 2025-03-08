@@ -529,8 +529,7 @@ impl Iterator for MessageFrames {
 /// [`WebSocketStream`]: super::WebSocketStream
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
-    /// The maximum allowed payload length. The default
-    /// is 64 MiB.
+    /// The maximum allowed payload length. The default is 64 MiB.
     pub(super) max_payload_len: usize,
 }
 
@@ -543,13 +542,19 @@ impl Limits {
         }
     }
 
-    /// Sets the maximum allowed payload length. `None` equals no limit. The
-    /// default is 64 MiB.
+    /// Sets the maximum allowed payload length. `None` equals no limit.
+    ///
+    /// The default is 64 MiB.
     #[must_use]
     pub fn max_payload_len(mut self, size: Option<usize>) -> Self {
-        self.max_payload_len = size.unwrap_or(usize::MAX);
+        self.set_max_payload_len(size);
 
         self
+    }
+
+    /// See [`max_payload_len`](Self::max_payload_len).
+    pub fn set_max_payload_len(&mut self, size: Option<usize>) {
+        self.max_payload_len = size.unwrap_or(usize::MAX);
     }
 }
 
