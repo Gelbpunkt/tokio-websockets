@@ -32,6 +32,11 @@
         powerpc_target_feature
     )
 )]
+// Required for s390x vectors until stable
+#![cfg_attr(
+    all(feature = "nightly", target_arch = "s390x"),
+    feature(stdarch_s390x, stdarch_s390x_feature_detection, s390x_target_feature)
+)]
 #![doc = include_str!("../README.md")]
 
 // If the client or server implementation is enabled, at least one SHA1 backend
