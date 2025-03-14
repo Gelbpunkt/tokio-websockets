@@ -223,6 +223,48 @@ unsafe fn frame_altivec(key: [u8; 4], input: &mut [u8], mut offset: usize) {
     }
 }
 
+/// (Un-)masks input bytes with the framing key using s390x vectors.
+///
+/// The input bytes may be further in the payload and therefore the offset
+/// into the payload must be specified.
+///
+/// This will use a fallback implementation for less than 16 bytes. For
+/// sufficiently large inputs, it masks in chunks of 16 bytes per
+/// instruction, applying the fallback method on all remaining data.
+#[cfg(all(feature = "nightly", target_arch = "s390x"))]
+#[target_feature(enable = "vector")]
+unsafe fn frame_s390x_vector(key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    use std::{
+        arch::s390x::{vec_splats, vec_xor, vector_signed_int, vector_unsigned_char},
+        mem::transmute,
+    };
+
+    unsafe {
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<vector_unsigned_char>();
+
+        // Run fallback implementation on unaligned prefix data
+        fallback_frame(key, prefix, offset);
+        offset = (offset + prefix.len()) % key.len();
+
+        if !aligned_data.is_empty() {
+            // SAFETY: 4x i32 to 16x u8 is safe
+            #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+            let mask: vector_unsigned_char = transmute(vec_splats::<i32, vector_signed_int>(
+                i32::from_be_bytes(key)
+                    .rotate_left(offset as u32 * u8::BITS)
+                    .to_be(),
+            ));
+
+            for block in aligned_data {
+                *block = vec_xor(*block, mask);
+            }
+        }
+
+        // Run fallback implementation on unaligned suffix data
+        fallback_frame(key, suffix, offset);
+    }
+}
+
 /// (Un-)masks input bytes with the framing key, one byte at once.
 ///
 /// See [`fallback_frame`] for more details.
@@ -328,6 +370,15 @@ pub fn frame(key: [u8; 4], input: &mut [u8], offset: usize) {
 
         if is_powerpc64_feature_detected!("altivec") {
             return unsafe { frame_altivec(key, input, offset) };
+        }
+    }
+
+    #[cfg(all(feature = "nightly", target_arch = "s390x"))]
+    {
+        use std::arch::is_s390x_feature_detected;
+
+        if is_s390x_feature_detected!("vector") {
+            return unsafe { frame_s390x_vector(key, input, offset) };
         }
     }
 
