@@ -3,7 +3,12 @@ name = "tokio-websockets"
 version = "0.11.3"
 edition = "2021"
 description = "High performance, strict, tokio-util based WebSockets implementation"
-categories = ["web-programming::websocket", "network-programming", "asynchronous", "concurrency"]
+categories = [
+    "web-programming::websocket",
+    "network-programming",
+    "asynchronous",
+    "concurrency",
+]
 repository = "https://github.com/Gelbpunkt/tokio-websockets/"
 rust-version = "1.79"
 license = "MIT"
@@ -15,7 +20,10 @@ bytes = "1.7"
 futures-core = "0.3"
 futures-sink = "0.3"
 # We enable aarch64_neon feature because it is MSRV-gated but ours is higher than 1.59
-simdutf8 = { version = "0.1", default-features = false, features = ["std", "aarch64_neon"] }
+simdutf8 = { version = "0.1", default-features = false, features = [
+    "std",
+    "aarch64_neon",
+] }
 
 tokio = "1"
 # tokio-util 0.7.3 is the first to depend on tracing without default features, otherwise minvers break
@@ -25,21 +33,29 @@ tokio-util = { version = "0.7.3", features = ["codec", "io"] }
 sha1_smol = { version = "1.0", optional = true }
 
 # Randomness providers
-fastrand = { version = "2.0", default-features = false, features = ["std"], optional = true }
+fastrand = { version = "2.0", default-features = false, features = [
+    "std",
+], optional = true }
 getrandom = { version = "0.3", default-features = false, optional = true }
-rand = { version = "0.9", default-features = false, features = ["thread_rng"], optional = true }
+rand = { version = "0.9", default-features = false, features = [
+    "thread_rng",
+], optional = true }
 
 # SIMD
 # Client
 base64 = { version = "0.22", optional = true }
-http = { version = "1", default-features = false, features = ["std"], optional = true }
+http = { version = "1", default-features = false, features = [
+    "std",
+], optional = true }
 httparse = { version = "1.6", optional = true }
 
 # Native TLS
 tokio-native-tls = { version = "0.3", optional = true }
 
 # Rustls
-aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"], optional = true }
+aws-lc-rs = { version = "1", default-features = false, features = [
+    "aws-lc-sys",
+], optional = true }
 ring = { version = "0.17", default-features = false, optional = true }
 rustls-native-certs = { version = "0.8", default-features = false, optional = true }
 rustls-pki-types = { version = "1", optional = true }
@@ -51,26 +67,54 @@ webpki-roots = { version = "0.26", default-features = false, optional = true }
 openssl = { version = "0.10", default-features = false, optional = true }
 
 [features]
-client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util"]
-aws_lc_rs = ["dep:aws-lc-rs", "tokio-rustls?/aws_lc_rs"] # Underscores for consistency with other rustls crates
+client = [
+    "dep:base64",
+    "dep:http",
+    "dep:httparse",
+    "tokio/net",
+    "tokio/io-util",
+]
+aws_lc_rs = [
+    "dep:aws-lc-rs",
+    "tokio-rustls?/aws_lc_rs",
+] # Underscores for consistency with other rustls crates
 aws-lc-rs = ["aws_lc_rs"] # Alias because Cargo features commonly use `-`
 fips = ["aws_lc_rs", "aws-lc-rs?/fips", "tokio-rustls?/fips"]
 ring = ["dep:ring", "tokio-rustls?/ring"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
 native-tls = ["dep:tokio-native-tls"]
-rustls-webpki-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots"]
-rustls-native-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-native-certs"]
-rustls-platform-verifier = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:rustls-platform-verifier"]
+rustls-webpki-roots = [
+    "dep:rustls-pki-types",
+    "dep:tokio-rustls",
+    "dep:webpki-roots",
+]
+rustls-native-roots = [
+    "dep:rustls-pki-types",
+    "dep:tokio-rustls",
+    "dep:rustls-native-certs",
+]
+rustls-platform-verifier = [
+    "dep:rustls-pki-types",
+    "dep:tokio-rustls",
+    "dep:rustls-platform-verifier",
+]
 rustls-bring-your-own-connector = ["dep:rustls-pki-types", "dep:tokio-rustls"]
 rustls-tls12 = ["tokio-rustls?/tls12"]
 simd = [] # No effect, deprecated
 nightly = ["simdutf8/aarch64_neon_prefetch"]
 
 [dev-dependencies]
-futures-util = { version = "0.3.14", default-features = false, features = ["sink"] }
+futures-util = { version = "0.3.14", default-features = false, features = [
+    "sink",
+] }
 rustls-pemfile = "2"
 rustls-pki-types = "1"
-tokio = { version = "1", default-features = false, features = ["net", "macros", "rt-multi-thread", "time"] }
+tokio = { version = "1", default-features = false, features = [
+    "net",
+    "macros",
+    "rt-multi-thread",
+    "time",
+] }
 tokio-rustls = { version = "0.26", default-features = false }
 
 [[example]]
@@ -111,7 +155,22 @@ required-features = ["server"]
 
 [package.metadata.docs.rs]
 # aws_lc_rs' fips mode can't be built in docs.rs
-features = ["client", "aws_lc_rs", "ring", "fastrand", "getrandom", "rand", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
+features = [
+    "client",
+    "aws_lc_rs",
+    "ring",
+    "fastrand",
+    "getrandom",
+    "rand",
+    "server",
+    "simd",
+    "native-tls",
+    "rustls-native-roots",
+    "rustls-webpki-roots",
+    "rustls-platform-verifier",
+    "rustls-tls12",
+    "nightly",
+]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]
