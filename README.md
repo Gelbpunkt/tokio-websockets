@@ -14,7 +14,7 @@ High performance, strict, tokio-util based WebSockets implementation.
   - `tokio`, `tokio-util`, `bytes`, `futures-core`, `futures-sink`, `simdutf8`
   - SHA1 backend, e.g. `sha1_smol` (see [Feature flags](#feature-flags))
 - Big selection of features to tailor dependencies to any project (see [Feature flags](#feature-flags))
-- SIMD support: AVX512, AVX2, SSE2, NEON or AltiVec for frame (un)masking and accelerated UTF-8 validation
+- SIMD support: AVX512, AVX2, SSE2, NEON, AltiVec or IBM z13 vector facilities for frame (un)masking and accelerated UTF-8 validation
 - Strict conformance with the WebSocket specification, passes the [Autobahn test suite](https://github.com/crossbario/autobahn-testsuite) without relaxations [by default](https://gelbpunkt.github.io/tokio-websockets/index.html)
 - TLS support
 - Reusable TLS connectors
@@ -27,7 +27,7 @@ High performance, strict, tokio-util based WebSockets implementation.
 Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 
 - The `simd` feature flag is deprecated and has no effect. SIMD support is detected at runtime now rather than opting in at compile time
-- The `nightly` feature when using a nightly compiler will enable AVX512, NEON (on 32-bit ARM) or AltiVec accelerated masking
+- The `nightly` feature when using a nightly compiler will enable AVX512, NEON (on 32-bit ARM), AltiVec or IBM z13 vector facilities accelerated masking
 - `client` enables a tiny client implementation
 - `server` enables a tiny server implementation
 
