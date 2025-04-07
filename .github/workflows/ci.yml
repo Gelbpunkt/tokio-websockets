@@ -4,7 +4,6 @@ on: [push]
 
 env:
   CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
-  OPENSSL_VERSION: 3.3.2
 
 jobs:
   codespell:
@@ -23,27 +22,41 @@ jobs:
           # Provided by GitHub, 4-core, 16GB RAM
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            apt-install: lld
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            container: chimeralinux/chimera:latest
+            apk-add: bash ca-certificates cmake curl git gmake go clang clang-devel libffi-devel libgit2 libtool linux-headers lld llvm-devel openssl-devel pkgconf
           - runner: ubuntu-latest
             target: i686-unknown-linux-gnu
-            apt-arch-setup: i386
-            apt-install: bindgen lld crossbuild-essential-i386 libssl-dev:i386 openssl:i386
-          # Also provided by GitHub, 4-core, 16GB RAM
+            container: i386/debian:latest
+            apt-install: bindgen clang cmake curl golang libssl-dev make openssl pkg-config
+          - runner: ubuntu-latest
+            target: i586-alpine-linux-musl
+            container: i386/alpine:edge
+            apk-add: bash clang19 clang19-dev cmake gcc git go linux-headers make musl-dev openssl-dev perl
+          # Also provided by GitHub, 4-core, 16GB RAM, Neoverse N2
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            apt-install: lld
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            container: chimeralinux/chimera:latest
+            apk-add: bash ca-certificates cmake curl git gmake go clang clang-devel libffi-devel libgit2 libtool linux-headers lld llvm-devel openssl-devel pkgconf
           - runner: ubuntu-24.04-arm
             target: armv7-unknown-linux-gnueabihf
-            apt-arch-setup: armhf
-            apt-install: bindgen lld crossbuild-essential-armhf libssl-dev:armhf openssl:armhf
+            container: arm32v7/debian:latest
+            apt-install: bindgen clang cmake curl golang libssl-dev make openssl pkg-config
+          - runner: ubuntu-24.04-arm
+            target: armv7-alpine-linux-musleabihf
+            container: arm32v7/alpine:edge
+            apk-add: bash clang19 clang19-dev cmake gcc git go linux-headers make musl-dev openssl-dev perl
           # Also provided by GitHub, 4-core, 16GB RAM
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-            choco-install: nasm ninja
+            choco-install: nasm ninja openssl
             path-append: C:\Program Files\NASM
           - runner: windows-latest
             target: x86_64-pc-windows-gnu
-            choco-install: nasm ninja
+            choco-install: nasm ninja openssl
             path-append: C:\Program Files\NASM
           # Also provided by GitHub, 4-core, 14GB RAM
           - runner: macos-13
@@ -53,9 +66,6 @@ jobs:
           - runner: macos-latest
             target: aarch64-apple-darwin
             brew-install: go
-          # Selfhosted, 6-core, 8GB RAM, Neoverse N1
-          - runner: aarch64-musl
-            target: aarch64-unknown-linux-musl
           # Selfhosted, 8-core, 16GB RAM, SpacemiT M1
           - runner: riscv64-gnu
             target: riscv64gc-unknown-linux-gnu
@@ -67,24 +77,27 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       CARGO_BUILD_TARGET: ${{ matrix.target }}
-      PKG_CONFIG_PATH_i686_unknown_linux_gnu: /usr/lib/i686-linux-gnu/pkgconfig
-      PKG_CONFIG_PATH_armv7_unknown_linux_gnueabihf: /usr/lib/arm-linux-gnueabihf/pkgconfig
-      PKG_CONFIG_SYSROOT_DIR:
+
+    container: ${{ matrix.container }}
 
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Set up apt for cross architecture packages
-        if: ${{ matrix.apt-arch-setup != '' }}
+      - name: Install apk dependencies
+        if: ${{ matrix.apk-add != '' }}
         run: |
-          sudo dpkg --add-architecture ${{ matrix.apt-arch-setup }}
-          sudo apt update -y
+          apk update
+          apk upgrade
+          apk add ${{ matrix.apk-add }}
 
-      - name: Install apt dependencies
-        if: ${{ matrix.apt-install != '' }}
+      - name: Install apt dependencies (with sudo)
+        if: ${{ matrix.apt-install != '' && matrix.container == '' }}
         run: |
           sudo apt install -y --no-install-recommends ${{ matrix.apt-install }}
+
+      - name: Install apt dependencies
+        if: ${{ matrix.apt-install != '' && matrix.container != '' }}
+        run: |
+          apt update
+          apt install -y --no-install-recommends ${{ matrix.apt-install }}
 
       - name: Install choco dependencies
         if: ${{ matrix.choco-install != '' }}
@@ -98,35 +111,36 @@ jobs:
           brew update
           echo "${{ matrix.brew-install}}" | xargs -n 1 brew install
 
+      # We cannot use actions/checkout here because that's a nodejs action
+      # and those are beyond broken inside non-x86_64 containers.
+      - name: Checkout sources
+        uses: taiki-e/checkout-action@v1
+
+      # musl.rs does not support x86 and ARMv7 yet
       - name: Install nightly toolchain
         if: ${{ !contains(matrix.target, 'musl') }}
-        uses: dtolnay/rust-toolchain@master
-        with:
-          targets: ${{ matrix.target }}
-          toolchain: nightly
-          components: rust-src
+        run: |
+          curl https://sh.rustup.rs | sh -s -- --profile minimal --default-host ${{ matrix.target }} --default-toolchain nightly --component rust-src -y
+          echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH
 
       - name: Install nightly toolchain (musl)
-        if: ${{ contains(matrix.target, 'musl') }}
+        if: ${{ contains(matrix.target, 'musl') && !contains(matrix.target, 'alpine') }}
         run: |
-          wget https://dl.musl.rs/nightly/rust-nightly-${{ matrix.target }}.tar.xz -O rust.tar.xz
-          tar xf rust.tar.xz
-          cd rust-nightly-${{ matrix.target }}
-          doas ./install.sh
-          cd ..
-          wget https://dl.musl.rs/nightly/rust-src-nightly.tar.xz
-          tar xf rust-src-nightly.tar.xz
-          cd rust-src-nightly
-          doas ./install.sh
+          curl https://musl.rs/install.sh | sh
 
-      # aws-lc uses CMAKE_LINKER in its CMake rules, which cannot properly be set from Rust code
-      # so it falls back to ld, which cannot cross-link.
-      # Our musl targets run on Chimera Linux, which already uses LLD.
-      - name: Use LLD as /usr/bin/ld
-        if: ${{ contains(matrix.target, 'gnu') && !contains(matrix.target, 'windows') }}
+      - name: Install Rust and configure like nightly (musl)
+        if: ${{ contains(matrix.target, 'alpine') }}
         run: |
-          sudo rm /usr/bin/ld
-          sudo ln -s /usr/bin/ld.lld /usr/bin/ld
+          apk add cargo rust rust-src
+          echo "RUSTC_BOOTSTRAP=1" >> $GITHUB_ENV
+
+      # Chimera Linux comes with weird LLVM paths
+      - name: Symlink clang lib dir
+        if: ${{ contains(matrix.container, 'chimera') }}
+        run: |
+          LIBDIR=$(find /usr/lib/clang/19/lib/ -name '*-musl' | head -n 1)
+          echo "Found clang libdir $LIBDIR"
+          ln -s /usr/lib/clang/19/lib/$LIBDIR /usr/lib/clang/19/lib/${{ matrix.target }}
 
       - name: Use MSRV-specific .cargo/config.toml
         run: |
