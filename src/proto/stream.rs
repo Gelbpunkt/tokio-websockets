@@ -7,7 +7,7 @@ use std::{
     io,
     mem::{replace, take},
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{ready, Context, Poll, Waker},
 };
 
 use bytes::{Buf, BytesMut};
@@ -93,9 +93,9 @@ pub struct WebSocketStream<T> {
     /// Total amount of bytes remaining to be sent in the frame queue.
     pending_bytes: usize,
 
-    /// Whether a task is currently actively polling
+    /// Waker used for currently actively polling
     /// [`WebSocketStream::poll_flush`] until completion.
-    flush_in_progress: bool,
+    flushing_waker: Option<Waker>,
 }
 
 impl<T> WebSocketStream<T>
@@ -115,7 +115,7 @@ where
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
             pending_bytes: 0,
-            flush_in_progress: false,
+            flushing_waker: None,
         }
     }
 
@@ -138,7 +138,7 @@ where
             frame_queue: VecDeque::with_capacity(1),
             bytes_written: 0,
             pending_bytes: 0,
-            flush_in_progress: false,
+            flushing_waker: None,
         }
     }
 
@@ -197,8 +197,11 @@ where
         // that of the read task) and our write task may never get woken up again. We
         // circumvent this by not calling poll_flush at all if poll_flush is polled by
         // another task at the moment.
-        if !self.frame_queue.is_empty() && !self.flush_in_progress {
-            _ = self.as_mut().poll_flush(cx)?;
+        if !self.frame_queue.is_empty() {
+            let waker = self.flushing_waker.clone();
+            _ = self.as_mut().poll_flush(&mut Context::from_waker(
+                waker.as_ref().unwrap_or(cx.waker()),
+            ))?;
         }
 
         let frame = match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
@@ -284,6 +287,18 @@ where
         };
         self.pending_bytes += item.header_len() + item.payload.len();
         self.frame_queue.push_back(item);
+    }
+
+    /// Sets the waker that is currently flushing to a new one and does nothing
+    /// if the waker is the same.
+    fn set_flushing_waker(&mut self, waker: &Waker) {
+        if !self
+            .flushing_waker
+            .as_ref()
+            .is_some_and(|w| w.will_wake(waker))
+        {
+            self.flushing_waker = Some(waker.clone());
+        }
     }
 }
 
@@ -375,7 +390,7 @@ where
         let io = this.inner.get_mut();
         let bytes_written = &mut this.bytes_written;
         let pending_bytes = &mut this.pending_bytes;
-        let flush_in_progress = &mut this.flush_in_progress;
+        let flushing_waker = &mut this.flushing_waker;
 
         while let Some(frame) = frame_queue.front() {
             let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len()) };
@@ -386,18 +401,18 @@ where
                 let n = match poll_write_buf(Pin::new(io), cx, &mut buf) {
                     Poll::Ready(Ok(n)) => n,
                     Poll::Ready(Err(e)) => {
-                        *flush_in_progress = false;
+                        *flushing_waker = None;
                         this.state = StreamState::CloseAcknowledged;
                         return Poll::Ready(Err(Error::Io(e)));
                     }
                     Poll::Pending => {
-                        *flush_in_progress = true;
+                        this.set_flushing_waker(cx.waker());
                         return Poll::Pending;
                     }
                 };
 
                 if n == 0 {
-                    *flush_in_progress = false;
+                    *flushing_waker = None;
                     this.state = StreamState::CloseAcknowledged;
                     return Poll::Ready(Err(Error::Io(io::ErrorKind::WriteZero.into())));
                 }
@@ -412,16 +427,16 @@ where
 
         match Pin::new(io).poll_flush(cx) {
             Poll::Ready(Ok(())) => {
-                *flush_in_progress = false;
+                *flushing_waker = None;
                 Poll::Ready(Ok(()))
             }
             Poll::Ready(Err(e)) => {
-                *flush_in_progress = false;
+                *flushing_waker = None;
                 this.state = StreamState::CloseAcknowledged;
                 Poll::Ready(Err(Error::Io(e)))
             }
             Poll::Pending => {
-                *flush_in_progress = true;
+                this.set_flushing_waker(cx.waker());
                 Poll::Pending
             }
         }
