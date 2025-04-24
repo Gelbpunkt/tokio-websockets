@@ -44,7 +44,7 @@ impl EncodedFrame {
     /// Returns the length of the combined header and mask in bytes.
     #[inline]
     fn header_len(&self) -> usize {
-        let mask_bytes = self.is_masked().then_some(4).unwrap_or_default();
+        let mask_bytes = if self.is_masked() { 4 } else { 0 };
         match self.header[1] & 127 {
             127 => 10 + mask_bytes,
             126 => 4 + mask_bytes,
