@@ -10,6 +10,8 @@
 //!     nightly rust)
 //!   - One IBM z13 vector facility based implementation that masks 16 bytes per
 //!     cycle (requires nightly rust)
+//!   - One LASX based implementation that masks 32 bytes per cycle (requires
+//!     nightly rust)
 //!   - A fallback implementation that masks 8 bytes per cycle
 //!
 //! The SIMD implementations will be used if CPU support for them is detected at
@@ -265,6 +267,48 @@ unsafe fn frame_s390x_vector(key: [u8; 4], input: &mut [u8], mut offset: usize) 
     }
 }
 
+/// (Un-)masks input bytes with the framing key using LASX.
+///
+/// The input bytes may be further in the payload and therefore the offset
+/// into the payload must be specified.
+///
+/// This will use a fallback implementation for less than 32 bytes. For
+/// sufficiently large inputs, it masks in chunks of 32 bytes per
+/// instruction, applying the fallback method on all remaining data.
+#[cfg(all(feature = "nightly", target_arch = "loongarch64"))]
+#[target_feature(enable = "lasx")]
+unsafe fn frame_lasx_vector(key: [u8; 4], input: &mut [u8], mut offset: usize) {
+    use std::{
+        arch::loongarch64::{lasx_xvld, lasx_xvxor_v, v32u8},
+        mem::transmute,
+    };
+
+    unsafe {
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<v32u8>();
+
+        // Run fallback implementation on unaligned prefix data
+        fallback_frame(key, prefix, offset);
+        offset = (offset + prefix.len()) % key.len();
+
+        if !aligned_data.is_empty() {
+            #[allow(clippy::cast_possible_truncation)] // offset is 0..4
+            let rotated_key = i32::from_be_bytes(key)
+                .rotate_left(offset as u32 * u8::BITS)
+                .to_be();
+            let rotated_key_vector = [rotated_key; 8];
+            // SAFETY: 32x i8 to 32x u8 is safe
+            let mask: v32u8 = transmute(lasx_xvld::<0>(rotated_key_vector.as_ptr().cast()));
+
+            for block in aligned_data {
+                *block = lasx_xvxor_v(*block, mask);
+            }
+        }
+
+        // Run fallback implementation on unaligned suffix data
+        fallback_frame(key, suffix, offset);
+    }
+}
+
 /// (Un-)masks input bytes with the framing key, one byte at once.
 ///
 /// See [`fallback_frame`] for more details.
@@ -379,6 +423,15 @@ pub fn frame(key: [u8; 4], input: &mut [u8], offset: usize) {
 
         if is_s390x_feature_detected!("vector") {
             return unsafe { frame_s390x_vector(key, input, offset) };
+        }
+    }
+
+    #[cfg(all(feature = "nightly", target_arch = "loongarch64"))]
+    {
+        use std::arch::is_loongarch_feature_detected;
+
+        if is_loongarch_feature_detected!("lasx") {
+            return unsafe { frame_lasx_vector(key, input, offset) };
         }
     }
 

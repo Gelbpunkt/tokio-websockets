@@ -1,1 +1,1 @@
-doc-valid-idents = ["AltiVec", "WebSocket", "WebSockets", "ToDo", ".."]
+doc-valid-idents = ["AltiVec", "WebSocket", "WebSockets", "ToDo", "x86_64", ".."]
