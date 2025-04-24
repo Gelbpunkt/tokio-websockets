@@ -72,6 +72,16 @@ rustflags = [
     "panic_abort_tests",
 ]
 
+[target.loongarch64-unknown-linux-gnu]
+rustflags = [
+    "-C",
+    "target-feature=+lasx",
+    "-C",
+    "panic=abort",
+    "-Z",
+    "panic_abort_tests",
+]
+
 [target.powerpc64le-unknown-linux-gnu]
 rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
 
