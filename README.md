@@ -14,7 +14,7 @@ High performance, strict, tokio-util based WebSockets implementation.
   - `tokio`, `tokio-util`, `bytes`, `futures-core`, `futures-sink`, `simdutf8`
   - SHA1 backend, e.g. `sha1_smol` (see [Feature flags](#feature-flags))
 - Big selection of features to tailor dependencies to any project (see [Feature flags](#feature-flags))
-- SIMD support: AVX512, AVX2, SSE2, NEON, AltiVec or IBM z13 vector facilities for frame (un)masking and accelerated UTF-8 validation
+- SIMD support for frame (un)masking and accelerated UTF-8 validation (see [SIMD](#simd))
 - Strict conformance with the WebSocket specification, passes the [Autobahn test suite](https://github.com/crossbario/autobahn-testsuite) without relaxations [by default](https://gelbpunkt.github.io/tokio-websockets/index.html)
 - TLS support
 - Reusable TLS connectors
@@ -27,7 +27,7 @@ High performance, strict, tokio-util based WebSockets implementation.
 Feature flags in tokio-websockets are added to allow tailoring it to your needs.
 
 - The `simd` feature flag is deprecated and has no effect. SIMD support is detected at runtime now rather than opting in at compile time
-- The `nightly` feature when using a nightly compiler will enable AVX512, NEON (on 32-bit ARM), AltiVec or IBM z13 vector facilities accelerated masking
+- The `nightly` feature when using a nightly compiler will enable SIMD accelerated masking and UTF-8 validation on additional targets (see [SIMD](#simd))
 - `client` enables a tiny client implementation
 - `server` enables a tiny server implementation
 
@@ -52,6 +52,23 @@ The `client` feature requires enabling one random number generator:
 - [`fastrand`](https://docs.rs/fastrand/latest/fastrand) can be used as a `PRNG`
 - [`getrandom`](https://docs.rs/getrandom/latest/getrandom) can be used as a cryptographically secure RNG
 - [`rand`](https://docs.rs/rand/latest/rand) can be used as an alternative to `fastrand` and should be preferred if it is already in the dependency tree
+
+## SIMD
+
+tokio-websockets makes use of SIMD to accelerate (un-)masking of messages and UTF-8 validation.
+
+| Architecture | Instructions | (Un-)masking   | UTF-8 validation |
+|--------------|--------------|----------------|------------------|
+| aarch64      | NEON         | ✅              | ✅                |
+| arm          | NEON         | ✅ (on nightly) | ✅ (on nightly)   |
+| loongarch64  | LASX         | ✅ (on nightly) | ❌                |
+| powerpc      | AltiVec      | ✅ (on nightly) | ❌                |
+| powerpc64    | AltiVec      | ✅ (on nightly) | ❌                |
+| powerpc64le  | AltiVec      | ✅ (on nightly) | ❌                |
+| s390x        | z13 vectors  | ✅ (on nightly) | ❌                |
+| x86_64       | SSE2         | ✅              | ❌                |
+| x86_64       | AVX2         | ✅              | ✅                |
+| x86_64       | AVX512       | ✅ (on nightly) | ❌                |
 
 ## Example
 
