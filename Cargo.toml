@@ -45,7 +45,7 @@ rustls-native-certs = { version = "0.8", default-features = false, optional = tr
 rustls-pki-types = { version = "1", optional = true }
 rustls-platform-verifier = { version = "0.5", optional = true }
 tokio-rustls = { version = "0.26", default-features = false, optional = true }
-webpki-roots = { version = "0.26", default-features = false, optional = true }
+webpki-roots = { version = "1", default-features = false, optional = true }
 
 # Users can manually tune into OpenSSL for SHA-1 when native-tls is enabled
 openssl = { version = "0.10", default-features = false, optional = true }
