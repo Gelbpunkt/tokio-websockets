@@ -63,7 +63,7 @@ async fn main() -> io::Result<()> {
 
         tokio::spawn(async move {
             if let Err(err) = fut.await {
-                eprintln!("{:?}", err);
+                eprintln!("{err:?}");
             }
         });
     }
