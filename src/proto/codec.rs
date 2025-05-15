@@ -152,14 +152,14 @@ impl Decoder for WebSocketProtocol {
             });
         }
 
-        let mask = if masked {
+        if masked {
             offset += 4;
-            get_buf_if_space!(src, offset - 4..offset)
-                .try_into()
-                .unwrap()
-        } else {
-            [0; 4]
-        };
+            if src.len() < offset {
+                src.reserve(MAX_FRAME_HEADER_SIZE - 4);
+
+                return Ok(None);
+            }
+        }
 
         if payload_length != 0 {
             let is_text = opcode == OpCode::Text
@@ -168,14 +168,25 @@ impl Decoder for WebSocketProtocol {
             let payload_available = (src.len() - offset).min(payload_length);
             let is_complete = payload_available == payload_length;
 
-            // SAFETY: self.payload_processed <= payload_length
-            let payload = unsafe {
-                src.get_unchecked_mut(offset + self.payload_processed..offset + payload_available)
+            let payload = if masked && (is_complete || is_text) {
+                let (l, r) = unsafe { src.split_at_mut_unchecked(offset) };
+                let mask = unsafe { l.get_unchecked_mut(l.len() - 4..).try_into().unwrap() };
+                // SAFETY: self.payload_processed <= payload_length
+                let payload =
+                    unsafe { r.get_unchecked_mut(self.payload_processed..payload_available) };
+
+                mask::frame(mask, payload);
+
+                payload
+            } else {
+                // SAFETY: self.payload_processed <= payload_length
+                unsafe {
+                    src.get_unchecked_mut(
+                        offset + self.payload_processed..offset + payload_available,
+                    )
+                }
             };
 
-            if masked && (is_complete || is_text) {
-                mask::frame(mask, payload, self.payload_processed % 4);
-            }
             if is_text {
                 self.validator.feed(payload, is_complete && fin)?;
 

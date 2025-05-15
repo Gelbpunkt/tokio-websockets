@@ -33,8 +33,7 @@ async fn run_test(case: u32) -> Result<(), Error> {
     println!("Running test case {case}");
 
     let uri = Uri::from_str(&format!(
-        "ws://localhost:9001/runCase?case={}&agent=tokio-websockets",
-        case,
+        "ws://localhost:9001/runCase?case={case}&agent=tokio-websockets",
     ))
     .unwrap();
 
