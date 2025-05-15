@@ -5,6 +5,7 @@
     rustdoc::broken_intra_doc_links,
     warnings
 )]
+#![allow(clippy::inline_always)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // Required for AVX512 until stable
 #![cfg_attr(

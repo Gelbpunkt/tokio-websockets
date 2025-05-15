@@ -58,7 +58,7 @@ impl WebSocketProtocol {
 /// missing capacity of the buffer if it is too small.
 macro_rules! get_buf_if_space {
     ($buf:expr, $range:expr) => {
-        if let Some(cont) = $buf.get($range) {
+        if let Some(cont) = $buf.get_mut($range) {
             cont
         } else {
             $buf.reserve(MAX_FRAME_HEADER_SIZE - $range.len());
@@ -154,11 +154,14 @@ impl Decoder for WebSocketProtocol {
 
         let mask = if masked {
             offset += 4;
-            get_buf_if_space!(src, offset - 4..offset)
-                .try_into()
-                .unwrap()
+            // SAFETY: We know the slice is exactly 4 bytes long
+            unsafe {
+                &mut *(get_buf_if_space!(src, offset - 4..offset)
+                    .as_mut_ptr()
+                    .cast())
+            }
         } else {
-            [0; 4]
+            &mut [0u8; 4]
         };
 
         if payload_length != 0 {
@@ -174,7 +177,7 @@ impl Decoder for WebSocketProtocol {
             };
 
             if masked && (is_complete || is_text) {
-                mask::frame(mask, payload, self.payload_processed % 4);
+                mask::frame(mask, payload);
             }
             if is_text {
                 self.validator.feed(payload, is_complete && fin)?;

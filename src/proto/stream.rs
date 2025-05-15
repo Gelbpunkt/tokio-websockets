@@ -275,7 +275,11 @@ where
             if self.inner.decoder().role == Role::Client {
                 let mut payload = BytesMut::from(frame.payload);
                 crate::rand::get_mask(mask);
-                crate::mask::frame(*mask, &mut payload, 0);
+                // mask::frame will mutate the mask in-place, but we want to send the original
+                // mask. This is essentially a u32, so copying it is cheap and easier than
+                // special-casing this in the masking implementation.
+                let mut temp_mask = *mask;
+                crate::mask::frame(&mut temp_mask, &mut payload);
                 frame.payload = Payload::from(payload);
                 self.header_buf[1] |= 1 << 7;
             }
