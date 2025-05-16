@@ -177,7 +177,7 @@ impl Decoder for WebSocketProtocol {
             };
 
             if masked && (is_complete || is_text) {
-                mask::frame(mask, payload);
+                mask::frame(mask, payload, is_complete);
             }
             if is_text {
                 self.validator.feed(payload, is_complete && fin)?;

@@ -7,46 +7,6 @@
 )]
 #![allow(clippy::inline_always)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-// Required for AVX512 until stable
-#![cfg_attr(
-    all(feature = "nightly", any(target_arch = "x86_64", target_arch = "x86")),
-    feature(stdarch_x86_avx512, avx512_target_feature)
-)]
-// Required for NEON on 32-bit ARM until stable
-#![cfg_attr(
-    all(feature = "nightly", target_arch = "arm"),
-    feature(
-        stdarch_arm_neon_intrinsics,
-        stdarch_arm_feature_detection,
-        arm_target_feature
-    )
-)]
-// Required for VSX until stable
-#![cfg_attr(
-    all(
-        feature = "nightly",
-        any(target_arch = "powerpc64", target_arch = "powerpc")
-    ),
-    feature(
-        stdarch_powerpc,
-        stdarch_powerpc_feature_detection,
-        powerpc_target_feature
-    )
-)]
-// Required for s390x vectors until stable
-#![cfg_attr(
-    all(feature = "nightly", target_arch = "s390x"),
-    feature(stdarch_s390x, stdarch_s390x_feature_detection, s390x_target_feature)
-)]
-// Required for LASX until stable
-#![cfg_attr(
-    all(feature = "nightly", target_arch = "loongarch64"),
-    feature(
-        stdarch_loongarch,
-        stdarch_loongarch_feature_detection,
-        loongarch_target_feature
-    )
-)]
 #![doc = include_str!("../README.md")]
 
 // If the client or server implementation is enabled, at least one SHA1 backend

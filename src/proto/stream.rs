@@ -279,7 +279,7 @@ where
                 // mask. This is essentially a u32, so copying it is cheap and easier than
                 // special-casing this in the masking implementation.
                 let mut temp_mask = *mask;
-                crate::mask::frame(&mut temp_mask, &mut payload);
+                crate::mask::frame(&mut temp_mask, &mut payload, true);
                 frame.payload = Payload::from(payload);
                 self.header_buf[1] |= 1 << 7;
             }
