@@ -9,7 +9,7 @@
 // Required for AVX512 until stable
 #![cfg_attr(
     all(feature = "nightly", any(target_arch = "x86_64", target_arch = "x86")),
-    feature(stdarch_x86_avx512, avx512_target_feature)
+    feature(stdarch_x86_avx512)
 )]
 // Required for NEON on 32-bit ARM until stable
 #![cfg_attr(
