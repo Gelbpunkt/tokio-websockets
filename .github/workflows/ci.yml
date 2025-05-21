@@ -258,7 +258,7 @@ jobs:
           cargo hack check \
             --feature-powerset \
             --no-dev-deps \
-            --exclude-features aws-lc-rs,rustls-tls12,nightly \
+            --exclude-features rustls-tls12,nightly \
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol
 
@@ -289,6 +289,6 @@ jobs:
             --target aarch64-unknown-linux-gnu \
             --feature-powerset \
             --no-dev-deps \
-            --exclude-features aws-lc-rs,rustls-tls12,nightly \
+            --exclude-features rustls-tls12,nightly \
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol

@@ -27,24 +27,6 @@ use rustls_pki_types::ServerName;
 #[cfg(feature = "rustls-platform-verifier")]
 use rustls_platform_verifier::BuilderVerifierExt;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-#[cfg(all(
-    any(
-        feature = "rustls-webpki-roots",
-        feature = "rustls-native-roots",
-        feature = "rustls-platform-verifier"
-    ),
-    feature = "aws_lc_rs"
-))]
-use tokio_rustls::rustls::crypto::aws_lc_rs;
-#[cfg(all(
-    any(
-        feature = "rustls-webpki-roots",
-        feature = "rustls-native-roots",
-        feature = "rustls-platform-verifier"
-    ),
-    all(feature = "ring", not(feature = "aws_lc_rs"))
-))]
-use tokio_rustls::rustls::crypto::ring;
 #[cfg(any(
     feature = "rustls-native-roots",
     feature = "rustls-webpki-roots",
@@ -258,13 +240,10 @@ impl Connector {
                 tokio_native_tls::native_tls::TlsConnector::new()?.into(),
             ))
         }
-        #[cfg(all(
-            any(
-                feature = "rustls-webpki-roots",
-                feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
-            ),
-            not(any(feature = "ring", feature = "aws_lc_rs"))
+        #[cfg(any(
+            feature = "rustls-webpki-roots",
+            feature = "rustls-native-roots",
+            feature = "rustls-platform-verifier"
         ))]
         {
             Self::new_rustls_with_crypto_provider(
@@ -272,28 +251,6 @@ impl Connector {
                     .ok_or(Error::NoCryptoProviderConfigured)?
                     .clone(),
             )
-        }
-        #[cfg(all(
-            any(
-                feature = "rustls-webpki-roots",
-                feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
-            ),
-            feature = "aws_lc_rs"
-        ))]
-        {
-            Self::new_rustls_with_crypto_provider(aws_lc_rs::default_provider().into())
-        }
-        #[cfg(all(
-            any(
-                feature = "rustls-webpki-roots",
-                feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
-            ),
-            all(feature = "ring", not(feature = "aws_lc_rs"))
-        ))]
-        {
-            Self::new_rustls_with_crypto_provider(ring::default_provider().into())
         }
     }
 
@@ -310,7 +267,7 @@ impl Connector {
         feature = "rustls-native-roots",
         feature = "rustls-platform-verifier"
     ))]
-    pub fn new_rustls_with_crypto_provider(provider: Arc<CryptoProvider>) -> Result<Self, Error> {
+    fn new_rustls_with_crypto_provider(provider: Arc<CryptoProvider>) -> Result<Self, Error> {
         // The rustls-platform-verifier changes the certificate verifier and is
         // therefore incompatible with the other two features
         let config_builder =
