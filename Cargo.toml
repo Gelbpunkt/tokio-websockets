@@ -52,10 +52,8 @@ openssl = { version = "0.10", default-features = false, optional = true }
 
 [features]
 client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util"]
-aws_lc_rs = ["dep:aws-lc-rs", "tokio-rustls?/aws_lc_rs"] # Underscores for consistency with other rustls crates
-aws-lc-rs = ["aws_lc_rs"] # Alias because Cargo features commonly use `-`
-fips = ["aws_lc_rs", "aws-lc-rs?/fips", "tokio-rustls?/fips"]
-ring = ["dep:ring", "tokio-rustls?/ring"]
+aws_lc_rs = ["dep:aws-lc-rs"] # Underscores for consistency with other rustls crates
+ring = ["dep:ring"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots"]
@@ -109,8 +107,7 @@ name = "utf8_benchmark_server"
 required-features = ["server"]
 
 [package.metadata.docs.rs]
-# aws_lc_rs' fips mode can't be built in docs.rs
-features = ["client", "aws_lc_rs", "ring", "fastrand", "getrandom", "rand", "server", "simd", "native-tls", "rustls-native-roots", "rustls-webpki-roots", "rustls-platform-verifier", "rustls-tls12", "nightly"]
+all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]

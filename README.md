@@ -38,7 +38,7 @@ TLS is supported via any of the following feature flags:
 - `rustls-platform-verifier` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`rustls-platform-verifier`](https://docs.rs/rustls-platform-verifier/latest/rustls_platform_verifier/)
 - `rustls-bring-your-own-connector` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation that requires you to create your own `Connector::Rustls` - the `Connector::new` method will return a plain connector
 
-The `rustls-*-roots` and `rustls-platform-verifier` features require a crypto provider for `rustls`. You can either enable the `aws_lc_rs` (optionally also FIPS-compliant via the `fips` feature) or `ring` features to use these crates as the providers and then use `TlsConnector::new()`, or bring your own with `TlsConnector::new_rustls_with_crypto_provider()`.
+The `rustls-*-roots` and `rustls-platform-verifier` features require installing a crypto provider for `rustls`, see [here](https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html#method.install_default) for more information.
 
 One SHA1 implementation is required, usually provided by the TLS implementation:
 

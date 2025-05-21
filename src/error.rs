@@ -59,15 +59,13 @@ pub enum Error {
     #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(crate::upgrade::Error),
     /// Rustls was enabled via crate features, but no crypto provider was
-    /// configured via [`rustls::crypto::CryptoProvider::install_default`]
+    /// configured via
+    /// [`tokio_rustls::rustls::crypto::CryptoProvider::install_default`]
     /// prior to connecting.
-    #[cfg(all(
-        any(
-            feature = "rustls-webpki-roots",
-            feature = "rustls-native-roots",
-            feature = "rustls-platform-verifier"
-        ),
-        not(any(feature = "ring", feature = "aws_lc_rs"))
+    #[cfg(any(
+        feature = "rustls-webpki-roots",
+        feature = "rustls-native-roots",
+        feature = "rustls-platform-verifier"
     ))]
     NoCryptoProviderConfigured,
     /// No native root certificates were found and no other root certificate
@@ -169,13 +167,10 @@ impl fmt::Display for Error {
             Error::UnsupportedScheme => f.write_str("unsupported or no URI scheme used"),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => e.fmt(f),
-            #[cfg(all(
-                any(
-                    feature = "rustls-webpki-roots",
-                    feature = "rustls-native-roots",
-                    feature = "rustls-platform-verifier"
-                ),
-                not(any(feature = "ring", feature = "aws_lc_rs"))
+            #[cfg(any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
             ))]
             Error::NoCryptoProviderConfigured => {
                 f.write_str("wss uri set but no tls connector was configured")
@@ -199,13 +194,10 @@ impl std::error::Error for Error {
             Error::AlreadyClosed | Error::CannotResolveHost | Error::PayloadTooLong { .. } => None,
             #[cfg(feature = "client")]
             Error::NoUriConfigured | Error::DisallowedHeader => None,
-            #[cfg(all(
-                any(
-                    feature = "rustls-webpki-roots",
-                    feature = "rustls-native-roots",
-                    feature = "rustls-platform-verifier"
-                ),
-                not(any(feature = "ring", feature = "aws_lc_rs"))
+            #[cfg(any(
+                feature = "rustls-webpki-roots",
+                feature = "rustls-native-roots",
+                feature = "rustls-platform-verifier"
             ))]
             Error::NoCryptoProviderConfigured => None,
             #[cfg(all(
