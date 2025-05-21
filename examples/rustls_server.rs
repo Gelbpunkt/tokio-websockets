@@ -28,6 +28,10 @@ fn load_key(path: &str) -> io::Result<PrivateKeyDer<'static>> {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    tokio_rustls::rustls::crypto::ring::default_provider()
+        .install_default()
+        .unwrap();
+
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     let certs = load_certs(PATH_TO_CERT)?;
     let key = load_key(PATH_TO_KEY)?;
