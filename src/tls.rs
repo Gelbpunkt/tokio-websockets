@@ -274,7 +274,7 @@ impl Connector {
             ClientConfig::builder_with_provider(provider).with_safe_default_protocol_versions()?;
 
         #[cfg(feature = "rustls-platform-verifier")]
-        let config_builder = config_builder.with_platform_verifier();
+        let config_builder = config_builder.with_platform_verifier()?;
 
         #[cfg(not(feature = "rustls-platform-verifier"))]
         let config_builder = {

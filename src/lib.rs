@@ -6,11 +6,6 @@
     warnings
 )]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-// Required for AVX512 until stable
-#![cfg_attr(
-    all(feature = "nightly", any(target_arch = "x86_64", target_arch = "x86")),
-    feature(stdarch_x86_avx512)
-)]
 // Required for NEON on 32-bit ARM until stable
 #![cfg_attr(
     all(feature = "nightly", target_arch = "arm"),
