@@ -4,7 +4,6 @@ on: [push]
 
 env:
   CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
-  OPENSSL_VERSION: 3.5.1
 
 jobs:
   codespell:
@@ -212,7 +211,19 @@ jobs:
 
   msrv:
     name: Feature powerset (MSRV)
-    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            image: ubuntu-latest
+          - arch: aarch64
+            image: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.image }}
+
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.arch }}-unknown-linux-gnu
 
     steps:
       - name: Checkout sources
@@ -221,11 +232,6 @@ jobs:
       - name: Use MSRV-specific .cargo/config.toml
         run: |
           mv .cargo/config.toml.msrv .cargo/config.toml
-
-      - name: Install GCC for aarch64-linux-gnu
-        run: |
-          sudo apt update -y
-          sudo apt install -y gcc-aarch64-linux-gnu
 
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
@@ -245,7 +251,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.79.0
-          targets: aarch64-unknown-linux-gnu
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
@@ -253,40 +258,9 @@ jobs:
       - name: Add problem matchers
         run: echo "::add-matcher::.github/rust.json"
 
-      - name: Check powerset on x86_64
+      - name: Check powerset (${{ matrix.arch }})
         run: |
           cargo hack check \
-            --feature-powerset \
-            --no-dev-deps \
-            --exclude-features rustls-tls12,nightly \
-            --group-features client,fastrand,sha1_smol \
-            --group-features server,sha1_smol
-
-      - name: Install cached cross-compiled OpenSSL
-        id: cache-openssl
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/aarch64-linux-gnu
-          key: ${{ runner.os }}-openssl-${{ env.OPENSSL_VERSION }}
-
-      - name: Cross-compile and install OpenSSL
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        env:
-          CROSS_COMPILE: aarch64-linux-gnu-
-        run: |
-          wget https://github.com/openssl/openssl/releases/download/openssl-${{ env.OPENSSL_VERSION }}/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
-          tar xzf openssl-${{ env.OPENSSL_VERSION }}.tar.gz
-          cd openssl-${{ env.OPENSSL_VERSION }}
-          ./Configure linux-aarch64 --cross-compile-prefix=aarch64-linux-gnu- --prefix=${{ github.workspace }}/aarch64-linux-gnu
-          make -j$(nproc)
-          make install
-
-      - name: Check powerset on aarch64
-        env:
-          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR: ${{ github.workspace }}/aarch64-linux-gnu
-        run: |
-          cargo hack check \
-            --target aarch64-unknown-linux-gnu \
             --feature-powerset \
             --no-dev-deps \
             --exclude-features rustls-tls12,nightly \
