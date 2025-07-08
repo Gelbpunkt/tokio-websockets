@@ -4,7 +4,7 @@
 //! parameter.
 use std::{
     collections::VecDeque,
-    io,
+    io::{self, IoSlice},
     mem::{replace, take},
     pin::Pin,
     task::{ready, Context, Poll, Waker},
@@ -51,6 +51,115 @@ impl EncodedFrame {
             _ => 2 + mask_bytes,
         }
     }
+
+    /// Total length of the frame.
+    fn len(&self) -> usize {
+        self.header_len() + self.payload.len()
+    }
+}
+
+/// Queued up frames that are being sent.
+#[derive(Debug)]
+struct FrameQueue {
+    /// Queue of outgoing frames to send. Some parts of the first item may have
+    /// been sent already.
+    queue: VecDeque<EncodedFrame>,
+    /// Amount of partial bytes written of the first frame in the queue.
+    bytes_written: usize,
+    /// Total amount of bytes remaining to be sent in the frame queue.
+    pending_bytes: usize,
+}
+
+impl FrameQueue {
+    /// Creates a new, empty [`FrameQueue`].
+    #[cfg(any(feature = "client", feature = "server"))]
+    fn new() -> Self {
+        Self {
+            queue: VecDeque::with_capacity(1),
+            bytes_written: 0,
+            pending_bytes: 0,
+        }
+    }
+
+    /// Queue a frame to be sent.
+    fn push(&mut self, item: EncodedFrame) {
+        self.pending_bytes += item.len();
+        self.queue.push_back(item);
+    }
+}
+
+impl Buf for FrameQueue {
+    fn remaining(&self) -> usize {
+        self.pending_bytes
+    }
+
+    fn chunk(&self) -> &[u8] {
+        if let Some(frame) = self.queue.front() {
+            if self.bytes_written >= frame.header_len() {
+                unsafe {
+                    frame
+                        .payload
+                        .get_unchecked(self.bytes_written - frame.header_len()..)
+                }
+            } else {
+                &frame.header[self.bytes_written..frame.header_len()]
+            }
+        } else {
+            &[]
+        }
+    }
+
+    fn advance(&mut self, mut cnt: usize) {
+        self.pending_bytes -= cnt;
+        cnt += self.bytes_written;
+
+        while cnt > 0 {
+            let item = self
+                .queue
+                .front()
+                .expect("advance called with too long count");
+            let item_len = item.len();
+
+            if cnt >= item_len {
+                self.queue.pop_front();
+                self.bytes_written = 0;
+                cnt -= item_len;
+            } else {
+                self.bytes_written = cnt;
+                return;
+            }
+        }
+    }
+
+    fn chunks_vectored<'a>(&'a self, dst: &mut [io::IoSlice<'a>]) -> usize {
+        let mut n = 0;
+        for (idx, frame) in self.queue.iter().enumerate() {
+            if idx == 0 {
+                if frame.header_len() > self.bytes_written {
+                    dst[n] = IoSlice::new(&frame.header[self.bytes_written..frame.header_len()]);
+                    n += 1;
+                }
+
+                if !frame.payload.is_empty() {
+                    dst[n] = IoSlice::new(unsafe {
+                        frame
+                            .payload
+                            .get_unchecked(self.bytes_written.saturating_sub(frame.header_len())..)
+                    });
+                    n += 1;
+                }
+            } else {
+                dst[n] = IoSlice::new(&frame.header[..frame.header_len()]);
+                n += 1;
+                if !frame.payload.is_empty() {
+                    dst[n] = IoSlice::new(&frame.payload);
+                    n += 1;
+                }
+            }
+        }
+
+        n
+    }
 }
 
 /// A WebSocket stream that full messages can be read from and written to.
@@ -87,11 +196,7 @@ pub struct WebSocketStream<T> {
     header_buf: [u8; 14],
 
     /// Queue of outgoing frames to send.
-    frame_queue: VecDeque<EncodedFrame>,
-    /// Amount of partial bytes written of the first frame in the queue.
-    bytes_written: usize,
-    /// Total amount of bytes remaining to be sent in the frame queue.
-    pending_bytes: usize,
+    frame_queue: FrameQueue,
 
     /// Waker used for currently actively polling
     /// [`WebSocketStream::poll_flush`] until completion.
@@ -112,9 +217,7 @@ where
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
             header_buf: [0; 14],
-            frame_queue: VecDeque::with_capacity(1),
-            bytes_written: 0,
-            pending_bytes: 0,
+            frame_queue: FrameQueue::new(),
             flushing_waker: None,
         }
     }
@@ -135,9 +238,7 @@ where
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
             header_buf: [0; 14],
-            frame_queue: VecDeque::with_capacity(1),
-            bytes_written: 0,
-            pending_bytes: 0,
+            frame_queue: FrameQueue::new(),
             flushing_waker: None,
         }
     }
@@ -197,7 +298,7 @@ where
         // that of the read task) and our write task may never get woken up again. We
         // circumvent this by not calling poll_flush at all if poll_flush is polled by
         // another task at the moment.
-        if !self.frame_queue.is_empty() {
+        if self.frame_queue.has_remaining() {
             let waker = self.flushing_waker.clone();
             _ = self.as_mut().poll_flush(&mut Context::from_waker(
                 waker.as_ref().unwrap_or(cx.waker()),
@@ -285,8 +386,7 @@ where
             header: self.header_buf,
             payload: frame.payload,
         };
-        self.pending_bytes += item.header_len() + item.payload.len();
-        self.frame_queue.push_back(item);
+        self.frame_queue.push(item);
     }
 
     /// Sets the waker that is currently flushing to a new one and does nothing
@@ -357,7 +457,7 @@ where
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // tokio-util calls poll_flush when more than 8096 bytes are pending, otherwise
         // it returns Ready. We will just replicate that behavior
-        if self.pending_bytes >= self.config.flush_threshold {
+        if self.frame_queue.remaining() >= self.config.flush_threshold {
             self.as_mut().poll_flush(cx)
         } else {
             Poll::Ready(Ok(()))
@@ -388,41 +488,27 @@ where
         let this = self.get_mut();
         let frame_queue = &mut this.frame_queue;
         let io = this.inner.get_mut();
-        let bytes_written = &mut this.bytes_written;
-        let pending_bytes = &mut this.pending_bytes;
         let flushing_waker = &mut this.flushing_waker;
 
-        while let Some(frame) = frame_queue.front() {
-            let frame_header = unsafe { frame.header.get_unchecked(..frame.header_len()) };
-            let mut buf = frame_header.chain(&*frame.payload);
-            buf.advance(*bytes_written);
-
-            while buf.has_remaining() {
-                let n = match poll_write_buf(Pin::new(io), cx, &mut buf) {
-                    Poll::Ready(Ok(n)) => n,
-                    Poll::Ready(Err(e)) => {
-                        *flushing_waker = None;
-                        this.state = StreamState::CloseAcknowledged;
-                        return Poll::Ready(Err(Error::Io(e)));
-                    }
-                    Poll::Pending => {
-                        this.set_flushing_waker(cx.waker());
-                        return Poll::Pending;
-                    }
-                };
-
-                if n == 0 {
+        while frame_queue.has_remaining() {
+            let n = match poll_write_buf(Pin::new(io), cx, frame_queue) {
+                Poll::Ready(Ok(n)) => n,
+                Poll::Ready(Err(e)) => {
                     *flushing_waker = None;
                     this.state = StreamState::CloseAcknowledged;
-                    return Poll::Ready(Err(Error::Io(io::ErrorKind::WriteZero.into())));
+                    return Poll::Ready(Err(Error::Io(e)));
                 }
+                Poll::Pending => {
+                    this.set_flushing_waker(cx.waker());
+                    return Poll::Pending;
+                }
+            };
 
-                *bytes_written += n;
-                *pending_bytes -= n;
+            if n == 0 {
+                *flushing_waker = None;
+                this.state = StreamState::CloseAcknowledged;
+                return Poll::Ready(Err(Error::Io(io::ErrorKind::WriteZero.into())));
             }
-
-            frame_queue.pop_front();
-            *bytes_written = 0;
         }
 
         match Pin::new(io).poll_flush(cx) {
