@@ -321,6 +321,7 @@ impl<'a, R: Resolver> Builder<'a, R> {
         let upgrade_codec = server_response::Codec::new(&key_base64);
         let request = build_request(uri, &key_base64, &self.headers);
         stream.write_all(&request).await?;
+        stream.flush().await?;
 
         let mut framed = FramedRead::new(stream, upgrade_codec);
         let res = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx))
