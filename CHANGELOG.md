@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2025-07-11
+
+### Added
+
+- With the `nightly` feature enabled, SIMD-accelerated masking is now supported on s390x and loongarch64
+
+### Changed
+
+- `webpki-roots` was upgraded to 1.x
+- `rustls-platform-verifier` was upgraded to 0.6
+- Multiple pending messages are now written in a single vectored write, improving performance when using `SinkExt::feed`
+- **[breaking]** The `rustls`-related features now require [configuring a global crypto provider for rustls](https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html#method.install_default)
+
+### Fixed
+
+- After writing the WebSocket upgrade request, the connection was not flushed, so in some cases with buffering, the connection would be stuck trying to read an upgrade response
+
+### Removed
+
+- **[breaking]** The `simd` feature flag was removed - it had no effect since 0.11.1, SIMD support is now detected at runtime
+
 ## [0.11.4] - 2025-04-18
 
 ### Fixed
