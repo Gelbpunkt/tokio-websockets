@@ -134,13 +134,17 @@ impl Buf for FrameQueue {
     fn chunks_vectored<'a>(&'a self, dst: &mut [io::IoSlice<'a>]) -> usize {
         let mut n = 0;
         for (idx, frame) in self.queue.iter().enumerate() {
+            if n >= dst.len() {
+                break;
+            }
+
             if idx == 0 {
                 if frame.header_len() > self.bytes_written {
                     dst[n] = IoSlice::new(&frame.header[self.bytes_written..frame.header_len()]);
                     n += 1;
                 }
 
-                if !frame.payload.is_empty() {
+                if !frame.payload.is_empty() && n < dst.len() {
                     dst[n] = IoSlice::new(unsafe {
                         frame
                             .payload
@@ -151,7 +155,7 @@ impl Buf for FrameQueue {
             } else {
                 dst[n] = IoSlice::new(&frame.header[..frame.header_len()]);
                 n += 1;
-                if !frame.payload.is_empty() {
+                if !frame.payload.is_empty() && n < dst.len() {
                     dst[n] = IoSlice::new(&frame.payload);
                     n += 1;
                 }
