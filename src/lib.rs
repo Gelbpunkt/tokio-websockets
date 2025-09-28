@@ -5,7 +5,7 @@
     rustdoc::broken_intra_doc_links,
     warnings
 )]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 // Required for NEON on 32-bit ARM until stable
 #![cfg_attr(
     all(feature = "nightly", target_arch = "arm"),
