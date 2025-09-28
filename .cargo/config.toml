@@ -1,112 +1,29 @@
-[unstable]
-build-std = ["std", "panic_abort"]
-build-std-features = ["panic_immediate_abort"]
-
 [target.x86_64-unknown-linux-gnu]
-rustflags = [
-    "-C",
-    "target-cpu=native",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-cpu=native"]
 
 [target.x86_64-unknown-linux-musl]
-rustflags = [
-    "-C",
-    "target-cpu=native",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-cpu=native"]
 
 [target.i686-unknown-linux-gnu]
-rustflags = [
-    "-C",
-    "target-cpu=native",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-cpu=native"]
 
 [target.aarch64-unknown-linux-gnu]
-rustflags = [
-    "-C",
-    "target-feature=+neon",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-feature=+neon"]
 
 [target.aarch64-unknown-linux-musl]
-rustflags = [
-    "-C",
-    "target-cpu=native",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-cpu=native"]
 
 [target.armv7-unknown-linux-gnueabi]
-rustflags = [
-    "-C",
-    "target-feature=+neon",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-feature=+neon"]
 
 [target.armv7-unknown-linux-gnueabihf]
-rustflags = [
-    "-C",
-    "target-feature=+neon",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-feature=+neon"]
 
 [target.loongarch64-unknown-linux-gnu]
-rustflags = [
-    "-C",
-    "target-feature=+lasx",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
-
-[target.powerpc64le-unknown-linux-gnu]
-rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
-
-[target.powerpc64le-unknown-linux-musl]
-rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
-
-[target.powerpc64-unknown-linux-gnu]
-rustflags = ["-C", "panic=abort", "-Z", "panic_abort_tests"]
+rustflags = ["-C", "target-feature=+lasx"]
 
 [target.powerpc-unknown-linux-gnu]
-rustflags = [
-    "-C",
-    "target-feature=+altivec",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-feature=+altivec"]
 
 [target.s390x-unknown-linux-gnu]
-rustflags = [
-    "-C",
-    "target-feature=+vector",
-    "-C",
-    "panic=abort",
-    "-Z",
-    "panic_abort_tests",
-]
+rustflags = ["-C", "target-feature=+vector"]

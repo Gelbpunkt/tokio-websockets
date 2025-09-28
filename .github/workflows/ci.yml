@@ -28,10 +28,6 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      - name: Use MSRV-specific .cargo/config.toml
-        run: |
-          mv .cargo/config.toml.msrv .cargo/config.toml
-
       - name: Add problem matchers
         run: echo "::add-matcher::.github/rust.json"
 
@@ -52,10 +48,6 @@ jobs:
         with:
           toolchain: nightly
           components: rust-src
-
-      - name: Use MSRV-specific .cargo/config.toml
-        run: |
-          mv .cargo/config.toml.msrv .cargo/config.toml
 
       - name: Install cargo-fuzz
         uses: baptiste0928/cargo-install@v3
@@ -228,10 +220,6 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
-
-      - name: Use MSRV-specific .cargo/config.toml
-        run: |
-          mv .cargo/config.toml.msrv .cargo/config.toml
 
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
