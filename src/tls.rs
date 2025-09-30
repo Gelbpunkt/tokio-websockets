@@ -32,12 +32,6 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
     feature = "rustls-webpki-roots",
     feature = "rustls-platform-verifier"
 ))]
-use tokio_rustls::rustls::crypto::CryptoProvider;
-#[cfg(any(
-    feature = "rustls-native-roots",
-    feature = "rustls-webpki-roots",
-    feature = "rustls-platform-verifier"
-))]
 use tokio_rustls::rustls::ClientConfig;
 
 use crate::Error;
@@ -217,6 +211,11 @@ impl Connector {
     ///
     /// This method returns an [`Error`] when creating the underlying TLS
     /// connector fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no rustls crypto provider is installed and rustls is unable
+    /// to determine a default crypto provider from its feature flags.
     pub fn new() -> Result<Self, Error> {
         #[cfg(not(any(
             feature = "native-tls",
@@ -246,68 +245,44 @@ impl Connector {
             feature = "rustls-platform-verifier"
         ))]
         {
-            Self::new_rustls_with_crypto_provider(
-                CryptoProvider::get_default()
-                    .ok_or(Error::NoCryptoProviderConfigured)?
-                    .clone(),
-            )
-        }
-    }
+            let config_builder = ClientConfig::builder();
 
-    /// Creates a new `Connector` using `rustls` with a custom crypto provider
-    /// as the TLS library and root certificates specified in the feature
-    /// flags.
-    ///
-    /// # Errors
-    ///
-    /// This method returns an [`Error`] when creating the underlying TLS
-    /// connector fails.
-    #[cfg(any(
-        feature = "rustls-webpki-roots",
-        feature = "rustls-native-roots",
-        feature = "rustls-platform-verifier"
-    ))]
-    fn new_rustls_with_crypto_provider(provider: Arc<CryptoProvider>) -> Result<Self, Error> {
-        // The rustls-platform-verifier changes the certificate verifier and is
-        // therefore incompatible with the other two features
-        let config_builder =
-            ClientConfig::builder_with_provider(provider).with_safe_default_protocol_versions()?;
+            #[cfg(feature = "rustls-platform-verifier")]
+            let config_builder = config_builder.with_platform_verifier()?;
 
-        #[cfg(feature = "rustls-platform-verifier")]
-        let config_builder = config_builder.with_platform_verifier()?;
+            #[cfg(not(feature = "rustls-platform-verifier"))]
+            let config_builder = {
+                let mut roots = tokio_rustls::rustls::RootCertStore::empty();
 
-        #[cfg(not(feature = "rustls-platform-verifier"))]
-        let config_builder = {
-            let mut roots = tokio_rustls::rustls::RootCertStore::empty();
+                #[cfg(feature = "rustls-native-roots")]
+                {
+                    #[cfg_attr(feature = "rustls-webpki-roots", allow(unused))]
+                    let rustls_native_certs::CertificateResult { certs, errors, .. } =
+                        rustls_native_certs::load_native_certs();
 
-            #[cfg(feature = "rustls-native-roots")]
-            {
-                #[cfg_attr(feature = "rustls-webpki-roots", allow(unused))]
-                let rustls_native_certs::CertificateResult { certs, errors, .. } =
-                    rustls_native_certs::load_native_certs();
+                    // Not finding any native roots is not fatal if webpki roots are enabled
+                    #[cfg(not(feature = "rustls-webpki-roots"))]
+                    if certs.is_empty() {
+                        return Err(Error::NoNativeRootCertificatesFound(errors));
+                    }
 
-                // Not finding any native roots is not fatal if webpki roots are enabled
-                #[cfg(not(feature = "rustls-webpki-roots"))]
-                if certs.is_empty() {
-                    return Err(Error::NoNativeRootCertificatesFound(errors));
+                    for cert in certs {
+                        roots.add(cert)?;
+                    }
                 }
 
-                for cert in certs {
-                    roots.add(cert)?;
-                }
-            }
+                #[cfg(feature = "rustls-webpki-roots")]
+                {
+                    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+                };
 
-            #[cfg(feature = "rustls-webpki-roots")]
-            {
-                roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+                config_builder.with_root_certificates(roots)
             };
 
-            config_builder.with_root_certificates(roots)
-        };
-
-        Ok(Self::Rustls(tokio_rustls::TlsConnector::from(Arc::new(
-            config_builder.with_no_client_auth(),
-        ))))
+            Ok(Self::Rustls(tokio_rustls::TlsConnector::from(Arc::new(
+                config_builder.with_no_client_auth(),
+            ))))
+        }
     }
 
     /// Wraps a given stream with a layer of TLS.
