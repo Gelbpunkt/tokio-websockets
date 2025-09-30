@@ -58,16 +58,6 @@ pub enum Error {
     /// The HTTP/1.1 Upgrade failed.
     #[cfg(any(feature = "client", feature = "server"))]
     Upgrade(crate::upgrade::Error),
-    /// Rustls was enabled via crate features, but no crypto provider was
-    /// configured via
-    /// [`tokio_rustls::rustls::crypto::CryptoProvider::install_default`]
-    /// prior to connecting.
-    #[cfg(any(
-        feature = "rustls-webpki-roots",
-        feature = "rustls-native-roots",
-        feature = "rustls-platform-verifier"
-    ))]
-    NoCryptoProviderConfigured,
     /// No native root certificates were found and no other root certificate
     /// source was enabled.
     #[cfg(all(
@@ -167,14 +157,6 @@ impl fmt::Display for Error {
             Error::UnsupportedScheme => f.write_str("unsupported or no URI scheme used"),
             #[cfg(any(feature = "client", feature = "server"))]
             Error::Upgrade(e) => e.fmt(f),
-            #[cfg(any(
-                feature = "rustls-webpki-roots",
-                feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
-            ))]
-            Error::NoCryptoProviderConfigured => {
-                f.write_str("wss uri set but no tls connector was configured")
-            }
             #[cfg(all(
                 not(feature = "rustls-webpki-roots"),
                 feature = "rustls-native-roots",
@@ -194,12 +176,6 @@ impl std::error::Error for Error {
             Error::AlreadyClosed | Error::CannotResolveHost | Error::PayloadTooLong { .. } => None,
             #[cfg(feature = "client")]
             Error::NoUriConfigured | Error::DisallowedHeader => None,
-            #[cfg(any(
-                feature = "rustls-webpki-roots",
-                feature = "rustls-native-roots",
-                feature = "rustls-platform-verifier"
-            ))]
-            Error::NoCryptoProviderConfigured => None,
             #[cfg(all(
                 not(feature = "rustls-webpki-roots"),
                 feature = "rustls-native-roots",
