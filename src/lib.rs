@@ -35,11 +35,7 @@
 // Required for LASX until stable
 #![cfg_attr(
     all(feature = "nightly", target_arch = "loongarch64"),
-    feature(
-        stdarch_loongarch,
-        stdarch_loongarch_feature_detection,
-        loongarch_target_feature
-    )
+    feature(stdarch_loongarch)
 )]
 #![cfg_attr(all(feature = "client", feature = "nightly"), feature(random))]
 #![doc = include_str!("../README.md")]

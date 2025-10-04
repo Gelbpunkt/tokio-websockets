@@ -22,7 +22,7 @@
 /// This will use a fallback implementation for less than 64 bytes. For
 /// sufficiently large inputs, it masks in chunks of 64 bytes per
 /// instruction, applying the fallback method on all remaining data.
-#[cfg(all(feature = "nightly", any(target_arch = "x86", target_arch = "x86_64")))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(clippy::incompatible_msrv)] // nightly feature gated, stable since 1.89.0
 #[target_feature(enable = "avx512f")]
 unsafe fn frame_avx512(key: &mut [u8; 4], input: &mut [u8]) {
@@ -333,12 +333,9 @@ pub fn frame(key: &mut [u8; 4], input: &mut [u8]) {
     {
         use std::arch::is_x86_feature_detected;
 
-        #[cfg(feature = "nightly")]
         if is_x86_feature_detected!("avx512f") {
             return unsafe { frame_avx512(key, input) };
-        }
-
-        if is_x86_feature_detected!("avx2") {
+        } else if is_x86_feature_detected!("avx2") {
             return unsafe { frame_avx2(key, input) };
         } else if is_x86_feature_detected!("sse2") {
             return unsafe { frame_sse2(key, input) };
