@@ -126,7 +126,7 @@ async fn main() -> Result<(), Error> {
 
 ## MSRV
 
-The current MSRV for all feature combinations is Rust 1.79.
+The current MSRV for all feature combinations is Rust 1.89.
 
 ## Caveats / Limitations / ToDo
 
