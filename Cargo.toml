@@ -5,7 +5,7 @@ edition = "2021"
 description = "High performance, strict, tokio-util based WebSockets implementation"
 categories = ["web-programming::websocket", "network-programming", "asynchronous", "concurrency"]
 repository = "https://github.com/Gelbpunkt/tokio-websockets/"
-rust-version = "1.79"
+rust-version = "1.89"
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
