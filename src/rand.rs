@@ -1,7 +1,35 @@
 //! Random numbers generation utilities required in WebSocket clients.
 
-#[cfg(not(any(feature = "fastrand", feature = "getrandom", feature = "rand")))]
-compile_error!("Using the `client` feature requires enabling a random number generator implementation via one of the following features: `fastrand`, `getrandom` or `rand`.");
+#[cfg(not(any(
+    feature = "fastrand",
+    feature = "getrandom",
+    feature = "nightly",
+    feature = "rand"
+)))]
+compile_error!("Using the `client` feature requires enabling a random number generator implementation via one of the following features: `fastrand`, `getrandom`, `nightly` or `rand`.");
+
+/// Random numbers generation utilities using [`std::random`].
+#[cfg(all(
+    feature = "nightly",
+    not(feature = "fastrand"),
+    not(feature = "getrandom"),
+    not(feature = "rand")
+))]
+mod imp {
+    use std::random::RandomSource;
+
+    /// Generate a random 16-byte WebSocket key.
+    pub fn get_key() -> [u8; 16] {
+        let mut bytes = [0; 16];
+        std::random::DefaultRandomSource.fill_bytes(&mut bytes);
+        bytes
+    }
+
+    /// Generate a random 4-byte WebSocket mask.
+    pub fn get_mask(dst: &mut [u8; 4]) {
+        std::random::DefaultRandomSource.fill_bytes(dst);
+    }
+}
 
 /// Random numbers generation utilities using [`fastrand`].
 #[cfg(all(
