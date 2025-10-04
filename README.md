@@ -68,7 +68,7 @@ tokio-websockets makes use of SIMD to accelerate (un-)masking of messages and UT
 | s390x        | z13 vectors  | ✅ (on nightly) | ❌                |
 | x86_64       | SSE2         | ✅              | ❌                |
 | x86_64       | AVX2         | ✅              | ✅                |
-| x86_64       | AVX512       | ✅ (on nightly) | ❌                |
+| x86_64       | AVX512       | ✅              | ❌                |
 
 ## Example
 
