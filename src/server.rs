@@ -12,9 +12,9 @@ use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::FramedRead;
 
 use crate::{
+    Error, WebSocketStream,
     proto::{Config, Limits, Role},
     upgrade::client_request,
-    Error, WebSocketStream,
 };
 
 /// HTTP/1.1 400 Bad Request response payload.

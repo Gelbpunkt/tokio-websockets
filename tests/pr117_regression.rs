@@ -1,7 +1,7 @@
 #![cfg(all(feature = "client", feature = "server"))]
 
-use futures_util::{stream, SinkExt, StreamExt};
-use tokio::io::{duplex, AsyncRead, AsyncWrite};
+use futures_util::{SinkExt, StreamExt, stream};
+use tokio::io::{AsyncRead, AsyncWrite, duplex};
 use tokio_websockets::{ClientBuilder, Message, ServerBuilder};
 
 const NUM_MSG: usize = 1024;

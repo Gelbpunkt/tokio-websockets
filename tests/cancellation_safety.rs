@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures_util::{task::noop_waker_ref, FutureExt, StreamExt};
+use futures_util::{FutureExt, StreamExt, task::noop_waker_ref};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_websockets::ServerBuilder;
 

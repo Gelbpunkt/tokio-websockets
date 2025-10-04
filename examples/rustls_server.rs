@@ -9,7 +9,7 @@ use futures_util::SinkExt;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::net::TcpListener;
-use tokio_rustls::{rustls, TlsAcceptor};
+use tokio_rustls::{TlsAcceptor, rustls};
 use tokio_websockets::Message;
 
 const PATH_TO_CERT: &str = "certs/localhost.crt";
