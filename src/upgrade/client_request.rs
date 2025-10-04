@@ -1,7 +1,7 @@
 //! A [`Codec`] to parse client HTTP Upgrade handshakes and validate them.
 use std::str::FromStr;
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use bytes::{Buf, BytesMut};
 use httparse::Request;
 use tokio_util::codec::Decoder;

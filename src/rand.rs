@@ -6,7 +6,9 @@
     feature = "nightly",
     feature = "rand"
 )))]
-compile_error!("Using the `client` feature requires enabling a random number generator implementation via one of the following features: `fastrand`, `getrandom`, `nightly` or `rand`.");
+compile_error!(
+    "Using the `client` feature requires enabling a random number generator implementation via one of the following features: `fastrand`, `getrandom`, `nightly` or `rand`."
+);
 
 /// Random numbers generation utilities using [`std::random`].
 #[cfg(all(

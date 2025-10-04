@@ -4,8 +4,8 @@ use std::{
     io::Result,
     pin::Pin,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll, Wake},
 };

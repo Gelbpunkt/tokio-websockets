@@ -2,9 +2,9 @@
 //! the response.
 use std::str::FromStr;
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use bytes::{Buf, BytesMut};
-use http::{header::HeaderName, HeaderValue, StatusCode};
+use http::{HeaderValue, StatusCode, header::HeaderName};
 use httparse::{Header, Response};
 use tokio_util::codec::Decoder;
 

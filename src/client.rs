@@ -9,11 +9,11 @@
 //!     [`Builder::take_over`] to let it take over a WebSocket stream
 use std::{future::poll_fn, io, pin::Pin, str::FromStr};
 
-use base64::{engine::general_purpose, Engine};
+use base64::{Engine, engine::general_purpose};
 use futures_core::Stream;
 use http::{
-    header::{self, HeaderName},
     HeaderMap, HeaderValue, Uri,
+    header::{self, HeaderName},
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
@@ -22,10 +22,10 @@ use tokio::{
 use tokio_util::codec::FramedRead;
 
 use crate::{
+    Connector, Error, MaybeTlsStream, WebSocketStream,
     proto::{Config, Limits, Role},
     resolver::{self, Resolver},
     upgrade::{self, server_response},
-    Connector, Error, MaybeTlsStream, WebSocketStream,
 };
 
 /// Generates a new, random 16-byte WebSocket key and encodes it as base64.
@@ -357,7 +357,7 @@ mod tests {
     use futures_util::StreamExt;
 
     use super::Builder;
-    use crate::{proto::ProtocolError, Error};
+    use crate::{Error, proto::ProtocolError};
 
     #[tokio::test]
     async fn control_payload_limit_receive() {

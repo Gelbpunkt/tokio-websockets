@@ -6,8 +6,8 @@
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures_util::StreamExt;
-use tokio::io::{duplex, AsyncWriteExt};
-use tokio_websockets::{proto::ProtocolError, Error, ServerBuilder};
+use tokio::io::{AsyncWriteExt, duplex};
+use tokio_websockets::{Error, ServerBuilder, proto::ProtocolError};
 
 const MASK: [u8; 4] = [0, 0, 0, 0];
 

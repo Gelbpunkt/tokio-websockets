@@ -12,10 +12,9 @@ use tokio_util::codec::Decoder;
 
 use super::types::{Frame, Limits, OpCode, Role};
 use crate::{
-    mask,
+    CloseCode, Error, Payload, mask,
     proto::ProtocolError,
     utf8::{self, Validator},
-    CloseCode, Error, Payload,
 };
 
 /// Maximum size of a frame header (2 + 8 + 4).
