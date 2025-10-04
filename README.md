@@ -50,7 +50,7 @@ The `client` feature requires enabling one random number generator:
 
 - [`fastrand`](https://docs.rs/fastrand/latest/fastrand) can be used as a `PRNG`
 - [`getrandom`](https://docs.rs/getrandom/latest/getrandom) can be used as a cryptographically secure RNG
-- [`nightly`](https://doc.rust-lang.org/stable/std/random/struct.DefaultRandomSource.html) can be used as a cryptographically secure RNG
+- [`std::random`](https://doc.rust-lang.org/stable/std/random/struct.DefaultRandomSource.html) can be used as a cryptographically secure RNG with the `nightly` feature enabled
 - [`rand`](https://docs.rs/rand/latest/rand) can be used as an alternative to `fastrand` and should be preferred if it is already in the dependency tree
 
 ## SIMD
