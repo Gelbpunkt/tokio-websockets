@@ -26,7 +26,9 @@ async fn test_pr102_regression() {
     // The close ack frame is queued, the connection is closed, before PR 102 this
     // would trigger an infinite loop in close()
     // For the regression test, fail the test if this doesn't close within a second
-    assert!(timeout(Duration::from_secs(1), client.close())
-        .await
-        .is_ok());
+    assert!(
+        timeout(Duration::from_secs(1), client.close())
+            .await
+            .is_ok()
+    );
 }

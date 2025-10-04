@@ -7,7 +7,7 @@ use std::{
     io::{self, IoSlice},
     mem::{replace, take},
     pin::Pin,
-    task::{ready, Context, Poll, Waker},
+    task::{Context, Poll, Waker, ready},
 };
 
 use bytes::{Buf, BytesMut};
@@ -19,9 +19,9 @@ use tokio_util::{codec::FramedRead, io::poll_write_buf};
 #[cfg(any(feature = "client", feature = "server"))]
 use super::types::Role;
 use super::{
+    Config, Limits,
     codec::WebSocketProtocol,
     types::{Frame, Message, OpCode, Payload, StreamState},
-    Config, Limits,
 };
 use crate::{CloseCode, Error};
 
