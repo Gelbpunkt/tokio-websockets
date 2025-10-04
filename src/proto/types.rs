@@ -118,14 +118,7 @@ impl CloseCode {
     /// Returns `None` if `code` is not a valid `CloseCode`
     const fn try_from_u16(code: u16) -> Option<Self> {
         match code {
-            1000..=1015 | 3000..=4999 => {
-                // FIXME: replace with `Some(Self(NonZeroU16::new(code).unwrap()))`
-                // once MSRV is bumped to 1.83
-                match NonZeroU16::new(code) {
-                    Some(code) => Some(Self(code)),
-                    None => unreachable!(),
-                }
-            }
+            1000..=1015 | 3000..=4999 => Some(Self(NonZeroU16::new(code).unwrap())),
             0..=999 | 1016..=2999 | 5000..=u16::MAX => None,
         }
     }
@@ -134,12 +127,7 @@ impl CloseCode {
     ///
     /// Panics if `code` is not a valid `CloseCode`
     const fn constant(code: u16) -> Self {
-        // FIXME: replace with `Self::try_from_u16(code).unwrap()`
-        // once MSRV is bumped to 1.83
-        match Self::try_from_u16(code) {
-            Some(code) => code,
-            None => unreachable!(),
-        }
+        Self::try_from_u16(code).unwrap()
     }
 
     /// Whether the close code is reserved and cannot be sent over the wire.
