@@ -215,13 +215,10 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v5
 
-      - name: Install nightly toolchain
+      - name: Install 1.89.0 toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly
-
-      - name: Get latest compatible dependencies for MSRV
-        run: CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo update
+          toolchain: 1.89.0
 
       - name: Install cargo-hack
         uses: baptiste0928/cargo-install@v3
@@ -229,10 +226,8 @@ jobs:
           crate: cargo-hack
           locked: false
 
-      - name: Install 1.89.0 toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.89.0
+      - name: Get latest compatible dependencies for MSRV
+        run: CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo update
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
