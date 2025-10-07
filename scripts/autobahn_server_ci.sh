@@ -8,7 +8,7 @@ function cleanup() {
 
 trap cleanup TERM EXIT
 
-target/x86_64-unknown-linux-gnu/release/examples/autobahn_server & WSSERVER_PID=$!
+target/release/examples/autobahn_server & WSSERVER_PID=$!
 
 sleep 3
 

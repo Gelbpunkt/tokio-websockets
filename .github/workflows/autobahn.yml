@@ -2,9 +2,6 @@ name: Run autobahn testsuite
 
 on: [push, pull_request]
 
-env:
-  CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
-
 jobs:
   autobahn:
     name: Run autobahn testsuite
@@ -12,7 +9,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
