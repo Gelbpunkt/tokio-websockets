@@ -204,14 +204,25 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: x86_64
-            image: ubuntu-latest
+          # We want to cover all supported architectures here
+          # FIXME: Add armv7, ppc64, ppc64le
           - arch: aarch64
             image: ubuntu-24.04-arm
+          - arch: loongarch64
+            image: [alpine-edge, loongarch64]
+          - arch: s390x
+            image: [ubuntu-25.10, s390x]
+          - arch: x86_64
+            image: ubuntu-latest
 
     runs-on: ${{ matrix.image }}
 
     steps:
+      # Helpful for debugging and making sure our runners support the
+      # vector instructions we emit
+      - name: Show CPU information
+        run: lscpu
+
       - name: Checkout sources
         uses: actions/checkout@v5
 
