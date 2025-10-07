@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2025-10-07
+
+### Added
+
+- With the `nightly` feature enabled and no random number generator enabled, `std::random` will now be used
+
+### Changed
+
+- **[breaking]** The default `rustls` crypto provider is now installed implicitly, which in turn results in `TlsConnector::now` now panicking instead of returning the now-removed `NoCryptoProviderConfigured` error variant
+- **[breaking]** The MSRV is now 1.89, which means AVX512 support is now available without the `nightly` feature
+
 ## [0.12.3] - 2025-09-28
 
 ### Fixed
