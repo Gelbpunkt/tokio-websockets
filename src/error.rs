@@ -25,7 +25,7 @@ pub enum Error {
     #[cfg(feature = "client")]
     NoUriConfigured,
     /// Attempted to add a disallowed header.
-    #[cfg(feature = "client")]
+    #[cfg(any(feature = "client", feature = "server"))]
     DisallowedHeader,
     /// WebSocket protocol violation.
     Protocol(ProtocolError),
@@ -127,7 +127,7 @@ impl fmt::Display for Error {
             Error::CannotResolveHost => f.write_str("client DNS lookup failed"),
             #[cfg(feature = "client")]
             Error::NoUriConfigured => f.write_str("client has no URI configured"),
-            #[cfg(feature = "client")]
+            #[cfg(any(feature = "client", feature = "server"))]
             Error::DisallowedHeader => f.write_str("attempted to add disallowed header"),
             Error::Protocol(e) => e.fmt(f),
             Error::PayloadTooLong { len, max_len } => {
@@ -175,7 +175,9 @@ impl std::error::Error for Error {
         match self {
             Error::AlreadyClosed | Error::CannotResolveHost | Error::PayloadTooLong { .. } => None,
             #[cfg(feature = "client")]
-            Error::NoUriConfigured | Error::DisallowedHeader => None,
+            Error::NoUriConfigured => None,
+            #[cfg(any(feature = "client", feature = "server"))]
+            Error::DisallowedHeader => None,
             #[cfg(all(
                 not(feature = "rustls-webpki-roots"),
                 feature = "rustls-native-roots",
