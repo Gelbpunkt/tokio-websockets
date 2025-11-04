@@ -274,6 +274,11 @@ where
         &mut self.inner.decoder_mut().limits
     }
 
+    /// Consumes the `WebSocketStream`, returning its underlying I/O stream.
+    pub fn into_inner(self) -> T {
+        self.inner.into_inner()
+    }
+
     /// Attempt to pull out the next frame from the [`Framed`] this stream and
     /// from that update the stream's internal state.
     ///
