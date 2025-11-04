@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use bytes::{Buf, BytesMut};
+use http::{HeaderMap, header::SET_COOKIE};
 use httparse::Request;
 use tokio_util::codec::Decoder;
 
@@ -10,7 +11,7 @@ use crate::{sha::digest, upgrade::Error};
 
 /// A static HTTP/1.1 101 Switching Protocols response up until the
 /// `Sec-WebSocket-Accept` header value.
-const SWITCHING_PROTOCOLS_BODY: &str = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ";
+const SWITCHING_PROTOCOLS_BODY: &[u8] = b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ";
 
 /// Returns whether an ASCII byte slice is contained in another one, ignoring
 /// captalization.
@@ -94,11 +95,14 @@ impl ClientRequest {
 /// It does not implement an [`Encoder`].
 ///
 /// [`Encoder`]: tokio_util::codec::Encoder
-pub struct Codec {}
+pub struct Codec<'a> {
+    /// List of headers to add to the Switching Protocols response.
+    pub response_headers: &'a HeaderMap,
+}
 
-impl Decoder for Codec {
+impl Decoder for Codec<'_> {
     type Error = crate::Error;
-    type Item = (http::Request<()>, String);
+    type Item = (http::Request<()>, Vec<u8>);
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let mut headers = [httparse::EMPTY_HEADER; 64];
@@ -151,11 +155,44 @@ impl Decoder for Codec {
 
         src.advance(request_len);
 
-        let mut resp = String::with_capacity(SWITCHING_PROTOCOLS_BODY.len() + ws_accept.len() + 4);
+        // Preallocate the size without extra headers
+        let mut resp = Vec::with_capacity(SWITCHING_PROTOCOLS_BODY.len() + ws_accept.len() + 4);
 
-        resp.push_str(SWITCHING_PROTOCOLS_BODY);
-        resp.push_str(&ws_accept);
-        resp.push_str("\r\n\r\n");
+        resp.extend_from_slice(SWITCHING_PROTOCOLS_BODY);
+        resp.extend_from_slice(ws_accept.as_bytes());
+        resp.extend_from_slice(b"\r\n");
+
+        for name in self.response_headers.keys() {
+            let values = self.response_headers.get_all(name).iter();
+
+            if name == SET_COOKIE {
+                // Set-Cookie is treated differently because if multiple values are present,
+                // multiple header entries should be used rather than one
+                for value in values {
+                    resp.extend_from_slice(name.as_str().as_bytes());
+                    resp.extend_from_slice(b": ");
+                    resp.extend_from_slice(value.as_bytes());
+                    resp.extend_from_slice(b"\r\n");
+                }
+            } else {
+                // All other header values of the same key should be concatenated with a comma
+                resp.extend_from_slice(name.as_str().as_bytes());
+                resp.extend_from_slice(b": ");
+
+                let mut values = values.peekable();
+                while let Some(value) = values.next() {
+                    resp.extend_from_slice(value.as_bytes());
+
+                    if values.peek().is_some() {
+                        resp.push(b',');
+                    }
+                }
+
+                resp.extend_from_slice(b"\r\n");
+            }
+        }
+
+        resp.extend_from_slice(b"\r\n");
 
         Ok(Some((request, resp)))
     }
