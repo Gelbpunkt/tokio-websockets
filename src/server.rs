@@ -8,6 +8,7 @@
 use std::{future::poll_fn, io, pin::Pin};
 
 use futures_core::Stream;
+use http::{HeaderMap, HeaderName, HeaderValue, header};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::FramedRead;
 
@@ -20,12 +21,27 @@ use crate::{
 /// HTTP/1.1 400 Bad Request response payload.
 const BAD_REQUEST: &[u8] = b"HTTP/1.1 400 Bad Request\r\n\r\n";
 
+/// List of headers added by the server which will cause an error
+/// if added by the user:
+///
+/// - `host`
+/// - `upgrade`
+/// - `connection`
+/// - `sec-websocket-accept`
+pub const DISALLOWED_HEADERS: &[HeaderName] = &[
+    header::UPGRADE,
+    header::CONNECTION,
+    header::SEC_WEBSOCKET_ACCEPT,
+];
+
 /// Builder for WebSocket server connections.
 pub struct Builder {
     /// Configuration for the WebSocket stream.
     config: Config,
     /// Limits to impose on the WebSocket stream.
     limits: Limits,
+    /// Headers to be sent with the switching protocols response.
+    headers: HeaderMap,
 }
 
 impl Default for Builder {
@@ -42,6 +58,7 @@ impl Builder {
         Self {
             config: Config::default(),
             limits: Limits::default(),
+            headers: HeaderMap::new(),
         }
     }
 
@@ -61,6 +78,21 @@ impl Builder {
         self
     }
 
+    /// Adds an extra HTTP header to the switching protocols response.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::DisallowedHeader`] if the header is in
+    /// the [`DISALLOWED_HEADERS`] list.
+    pub fn add_header(mut self, name: HeaderName, value: HeaderValue) -> Result<Self, Error> {
+        if DISALLOWED_HEADERS.contains(&name) {
+            return Err(Error::DisallowedHeader);
+        }
+        self.headers.insert(name, value);
+
+        Ok(self)
+    }
+
     /// Perform a HTTP upgrade handshake on an already established stream and
     /// uses it to send and receive WebSocket messages.
     ///
@@ -71,12 +103,17 @@ impl Builder {
         &self,
         stream: S,
     ) -> Result<(http::Request<()>, WebSocketStream<S>), Error> {
-        let mut framed = FramedRead::new(stream, client_request::Codec {});
+        let mut framed = FramedRead::new(
+            stream,
+            client_request::Codec {
+                response_headers: &self.headers,
+            },
+        );
         let reply = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx)).await;
 
         match reply {
             Some(Ok((request, response))) => {
-                framed.get_mut().write_all(response.as_bytes()).await?;
+                framed.get_mut().write_all(&response).await?;
                 Ok((
                     request,
                     WebSocketStream::from_framed(framed, Role::Server, self.config, self.limits),
