@@ -148,7 +148,8 @@ unsafe fn frame_neon(key: &mut [u8; 4], input: &mut [u8]) {
         }
 
         if !aligned_data.is_empty() {
-            let mask = vreinterpretq_u8_s32(vld1q_dup_s32(key.as_ptr() as *const i32));
+            let key_i32 = key.as_ptr().cast::<i32>().read_unaligned();
+            let mask = vreinterpretq_u8_s32(vld1q_dup_s32(&key_i32));
 
             for block in aligned_data {
                 *block = veorq_u8(*block, mask);
