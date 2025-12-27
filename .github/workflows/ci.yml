@@ -198,6 +198,45 @@ jobs:
             --group-features client,fastrand,sha1_smol \
             --group-features server,sha1_smol
 
+  miri:
+    name: Run tests in miri
+
+    strategy:
+      matrix:
+        include:
+          # We want to cover all supported architectures here
+          # FIXME: Once stdarch supports LSX/LASX with portable SIMD, enable loongarch64 here
+          # FIXME: Add armv7, ppc64
+          - arch: aarch64
+            image: ubuntu-24.04-arm
+          - arch: ppc64le
+            image: [postmarketos-edge, ppc64le]
+          - arch: s390x
+            image: [ubuntu-25.10, s390x]
+          - arch: x86_64
+            image: ubuntu-latest
+
+    runs-on: ${{ matrix.image }}
+
+    steps:
+      # Helpful for debugging and making sure our runners support the
+      # vector instructions we emit
+      - name: Show CPU information
+        run: lscpu
+
+      - name: Checkout sources
+        uses: actions/checkout@v5
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: miri, rust-src
+
+      - name: Run tests in miri
+        run: |
+          cargo miri test --all-features --all-targets
+
   msrv:
     name: Feature powerset (MSRV)
 
