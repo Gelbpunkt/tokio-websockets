@@ -355,9 +355,12 @@ impl Default for Builder<'_> {
 #[cfg(test)]
 mod tests {
     use futures_util::StreamExt;
+    use static_assertions::assert_impl_all;
 
     use super::Builder;
     use crate::{Error, proto::ProtocolError};
+
+    assert_impl_all!(Builder: Send, Sync);
 
     #[tokio::test]
     async fn control_payload_limit_receive() {
