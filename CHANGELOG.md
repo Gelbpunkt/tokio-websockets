@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2025-12-28
+
+### Added
+
+- The new `WebSocketStream::into_inner` method discards the WebSocket stream and provides you with the raw underlying I/O
+- It is now possible to add custom headers to the built-in server's Switching Protocols response via `ServerBuilder::add_header`
+
+### Fixed
+
+- Compilation with the `nightly` feature enabled on s390x now works with the latest nightlies again
+- Fixed a case of UB in the ARM NEON intrinsic code uncovered by Miri
+
+### Other
+
+- CI now test builds all feature combinations on architectures supported by the SIMD code (aarch64, loongarch64, ppc64le, s390x, x86_64)
+- Further, on aarch64, ppc64le, s390x and x86_64 we now also run the tests with Miri
+
 ## [0.13.0] - 2025-10-07
 
 ### Added
