@@ -61,6 +61,7 @@ tokio-websockets makes use of SIMD to accelerate (un-)masking of messages and UT
 |--------------|--------------|----------------|------------------|
 | aarch64      | NEON         | ✅              | ✅                |
 | arm          | NEON         | ✅ (on nightly) | ✅ (on nightly)   |
+| loongarch64  | LSX          | ✅ (on nightly) | ❌                |
 | loongarch64  | LASX         | ✅ (on nightly) | ❌                |
 | powerpc      | AltiVec      | ✅ (on nightly) | ❌                |
 | powerpc64    | AltiVec      | ✅ (on nightly) | ❌                |

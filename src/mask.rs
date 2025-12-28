@@ -251,13 +251,10 @@ unsafe fn frame_s390x_vector(key: &mut [u8; 4], input: &mut [u8]) {
 #[cfg(all(feature = "nightly", target_arch = "loongarch64"))]
 #[target_feature(enable = "lasx")]
 unsafe fn frame_lasx_vector(key: &mut [u8; 4], input: &mut [u8]) {
-    use std::{
-        arch::loongarch64::{lasx_xvld, lasx_xvxor_v, v32u8},
-        mem::transmute,
-    };
+    use std::arch::loongarch64::{lasx_xvld, lasx_xvxor_v, m256i};
 
     unsafe {
-        let (prefix, aligned_data, suffix) = input.align_to_mut::<v32u8>();
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<m256i>();
 
         // Run fallback implementation on unaligned prefix data
         if !prefix.is_empty() {
@@ -266,11 +263,44 @@ unsafe fn frame_lasx_vector(key: &mut [u8; 4], input: &mut [u8]) {
 
         if !aligned_data.is_empty() {
             let key_vector = [i32::from_ne_bytes(*key); 8];
-            // SAFETY: 32x i8 to 32x u8 is safe
-            let mask: v32u8 = transmute(lasx_xvld::<0>(key_vector.as_ptr().cast()));
+            let mask = lasx_xvld::<0>(key_vector.as_ptr().cast());
 
             for block in aligned_data {
                 *block = lasx_xvxor_v(*block, mask);
+            }
+        }
+
+        // Run fallback implementation on unaligned suffix data
+        if !suffix.is_empty() {
+            fallback_frame(key, suffix);
+        }
+    }
+}
+
+/// (Un-)masks input bytes with the framing key using LSX.
+///
+/// This will use a fallback implementation for less than 16 bytes. For
+/// sufficiently large inputs, it masks in chunks of 16 bytes per
+/// instruction, applying the fallback method on all remaining data.
+#[cfg(all(feature = "nightly", target_arch = "loongarch64"))]
+#[target_feature(enable = "lsx")]
+unsafe fn frame_lsx_vector(key: &mut [u8; 4], input: &mut [u8]) {
+    use std::arch::loongarch64::{lsx_vld, lsx_vxor_v, m128i};
+
+    unsafe {
+        let (prefix, aligned_data, suffix) = input.align_to_mut::<m128i>();
+
+        // Run fallback implementation on unaligned prefix data
+        if !prefix.is_empty() {
+            fallback_frame(key, prefix);
+        }
+
+        if !aligned_data.is_empty() {
+            let key_vector = [i32::from_ne_bytes(*key); 4];
+            let mask = lsx_vld(key_vector.as_ptr().cast(), 0);
+
+            for block in aligned_data {
+                *block = lsx_vxor_v(*block, mask);
             }
         }
 
@@ -394,6 +424,8 @@ pub fn frame(key: &mut [u8; 4], input: &mut [u8]) {
 
         if is_loongarch_feature_detected!("lasx") {
             return unsafe { frame_lasx_vector(key, input) };
+        } else if is_loongarch_feature_detected!("lsx") {
+            return unsafe { frame_lsx_vector(key, input) };
         }
     }
 
