@@ -1,5 +1,4 @@
 /target
-Cargo.lock
 /certs
 /autobahn/reports
 flamegraph.svg
