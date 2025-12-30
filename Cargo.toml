@@ -52,8 +52,8 @@ openssl = { version = "0.10", default-features = false, optional = true }
 
 [features]
 client = ["dep:base64", "dep:http", "dep:httparse", "tokio/net", "tokio/io-util"]
-aws_lc_rs = ["dep:aws-lc-rs"] # Underscores for consistency with other rustls crates
-ring = ["dep:ring"]
+aws_lc_rs = ["dep:aws-lc-rs", "tokio-rustls?/aws_lc_rs"] # Underscores for consistency with other rustls crates
+ring = ["dep:ring", "tokio-rustls?/ring"]
 server = ["dep:base64", "dep:http", "dep:httparse", "tokio/io-util"]
 native-tls = ["dep:tokio-native-tls"]
 rustls-webpki-roots = ["dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots"]
