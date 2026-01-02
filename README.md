@@ -71,11 +71,11 @@ tokio-websockets makes use of SIMD to accelerate (un-)masking of messages and UT
 | x86_64       | AVX2         | ✅              | ✅                |
 | x86_64       | AVX512       | ✅              | ❌                |
 
-## Example
-
-This is a simple WebSocket echo server without any proper error handling.
+## Examples
 
 More examples can be found in the [examples folder](https://github.com/Gelbpunkt/tokio-websockets/tree/main/examples).
+
+Simple WebSocket echo server without any proper error handling:
 
 ```rust
 use futures_util::{SinkExt, StreamExt};
@@ -122,6 +122,40 @@ async fn main() -> Result<(), Error> {
   }
 
   Ok(())
+}
+```
+
+Basic client using `rustls` with `aws_lc_rs` as the crypto provider:
+
+```rs
+use futures_util::{SinkExt, StreamExt};
+use http::Uri;
+use tokio_websockets::{ClientBuilder, Error, Message};
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    // Will set the default crypto provider for libraries which configure rustls
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
+    // Connecting to a echo server with TLS set up
+    let uri = Uri::from_static("wss://ws.vi-server.org/mirror");
+    let (mut client, _) = ClientBuilder::from_uri(uri).connect().await?;
+
+    // Print out if its a plain or TLS socket
+    // Requires a TLS feature to be turned on to not be plain
+    println!("{:?}", client.get_ref());
+
+    client.send(Message::text("Hello, world!")).await?;
+
+    let msg = client.next().await;
+
+    println!("Got echo response: {msg:?}");
+
+    client.close().await?;
+
+    Ok(())
 }
 ```
 
