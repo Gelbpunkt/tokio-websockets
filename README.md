@@ -38,11 +38,11 @@ TLS is supported via any of the following feature flags:
 - `rustls-platform-verifier` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation with [`rustls-platform-verifier`](https://docs.rs/rustls-platform-verifier/latest/rustls_platform_verifier/)
 - `rustls-bring-your-own-connector` for a [`tokio-rustls`](https://docs.rs/tokio-rustls/latest/tokio_rustls/) backed implementation that requires you to create your own `Connector::Rustls` - the `Connector::new` method will return a plain connector
 
-The `rustls-*-roots` and `rustls-platform-verifier` features require installing a crypto provider for `rustls`, see [here](https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html#method.install_default) for more information.
+The `rustls-*-roots` and `rustls-platform-verifier` features require installing a global [crypto provider](https://docs.rs/rustls/latest/rustls/index.html#cryptography-providers) for `rustls`, you can do so by calling [`CryptoProvider::install_default()`](https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html#method.install_default) on the provider you choose.
 
-One SHA1 implementation is required, usually provided by the TLS implementation:
+One SHA1 implementation is required, usually provided by the TLS implementation or its crypto provider:
 
-- [`ring`](https://docs.rs/ring/latest/ring/) or [`aws_lc_rs`](https://docs.rs/aws-lc-rs/latest/aws_lc_rs/) are used if the `ring` or `aws_lc_rs` features are enabled (recommended when `rustls` is used)
+- [`ring`](https://docs.rs/ring/latest/ring/) or [`aws_lc_rs`](https://docs.rs/aws-lc-rs/latest/aws_lc_rs/) are used if the `ring` or `aws_lc_rs` features are enabled (recommended when also used in `rustls`)
 - The `openssl` feature will use [`openssl`](https://docs.rs/openssl/latest/openssl/), usually preferred on most Linux/BSD systems with `native-tls`
 - The [`sha1_smol`](https://docs.rs/sha1_smol/latest/sha1_smol/) feature can be used as a fallback if no TLS is needed
 
@@ -71,11 +71,11 @@ tokio-websockets makes use of SIMD to accelerate (un-)masking of messages and UT
 | x86_64       | AVX2         | ✅              | ✅                |
 | x86_64       | AVX512       | ✅              | ❌                |
 
-## Example
-
-This is a simple WebSocket echo server without any proper error handling.
+## Examples
 
 More examples can be found in the [examples folder](https://github.com/Gelbpunkt/tokio-websockets/tree/main/examples).
+
+Simple WebSocket echo server without any proper error handling:
 
 ```rust
 use futures_util::{SinkExt, StreamExt};
@@ -122,6 +122,40 @@ async fn main() -> Result<(), Error> {
   }
 
   Ok(())
+}
+```
+
+Basic client using `rustls` with `aws_lc_rs` as the crypto provider:
+
+```rs
+use futures_util::{SinkExt, StreamExt};
+use http::Uri;
+use tokio_websockets::{ClientBuilder, Error, Message};
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    // Will set the default crypto provider for libraries which configure rustls
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
+    // Connecting to a echo server with TLS set up
+    let uri = Uri::from_static("wss://ws.vi-server.org/mirror");
+    let (mut client, _) = ClientBuilder::from_uri(uri).connect().await?;
+
+    // Print out if its a plain or TLS socket
+    // Requires a TLS feature to be turned on to not be plain
+    eprintln!("{:?}", client.get_ref());
+
+    client.send(Message::text("Hello, world!")).await?;
+
+    let msg = client.next().await;
+
+    println!("Got message: {msg:?}");
+
+    client.close().await?;
+
+    Ok(())
 }
 ```
 
