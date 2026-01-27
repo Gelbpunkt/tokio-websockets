@@ -66,7 +66,7 @@ tokio-websockets makes use of SIMD to accelerate (un-)masking of messages and UT
 | powerpc      | AltiVec      | ✅ (on nightly) | ❌                |
 | powerpc64    | AltiVec      | ✅ (on nightly) | ❌                |
 | powerpc64le  | AltiVec      | ✅ (on nightly) | ❌                |
-| s390x        | z13 vectors  | ✅ (on nightly) | ❌                |
+| s390x        | z13 vectors  | ✅              | ❌                |
 | x86_64       | SSE2         | ✅              | ❌                |
 | x86_64       | AVX2         | ✅              | ✅                |
 | x86_64       | AVX512       | ✅              | ❌                |
@@ -161,7 +161,7 @@ async fn main() -> Result<(), Error> {
 
 ## MSRV
 
-The current MSRV for all feature combinations is Rust 1.89.
+The current MSRV for all feature combinations is Rust 1.93.
 
 ## Caveats / Limitations / ToDo
 

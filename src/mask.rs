@@ -9,8 +9,10 @@
 //!   - One AltiVec-based implementation that masks 16 bytes per cycle (requires
 //!     nightly rust)
 //!   - One IBM z13 vector facility based implementation that masks 16 bytes per
-//!     cycle (requires nightly rust)
+//!     cycle
 //!   - One LASX based implementation that masks 32 bytes per cycle (requires
+//!     nightly rust)
+//!   - One LSX based implementation that masks 16 bytes per cycle (requires
 //!     nightly rust)
 //!   - A fallback implementation that masks 8 bytes per cycle
 //!
@@ -209,7 +211,7 @@ unsafe fn frame_altivec(key: &mut [u8; 4], input: &mut [u8]) {
 /// This will use a fallback implementation for less than 16 bytes. For
 /// sufficiently large inputs, it masks in chunks of 16 bytes per
 /// instruction, applying the fallback method on all remaining data.
-#[cfg(all(feature = "nightly", target_arch = "s390x"))]
+#[cfg(target_arch = "s390x")]
 #[target_feature(enable = "vector")]
 unsafe fn frame_s390x_vector(key: &mut [u8; 4], input: &mut [u8]) {
     use std::{
@@ -409,7 +411,7 @@ pub fn frame(key: &mut [u8; 4], input: &mut [u8]) {
         }
     }
 
-    #[cfg(all(feature = "nightly", target_arch = "s390x"))]
+    #[cfg(target_arch = "s390x")]
     {
         use std::arch::is_s390x_feature_detected;
 
