@@ -1,0 +1,98 @@
+{
+   "agent": "tokio-websockets",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 237,
+   "closedByMe": true,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send close with invalid close code 999",
+   "droppedByMe": false,
+   "duration": 1,
+   "expectation": "Clean close with protocol error code or drop TCP",
+   "expected": {
+      "OK": []
+   },
+   "expectedClose": {
+      "closeCode": [
+         1002
+      ],
+      "closedByMe": true,
+      "requireClean": false
+   },
+   "failedByMe": false,
+   "httpRequest": "GET /runCase?case=237&agent=tokio-websockets HTTP/1.1\r\nHost: localhost:9001\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: fNHdYEOMs/Dk6x3IqIFLdg==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nServer: AutobahnTestSuite/25.10.1-0.10.9\r\nX-Powered-By: AutobahnPython/0.10.9\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: 8M18E3QjIVsMRCUDp+FMu4+6nM4=\r\n\r\n",
+   "id": "7.9.2",
+   "isServer": true,
+   "localCloseCode": 999,
+   "localCloseReason": null,
+   "received": [],
+   "remoteCloseCode": null,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": false,
+   "result": "Actual events match at least one expected.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {},
+   "rxOctetStats": {
+      "192": 1
+   },
+   "started": "2026-01-27T04:28:53.796Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "8": 1
+   },
+   "txOctetStats": {
+      "4": 1,
+      "208": 1
+   },
+   "wasClean": false,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": "peer dropped the TCP connection without previous WebSocket closing handshake",
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "RO",
+         [
+            192,
+            "474554202f72756e436173653f636173653d323337266167656e743d746f6b696f2d776562736f636b65747320485454502f312e310d0a486f73743a206c6f63 ..."
+         ]
+      ],
+      [
+         "TO",
+         [
+            208,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a5365727665723a204175746f6261686e5465737453756974652f32352e31 ..."
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            2,
+            "0x03e7"
+         ],
+         8,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            4,
+            "880203e7"
+         ],
+         false
+      ],
+      [
+         "KL",
+         1
+      ]
+   ]
+}

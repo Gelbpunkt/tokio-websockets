@@ -1,0 +1,179 @@
+{
+   "agent": "tokio-websockets",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 29,
+   "closedByMe": false,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send small text message, then send again with <b>RSV = 2</b>, then send Ping.",
+   "droppedByMe": false,
+   "duration": 1,
+   "expectation": "Echo for first message is received, but then connection is failed immediately, since RSV must be 0, when no extension defining RSV meaning has been negotiated. The Pong is not received.",
+   "expected": {
+      "NON-STRICT": [],
+      "OK": [
+         [
+            "message",
+            "Hello, world!",
+            false
+         ]
+      ]
+   },
+   "expectedClose": {
+      "closeCode": [
+         1002
+      ],
+      "closedByMe": false,
+      "requireClean": false
+   },
+   "failedByMe": false,
+   "httpRequest": "GET /runCase?case=29&agent=tokio-websockets HTTP/1.1\r\nHost: localhost:9001\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: YQ1to/0i0x5W/mg6JPnvUg==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nServer: AutobahnTestSuite/25.10.1-0.10.9\r\nX-Powered-By: AutobahnPython/0.10.9\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: +DZQLM+YdExXFvulhWT+c6b2jlM=\r\n\r\n",
+   "id": "3.2",
+   "isServer": true,
+   "localCloseCode": null,
+   "localCloseReason": null,
+   "received": [
+      [
+         "message",
+         "Hello, world!",
+         false
+      ]
+   ],
+   "remoteCloseCode": null,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": false,
+   "result": "Actual events match at least one expected.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {
+      "1": 1
+   },
+   "rxOctetStats": {
+      "19": 1,
+      "191": 1
+   },
+   "started": "2026-01-27T04:28:47.288Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "1": 2,
+      "9": 1
+   },
+   "txOctetStats": {
+      "2": 1,
+      "15": 2,
+      "208": 1
+   },
+   "wasClean": false,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": "peer dropped the TCP connection without previous WebSocket closing handshake",
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "RO",
+         [
+            191,
+            "474554202f72756e436173653f636173653d3239266167656e743d746f6b696f2d776562736f636b65747320485454502f312e310d0a486f73743a206c6f6361 ..."
+         ]
+      ],
+      [
+         "TO",
+         [
+            208,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a5365727665723a204175746f6261686e5465737453756974652f32352e31 ..."
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            13,
+            "Hello, world!"
+         ],
+         1,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            15,
+            "810d48656c6c6f2c20776f726c6421"
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            13,
+            "Hello, world!"
+         ],
+         1,
+         true,
+         2,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            15,
+            "a10d48656c6c6f2c20776f726c6421"
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            0,
+            ""
+         ],
+         9,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            2,
+            "8900"
+         ],
+         false
+      ],
+      [
+         "KL",
+         1
+      ],
+      [
+         "RO",
+         [
+            19,
+            "818db19b82e4f9feee88deb7a293dee9ee8090"
+         ]
+      ],
+      [
+         "RF",
+         [
+            13,
+            "Hello, world!"
+         ],
+         1,
+         true,
+         0,
+         true,
+         "b19b82e4"
+      ]
+   ]
+}

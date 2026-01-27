@@ -1,0 +1,706 @@
+{
+   "agent": "tokio-websockets",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 16,
+   "closedByMe": true,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send binary message message with payload of length 65536. Sent out data in chops of 997 octets.",
+   "droppedByMe": true,
+   "duration": 14,
+   "expectation": "Receive echo'ed binary message (with payload as sent). Clean close with normal code.",
+   "expected": {
+      "OK": [
+         [
+            "message",
+            "0xfefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ...",
+            true
+         ]
+      ]
+   },
+   "expectedClose": {
+      "closeCode": [
+         1000
+      ],
+      "closedByMe": true,
+      "requireClean": true
+   },
+   "failedByMe": false,
+   "httpRequest": "GET /runCase?case=16&agent=tokio-websockets HTTP/1.1\r\nHost: localhost:9001\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: CvaYSkRpHT0fSjGQflJyEw==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nServer: AutobahnTestSuite/25.10.1-0.10.9\r\nX-Powered-By: AutobahnPython/0.10.9\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: WIRpXFceZbLMQ4EfzH/V3X0MUKk=\r\n\r\n",
+   "id": "1.2.8",
+   "isServer": true,
+   "localCloseCode": 1000,
+   "localCloseReason": null,
+   "received": [
+      [
+         "message",
+         "0xfefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ...",
+         true
+      ]
+   ],
+   "remoteCloseCode": 1000,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": false,
+   "result": "Actual events match at least one expected.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {
+      "2": 1,
+      "8": 1
+   },
+   "rxOctetStats": {
+      "8": 1,
+      "14": 1,
+      "191": 1,
+      "65536": 1
+   },
+   "started": "2026-01-27T04:28:47.161Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "2": 1,
+      "8": 1
+   },
+   "txOctetStats": {
+      "4": 1,
+      "208": 1,
+      "741": 1,
+      "997": 65
+   },
+   "wasClean": true,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": null,
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "RO",
+         [
+            191,
+            "474554202f72756e436173653f636173653d3136266167656e743d746f6b696f2d776562736f636b65747320485454502f312e310d0a486f73743a206c6f6361 ..."
+         ]
+      ],
+      [
+         "TO",
+         [
+            208,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a5365727665723a204175746f6261686e5465737453756974652f32352e31 ..."
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            65536,
+            "0xfefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         2,
+         true,
+         0,
+         null,
+         null,
+         997,
+         false
+      ],
+      [
+         "TO",
+         [
+            997,
+            "827f0000000000010000fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "KL",
+         10
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            997,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            741,
+            "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         true
+      ],
+      [
+         "RO",
+         [
+            65536,
+            "82ff0000000000010000f791150f096febf1096febf1096febf1096febf1096febf1096febf1096febf1096febf1096febf1096febf1096febf1096febf1096f ..."
+         ]
+      ],
+      [
+         "RO",
+         [
+            14,
+            "ebf1096febf1096febf1096febf1"
+         ]
+      ],
+      [
+         "RF",
+         [
+            65536,
+            "0xfefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe ..."
+         ],
+         2,
+         true,
+         0,
+         true,
+         "f791150f"
+      ],
+      [
+         "TF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            4,
+            "880203e8"
+         ],
+         false
+      ],
+      [
+         "RO",
+         [
+            8,
+            "88828bb1825d8859"
+         ]
+      ],
+      [
+         "RF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         true,
+         "8bb1825d"
+      ]
+   ]
+}

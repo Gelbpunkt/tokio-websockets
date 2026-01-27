@@ -1,0 +1,130 @@
+{
+   "agent": "tokio-websockets",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 290,
+   "closedByMe": true,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send 1000 text messages of payload size 16 to measure implementation/network RTT (round trip time) / latency.",
+   "droppedByMe": true,
+   "duration": 257,
+   "expectation": "Receive echo'ed text messages (with payload as sent). Timeout case after 60 secs.",
+   "expected": {},
+   "expectedClose": {
+      "closeCode": [
+         1000
+      ],
+      "closedByMe": true,
+      "requireClean": true
+   },
+   "failedByMe": false,
+   "httpRequest": "GET /runCase?case=290&agent=tokio-websockets HTTP/1.1\r\nHost: localhost:9001\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: 7tdvYmcl6o/3UbdQVUGMdQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nServer: AutobahnTestSuite/25.10.1-0.10.9\r\nX-Powered-By: AutobahnPython/0.10.9\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: HRi9UTFXQ5VpmJARtT3eDC18RjA=\r\n\r\n",
+   "id": "9.7.2",
+   "isServer": true,
+   "localCloseCode": 1000,
+   "localCloseReason": null,
+   "received": [],
+   "remoteCloseCode": 1000,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": true,
+   "result": "Ok, received all echo'ed messages in time.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {
+      "1": 1000,
+      "8": 1
+   },
+   "rxOctetStats": {
+      "8": 1,
+      "22": 1000,
+      "192": 1
+   },
+   "started": "2026-01-27T04:28:57.685Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "1": 1000,
+      "8": 1
+   },
+   "txOctetStats": {
+      "4": 1,
+      "18": 1000,
+      "208": 1
+   },
+   "wasClean": true,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": null,
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "RO",
+         [
+            192,
+            "474554202f72756e436173653f636173653d323930266167656e743d746f6b696f2d776562736f636b65747320485454502f312e310d0a486f73743a206c6f63 ..."
+         ]
+      ],
+      [
+         "TO",
+         [
+            208,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a5365727665723a204175746f6261686e5465737453756974652f32352e31 ..."
+         ],
+         false
+      ],
+      [
+         "WLM",
+         false
+      ],
+      [
+         "TI",
+         60
+      ],
+      [
+         "WLM",
+         true
+      ],
+      [
+         "TF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            4,
+            "880203e8"
+         ],
+         false
+      ],
+      [
+         "RO",
+         [
+            8,
+            "8882e75eaf9ce4b6"
+         ]
+      ],
+      [
+         "RF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         true,
+         "e75eaf9c"
+      ]
+   ]
+}

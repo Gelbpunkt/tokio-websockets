@@ -1,0 +1,120 @@
+{
+   "agent": "tokio-websockets",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 62,
+   "closedByMe": false,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send text Message fragmented into 2 fragments, with both frame opcodes set to text, sent in one chop.",
+   "droppedByMe": false,
+   "duration": 1,
+   "expectation": "The connection is failed immediately, since all data frames after the initial data frame must have opcode 0.",
+   "expected": {
+      "OK": []
+   },
+   "expectedClose": {
+      "closeCode": [
+         1002
+      ],
+      "closedByMe": false,
+      "requireClean": false
+   },
+   "failedByMe": false,
+   "httpRequest": "GET /runCase?case=62&agent=tokio-websockets HTTP/1.1\r\nHost: localhost:9001\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ODfRxbyT5Bnuo23OC0YG/A==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nServer: AutobahnTestSuite/25.10.1-0.10.9\r\nX-Powered-By: AutobahnPython/0.10.9\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: 0/axBJ9jS7XT0Fwxg9xhAt8IzTI=\r\n\r\n",
+   "id": "5.18",
+   "isServer": true,
+   "localCloseCode": null,
+   "localCloseReason": null,
+   "received": [],
+   "remoteCloseCode": null,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": false,
+   "result": "Actual events match at least one expected.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {},
+   "rxOctetStats": {
+      "191": 1
+   },
+   "started": "2026-01-27T04:28:47.419Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "1": 2
+   },
+   "txOctetStats": {
+      "11": 2,
+      "208": 1
+   },
+   "wasClean": false,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": "peer dropped the TCP connection without previous WebSocket closing handshake",
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "RO",
+         [
+            191,
+            "474554202f72756e436173653f636173653d3632266167656e743d746f6b696f2d776562736f636b65747320485454502f312e310d0a486f73743a206c6f6361 ..."
+         ]
+      ],
+      [
+         "TO",
+         [
+            208,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a5365727665723a204175746f6261686e5465737453756974652f32352e31 ..."
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            9,
+            "fragment1"
+         ],
+         1,
+         false,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            11,
+            "0109667261676d656e7431"
+         ],
+         false
+      ],
+      [
+         "TF",
+         [
+            9,
+            "fragment2"
+         ],
+         1,
+         true,
+         0,
+         null,
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            11,
+            "8109667261676d656e7432"
+         ],
+         false
+      ],
+      [
+         "KL",
+         1
+      ]
+   ]
+}

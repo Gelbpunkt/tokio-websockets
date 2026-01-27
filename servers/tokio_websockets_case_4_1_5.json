@@ -1,0 +1,331 @@
+{
+   "agent": "tokio-websockets",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 39,
+   "closedByMe": false,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send small text message, then send frame with reserved non-control <b>Opcode = 7</b> and non-empty payload, then send Ping.",
+   "droppedByMe": false,
+   "duration": 4,
+   "expectation": "Echo for first message is received, but then connection is failed immediately, since reserved opcode frame is used. A Pong is not received.",
+   "expected": {
+      "NON-STRICT": [],
+      "OK": [
+         [
+            "message",
+            "Hello, world!",
+            false
+         ]
+      ]
+   },
+   "expectedClose": {
+      "closeCode": [
+         1002
+      ],
+      "closedByMe": false,
+      "requireClean": false
+   },
+   "failedByMe": false,
+   "httpRequest": "GET / HTTP/1.1\r\nUser-Agent: AutobahnTestSuite/25.10.1-0.10.9\r\nHost: 127.0.0.1:9006\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nPragma: no-cache\r\nCache-Control: no-cache\r\nSec-WebSocket-Key: MtNgMAlBMWAi7CwRUgX7Tw==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: jW163UjEguGvStH6F1XnE6NHUIE=\r\n\r\n",
+   "id": "4.1.5",
+   "isServer": false,
+   "localCloseCode": null,
+   "localCloseReason": null,
+   "received": [
+      [
+         "message",
+         "Hello, world!",
+         false
+      ]
+   ],
+   "remoteCloseCode": null,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": false,
+   "result": "Actual events match at least one expected.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {
+      "1": 1
+   },
+   "rxOctetStats": {
+      "15": 1,
+      "129": 1
+   },
+   "started": "2026-01-27T04:29:04.282Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "1": 1,
+      "7": 1,
+      "9": 1
+   },
+   "txOctetStats": {
+      "1": 22,
+      "242": 1
+   },
+   "wasClean": false,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": "peer dropped the TCP connection without previous WebSocket closing handshake",
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "TO",
+         [
+            242,
+            "474554202f20485454502f312e310d0a557365722d4167656e743a204175746f6261686e5465737453756974652f32352e31302e312d302e31302e390d0a486f ..."
+         ],
+         false
+      ],
+      [
+         "RO",
+         [
+            129,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a557067726164653a20776562736f636b65740d0a436f6e6e656374696f6e ..."
+         ]
+      ],
+      [
+         "TF",
+         [
+            13,
+            "Hello, world!"
+         ],
+         1,
+         true,
+         0,
+         "f7bf7d5d",
+         null,
+         1,
+         false
+      ],
+      [
+         "TO",
+         [
+            1,
+            "81"
+         ],
+         true
+      ],
+      [
+         "TF",
+         [
+            13,
+            "Hello, world!"
+         ],
+         7,
+         true,
+         0,
+         "b44775a3",
+         null,
+         1,
+         false
+      ],
+      [
+         "TF",
+         [
+            0,
+            ""
+         ],
+         9,
+         true,
+         0,
+         "d53da2d6",
+         null,
+         1,
+         false
+      ],
+      [
+         "KL",
+         1
+      ],
+      [
+         "TO",
+         [
+            1,
+            "8d"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "f7"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "bf"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "7d"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "5d"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "bf"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "da"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "11"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "31"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "98"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "93"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "5d"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "2a"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "98"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "cd"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "11"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "39"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "d6"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "87"
+         ],
+         true
+      ],
+      [
+         "RO",
+         [
+            15,
+            "810d48656c6c6f2c20776f726c6421"
+         ]
+      ],
+      [
+         "RF",
+         [
+            13,
+            "Hello, world!"
+         ],
+         1,
+         true,
+         0,
+         false,
+         null
+      ],
+      [
+         "TO",
+         [
+            1,
+            "8d"
+         ],
+         true
+      ],
+      [
+         "TO",
+         [
+            1,
+            "b4"
+         ],
+         true
+      ]
+   ]
+}
