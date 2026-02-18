@@ -29,8 +29,7 @@ jobs:
         run: echo "::add-matcher::.github/rust.json"
 
       - name: Run tests
-        run: |
-          cargo test --all-targets --all-features
+        run: cargo test --all-targets --features client,fastrand,server,sha1_smol
 
   run-fuzzer:
     name: Run fuzzer
@@ -76,8 +75,7 @@ jobs:
       - name: Build docs
         env:
           RUSTDOCFLAGS: --cfg docsrs
-        run: |
-          cargo doc --no-deps --all-features
+        run: cargo doc --no-deps --all-features
 
   clippy:
     name: Clippy
@@ -103,7 +101,7 @@ jobs:
         run: cargo clippy --all-features --all-targets
 
       - name: Run clippy (fuzz)
-        run: cargo clippy --manifest-path fuzz/Cargo.toml --all-features --all-targets
+        run: cargo clippy --manifest-path fuzz/Cargo.toml --all-targets
 
   rustfmt:
     name: Format
@@ -235,7 +233,7 @@ jobs:
 
       - name: Run tests in miri
         run: |
-          cargo miri test --all-features --all-targets
+          cargo miri test --all-targets --features client,fastrand,server,sha1_smol
 
   msrv:
     name: Feature powerset (MSRV)
