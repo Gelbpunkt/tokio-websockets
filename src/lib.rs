@@ -37,7 +37,16 @@
     all(feature = "nightly", target_arch = "loongarch64"),
     feature(stdarch_loongarch)
 )]
-#![cfg_attr(all(feature = "client", feature = "nightly"), feature(random))]
+#![cfg_attr(
+    all(
+        feature = "nightly",
+        feature = "client",
+        not(feature = "fastrand"),
+        not(feature = "getrandom"),
+        not(feature = "rand"),
+    ),
+    feature(random)
+)]
 #![doc = include_str!("../README.md")]
 
 // If the client or server implementation is enabled, at least one SHA1 backend
