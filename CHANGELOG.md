@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2] - 2026-03-17
+
+### Added
+
+- On loongarch64, frame (un)masking can now also make use of LSX alongside the existing LASX support
+
+### Changed
+
+- getrandom was upgraded to 0.4, rand was upgraded to 0.10
+
+### Fixed
+
+- Compilation with the `nightly` feature enabled now works on s390x with the latest Rust nightlies again
+
 ## [0.13.1] - 2025-12-28
 
 ### Added
