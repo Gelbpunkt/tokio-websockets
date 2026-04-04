@@ -59,7 +59,7 @@ This target uses AVX2 to emulate AVX512 in hardware.
 
 </details>
 
-### Rockchip RK3588S2, Linux 6.1.48
+### Qualcomm Snapdragon X Elite, Linux 7.0-rc3
 
 This target uses NEON.
 

@@ -1,11 +1,11 @@
 # Environment for compiling all executables to benchmark
-FROM docker.io/chimeralinux/chimera:latest AS builder
+FROM docker.io/library/alpine:edge AS builder
 
 # Update the system and install dependencies
 RUN apk update --no-cache && \
     apk upgrade --no-cache && \
-    apk add --no-cache bsdtar curl clang llvm gmake git zlib-ng-compat-devel openssl-devel libgit2 && \
-    curl https://musl.rs/install.sh | sh
+    apk add --no-cache curl clang git llvm make openssl-dev libgit2 tar zlib-dev && \
+    curl https://sh.rustup.rs | sh -s -- --profile minimal --default-toolchain nightly --component rust-src -y
 
 # uWebSockets for whatever reason defaults to g++ unless we set this
 ENV CC clang
@@ -14,7 +14,8 @@ ENV CXX clang++
 WORKDIR /build
 
 # Compile fastwebsockets
-RUN git clone https://github.com/denoland/fastwebsockets.git && \
+RUN source $HOME/.cargo/env && \
+    git clone https://github.com/denoland/fastwebsockets.git && \
     cd fastwebsockets && \
     cargo update && \
     cargo build --release --example echo_server --features upgrade && \
@@ -27,7 +28,8 @@ RUN git clone --recursive https://github.com/uNetworking/uWebSockets.git && \
     cp uWebSockets/EchoServer /usr/bin/uWebSockets
 
 # Compile tokio-tungstenite
-RUN git clone https://github.com/snapview/tokio-tungstenite.git && \
+RUN source $HOME/.cargo/env && \
+    git clone https://github.com/snapview/tokio-tungstenite.git && \
     cd tokio-tungstenite && \
     cargo update && \
     sed -i.bak 's/tokio::main/tokio::main(flavor = "current_thread")/g' examples/echo-server.rs && \
@@ -36,7 +38,8 @@ RUN git clone https://github.com/snapview/tokio-tungstenite.git && \
     cd ..
 
 # Compile the benchmark tool
-RUN cd /build/uWebSockets && \
+RUN source $HOME/.cargo/env && \
+    cd /build/uWebSockets && \
     sed -i.bak "s/	g++/	clang++/g" benchmarks/Makefile && \
     sed -i.bak '5i\'$'\n'"#include <endian.h>" benchmarks/parser.cpp && \
     make -C benchmarks && \
@@ -45,19 +48,17 @@ RUN cd /build/uWebSockets && \
 # Compile tokio-websockets
 WORKDIR /build/tokio-websockets
 COPY . .
-RUN cargo build --release --no-default-features --features nightly,server,sha1_smol --example echo_server --target $(uname -m)-unknown-linux-musl && \
+RUN source $HOME/.cargo/env && \
+    cargo build --release --no-default-features --features nightly,server,sha1_smol --example echo_server --target $(uname -m)-unknown-linux-musl && \
     cp target/$(uname -m)-unknown-linux-musl/release/examples/echo_server /usr/bin/tokio-websockets && \
     cd ..
 
 # Environment for benchmarking all executables
-FROM docker.io/chimeralinux/chimera:latest
+FROM docker.io/library/alpine:edge
 
 RUN apk update --no-cache && \
     apk upgrade --no-cache && \
-    apk add python --no-cache && \
-    apk add clang python-pip python-devel --virtual .deps && \
-    pip install matplotlib --break-system-packages && \
-    apk del .deps
+    apk add coreutils python3 py3-matplotlib --no-cache
 
 COPY --from=builder /usr/bin/fastwebsockets /usr/bin/fastwebsockets
 COPY --from=builder /usr/bin/uWebSockets /usr/bin/uWebSockets
