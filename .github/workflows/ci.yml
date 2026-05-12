@@ -203,10 +203,11 @@ jobs:
       matrix:
         include:
           # We want to cover all supported architectures here
-          # FIXME: Once stdarch supports LSX/LASX with portable SIMD, enable loongarch64 here
           # FIXME: Add armv7, ppc64
           - arch: aarch64
             image: ubuntu-24.04-arm
+          - arch: loongarch64
+            image: [alpine-edge, loongarch64]
           - arch: ppc64le
             image: [postmarketos-edge, ppc64le]
           - arch: s390x
