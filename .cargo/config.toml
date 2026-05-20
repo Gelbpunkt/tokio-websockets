@@ -8,7 +8,7 @@ rustflags = ["-C", "target-cpu=native"]
 rustflags = ["-C", "target-cpu=native"]
 
 [target.aarch64-unknown-linux-musl]
-rustflags = ["-C", "target-cpu=native"]
+rustflags = ["-C", "target-cpu=native", "-C", "target-feature=-crt-static"]
 
 [target.loongarch64-unknown-linux-musl]
 rustflags = ["-C", "target-cpu=native"]
