@@ -47,6 +47,7 @@
     ),
     feature(random)
 )]
+#![cfg_attr(all(test, feature = "nightly"), feature(test))]
 #![doc = include_str!("../README.md")]
 
 // If the client or server implementation is enabled, at least one SHA1 backend

@@ -432,22 +432,170 @@ pub fn frame(key: &mut [u8; 4], input: &mut [u8]) {
     fallback_frame(key, input);
 }
 
-#[cfg(all(test, feature = "client", feature = "fastrand"))]
-#[test]
-fn test_mask() {
+#[cfg(all(feature = "client", feature = "fastrand"))]
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "nightly")]
+    extern crate test;
+
+    #[cfg(feature = "nightly")]
+    use test::Bencher;
+
+    use super::{frame, one_byte_at_once};
     use crate::rand::get_mask;
 
-    let mut random_data: Vec<u8> = std::iter::repeat_with(|| fastrand::u8(..))
-        .take(1024)
-        .collect();
-    // Mess around with the data to ensure we have unaligned input
-    let data = &mut random_data[2..998];
-    let mut data_clone = data.to_vec();
-    let mut mask = [0; 4];
-    get_mask(&mut mask);
-    let mut mask2 = mask;
-    frame(&mut mask, data);
-    one_byte_at_once(&mut mask2, &mut data_clone);
+    fn random_data(size: usize) -> ([u8; 4], Vec<u8>) {
+        let data = std::iter::repeat_with(|| fastrand::u8(..))
+            .take(size)
+            .collect();
+        let mut mask = [0; 4];
+        get_mask(&mut mask);
+        (mask, data)
+    }
 
-    assert_eq!(&data, &data_clone);
+    #[test]
+    fn test_mask() {
+        let (mut mask, mut random_data) = random_data(1024);
+        // Mess around with the data to ensure we have unaligned input
+        let data = &mut random_data[2..998];
+        let mut data_clone = data.to_vec();
+        let mut mask2 = mask;
+        frame(&mut mask, data);
+        one_byte_at_once(&mut mask2, &mut data_clone);
+
+        assert_eq!(&data, &data_clone);
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_empty(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(0));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_1(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(1));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_2(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(2));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_4(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(4));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_8(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(8));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_16(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(16));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_32(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(32));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_64(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(64));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_128(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(128));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_256(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(256));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_512(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(512));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_1024(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(1024));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_2048(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(2048));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_4096(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(4096));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_8192(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(8192));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_16384(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(16384));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_32768(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(32768));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_65536(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(65536));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[bench]
+    fn bench_mask_131072(b: &mut Bencher) {
+        let (mut mask, mut data) = std::hint::black_box(random_data(131072));
+        b.iter(|| frame(&mut mask, &mut data));
+    }
 }
