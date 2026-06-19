@@ -25,7 +25,7 @@ use crate::{
     Connector, Error, MaybeTlsStream, WebSocketStream,
     proto::{Config, Limits, Role},
     resolver::{self, Resolver},
-    upgrade::{self, server_response},
+    upgrade::{self, Handshake, server_response},
 };
 
 /// Generates a new, random 16-byte WebSocket key and encodes it as base64.
@@ -132,8 +132,8 @@ pub struct Builder<'a, R: Resolver = resolver::Gai> {
     config: Config,
     /// Limits to impose on the WebSocket stream.
     limits: Limits,
-    /// Headers to be sent with the upgrade request.
-    headers: HeaderMap,
+    /// Configuration for the HTTP upgrade handshake.
+    handshake: Handshake,
 }
 
 impl Builder<'_> {
@@ -147,7 +147,7 @@ impl Builder<'_> {
             resolver: resolver::Gai,
             config: Config::default(),
             limits: Limits::default(),
-            headers: HeaderMap::new(),
+            handshake: Handshake::default(),
         }
     }
 
@@ -163,7 +163,7 @@ impl Builder<'_> {
             resolver: resolver::Gai,
             config: Config::default(),
             limits: Limits::default(),
-            headers: HeaderMap::new(),
+            handshake: Handshake::default(),
         }
     }
 }
@@ -207,7 +207,7 @@ impl<'a, R: Resolver> Builder<'a, R> {
             resolver: _,
             config,
             limits,
-            headers,
+            handshake,
         } = self;
 
         Builder {
@@ -216,7 +216,7 @@ impl<'a, R: Resolver> Builder<'a, R> {
             resolver,
             config,
             limits,
-            headers,
+            handshake,
         }
     }
 
@@ -246,9 +246,18 @@ impl<'a, R: Resolver> Builder<'a, R> {
         if DISALLOWED_HEADERS.contains(&name) {
             return Err(Error::DisallowedHeader);
         }
-        self.headers.insert(name, value);
+        self.handshake.headers.insert(name, value);
 
         Ok(self)
+    }
+
+    /// Sets the maximum number of HTTP headers to parse from the server's
+    /// upgrade response. The default is 64.
+    #[must_use]
+    pub fn max_headers(mut self, max: usize) -> Self {
+        self.handshake.max_headers = max;
+
+        self
     }
 
     /// Establishes a connection to the WebSocket server. This requires a URI to
@@ -318,8 +327,8 @@ impl<'a, R: Resolver> Builder<'a, R> {
 
         let key_base64 = make_key();
 
-        let upgrade_codec = server_response::Codec::new(&key_base64);
-        let request = build_request(uri, &key_base64, &self.headers);
+        let upgrade_codec = server_response::Codec::new(&key_base64, self.handshake.max_headers);
+        let request = build_request(uri, &key_base64, &self.handshake.headers);
         stream.write_all(&request).await?;
         stream.flush().await?;
 

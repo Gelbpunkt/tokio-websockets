@@ -1,10 +1,36 @@
 //! HTTP upgrade request and response generation and validation helpers.
 
 use std::fmt;
+
+use http::HeaderMap;
+
 #[cfg(feature = "server")]
 pub(crate) mod client_request;
 #[cfg(feature = "client")]
 pub(crate) mod server_response;
+
+/// The default maximum number of HTTP headers to parse during the upgrade
+/// handshake.
+const DEFAULT_MAX_HEADERS: usize = 64;
+
+/// Configuration for the HTTP upgrade handshake.
+#[derive(Debug, Clone)]
+pub(crate) struct Handshake {
+    /// Maximum number of HTTP headers to parse from the upgrade request or
+    /// response.
+    pub(crate) max_headers: usize,
+    /// Extra headers to include in the upgrade request or response.
+    pub(crate) headers: HeaderMap,
+}
+
+impl Default for Handshake {
+    fn default() -> Self {
+        Self {
+            max_headers: DEFAULT_MAX_HEADERS,
+            headers: HeaderMap::new(),
+        }
+    }
+}
 
 /// A parsed HTTP/1.1 101 Switching Protocols response.
 /// These responses typically do not contain a body, therefore it is omitted.

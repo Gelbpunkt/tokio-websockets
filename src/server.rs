@@ -8,14 +8,14 @@
 use std::{future::poll_fn, io, pin::Pin};
 
 use futures_core::Stream;
-use http::{HeaderMap, HeaderName, HeaderValue, header};
+use http::{HeaderName, HeaderValue, header};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::FramedRead;
 
 use crate::{
     Error, WebSocketStream,
     proto::{Config, Limits, Role},
-    upgrade::client_request,
+    upgrade::{Handshake, client_request},
 };
 
 /// HTTP/1.1 400 Bad Request response payload.
@@ -40,8 +40,8 @@ pub struct Builder {
     config: Config,
     /// Limits to impose on the WebSocket stream.
     limits: Limits,
-    /// Headers to be sent with the switching protocols response.
-    headers: HeaderMap,
+    /// Configuration for the HTTP upgrade handshake.
+    handshake: Handshake,
 }
 
 impl Default for Builder {
@@ -58,7 +58,7 @@ impl Builder {
         Self {
             config: Config::default(),
             limits: Limits::default(),
-            headers: HeaderMap::new(),
+            handshake: Handshake::default(),
         }
     }
 
@@ -88,9 +88,18 @@ impl Builder {
         if DISALLOWED_HEADERS.contains(&name) {
             return Err(Error::DisallowedHeader);
         }
-        self.headers.insert(name, value);
+        self.handshake.headers.insert(name, value);
 
         Ok(self)
+    }
+
+    /// Sets the maximum number of HTTP headers to parse from the client's
+    /// upgrade request. The default is 64.
+    #[must_use]
+    pub fn max_headers(mut self, max: usize) -> Self {
+        self.handshake.max_headers = max;
+
+        self
     }
 
     /// Perform a HTTP upgrade handshake on an already established stream and
@@ -106,7 +115,7 @@ impl Builder {
         let mut framed = FramedRead::new(
             stream,
             client_request::Codec {
-                response_headers: &self.headers,
+                handshake: &self.handshake,
             },
         );
         let reply = poll_fn(|cx| Pin::new(&mut framed).poll_next(cx)).await;

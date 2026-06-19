@@ -31,6 +31,8 @@ fn header<'a, 'header: 'a>(
 pub struct Codec {
     /// The SHA-1 digest of the `Sec-WebSocket-Key` header.
     ws_accept: [u8; 20],
+    /// Maximum number of HTTP headers to parse.
+    max_headers: usize,
 }
 
 impl Codec {
@@ -39,9 +41,10 @@ impl Codec {
     /// The `key` parameter provides the string passed to the server via the
     /// HTTP `Sec-WebSocket-Key` header.
     #[must_use]
-    pub fn new(key: &[u8]) -> Self {
+    pub fn new(key: &[u8], max_headers: usize) -> Self {
         Self {
             ws_accept: digest(key),
+            max_headers,
         }
     }
 }
@@ -51,7 +54,7 @@ impl Decoder for Codec {
     type Item = super::Response;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let mut headers = [httparse::EMPTY_HEADER; 25];
+        let mut headers = vec![httparse::EMPTY_HEADER; self.max_headers];
         let mut response = Response::new(&mut headers);
         let status = response.parse(src).map_err(Error::Parsing)?;
 

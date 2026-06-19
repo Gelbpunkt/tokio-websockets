@@ -3,11 +3,14 @@ use std::str::FromStr;
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use bytes::{Buf, BytesMut};
-use http::{HeaderMap, header::SET_COOKIE};
+use http::header::SET_COOKIE;
 use httparse::Request;
 use tokio_util::codec::Decoder;
 
-use crate::{sha::digest, upgrade::Error};
+use crate::{
+    sha::digest,
+    upgrade::{Error, Handshake},
+};
 
 /// A static HTTP/1.1 101 Switching Protocols response up until the
 /// `Sec-WebSocket-Accept` header value.
@@ -96,8 +99,8 @@ impl ClientRequest {
 ///
 /// [`Encoder`]: tokio_util::codec::Encoder
 pub struct Codec<'a> {
-    /// List of headers to add to the Switching Protocols response.
-    pub response_headers: &'a HeaderMap,
+    /// Configuration for the HTTP upgrade handshake.
+    pub handshake: &'a Handshake,
 }
 
 impl Decoder for Codec<'_> {
@@ -105,7 +108,7 @@ impl Decoder for Codec<'_> {
     type Item = (http::Request<()>, Vec<u8>);
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let mut headers = [httparse::EMPTY_HEADER; 64];
+        let mut headers = vec![httparse::EMPTY_HEADER; self.handshake.max_headers];
         let mut request = Request::new(&mut headers);
         let status = request.parse(src).map_err(Error::Parsing)?;
 
@@ -162,8 +165,8 @@ impl Decoder for Codec<'_> {
         resp.extend_from_slice(ws_accept.as_bytes());
         resp.extend_from_slice(b"\r\n");
 
-        for name in self.response_headers.keys() {
-            let values = self.response_headers.get_all(name).iter();
+        for name in self.handshake.headers.keys() {
+            let values = self.handshake.headers.get_all(name).iter();
 
             if name == SET_COOKIE {
                 // Set-Cookie is treated differently because if multiple values are present,
