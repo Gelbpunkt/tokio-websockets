@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   codespell:
     name: Run codespell
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Run codespell
@@ -13,7 +13,7 @@ jobs:
 
   run-tests:
     name: Run tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout sources
@@ -33,7 +33,7 @@ jobs:
 
   run-fuzzer:
     name: Run fuzzer
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout sources
@@ -57,7 +57,7 @@ jobs:
 
   build-docs:
     name: Build docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout sources
@@ -86,7 +86,7 @@ jobs:
           # We want to cover all supported architectures here
           # FIXME: Add armv7, ppc64
           - arch: aarch64
-            image: ubuntu-24.04-arm
+            image: ubuntu-26.04-arm
           - arch: loongarch64
             image: [alpine-edge, loongarch64]
           - arch: ppc64le
@@ -94,7 +94,7 @@ jobs:
           - arch: s390x
             image: [ubuntu-25.10, s390x]
           - arch: x86_64
-            image: ubuntu-latest
+            image: ubuntu-26.04
 
     runs-on: ${{ matrix.image }}
 
@@ -122,7 +122,7 @@ jobs:
 
   rustfmt:
     name: Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout sources
@@ -145,7 +145,7 @@ jobs:
 
   min-vers:
     name: Minimal crate versions
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout sources
@@ -180,7 +180,7 @@ jobs:
 
   features:
     name: Feature powerset (nightly)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout sources
@@ -222,7 +222,7 @@ jobs:
           # We want to cover all supported architectures here
           # FIXME: Add armv7, ppc64
           - arch: aarch64
-            image: ubuntu-24.04-arm
+            image: ubuntu-26.04-arm
           - arch: loongarch64
             image: [alpine-edge, loongarch64]
           - arch: ppc64le
@@ -230,7 +230,7 @@ jobs:
           - arch: s390x
             image: [ubuntu-25.10, s390x]
           - arch: x86_64
-            image: ubuntu-latest
+            image: ubuntu-26.04
 
     runs-on: ${{ matrix.image }}
 
@@ -262,7 +262,7 @@ jobs:
           # We want to cover all supported architectures here
           # FIXME: Add armv7, ppc64
           - arch: aarch64
-            image: ubuntu-24.04-arm
+            image: ubuntu-26.04-arm
           - arch: loongarch64
             image: [alpine-edge, loongarch64]
           - arch: ppc64le
@@ -270,7 +270,7 @@ jobs:
           - arch: s390x
             image: [ubuntu-25.10, s390x]
           - arch: x86_64
-            image: ubuntu-latest
+            image: ubuntu-26.04
 
     runs-on: ${{ matrix.image }}
 
