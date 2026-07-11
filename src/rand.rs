@@ -18,18 +18,18 @@ compile_error!(
     not(feature = "rand")
 ))]
 mod imp {
-    use std::random::RandomSource;
+    use std::random::{Rng, SystemRng};
 
     /// Generate a random 16-byte WebSocket key.
     pub fn get_key() -> [u8; 16] {
         let mut bytes = [0; 16];
-        std::random::DefaultRandomSource.fill_bytes(&mut bytes);
+        SystemRng.fill_bytes(&mut bytes);
         bytes
     }
 
     /// Generate a random 4-byte WebSocket mask.
     pub fn get_mask(dst: &mut [u8; 4]) {
-        std::random::DefaultRandomSource.fill_bytes(dst);
+        SystemRng.fill_bytes(dst);
     }
 }
 
