@@ -251,7 +251,7 @@ jobs:
 
       - name: Run tests in miri
         run: |
-          cargo miri test --all-targets --features client,fastrand,server,sha1_smol
+          cargo miri test --examples --tests --features client,fastrand,server,sha1_smol
 
   msrv:
     name: Feature powerset (MSRV)
