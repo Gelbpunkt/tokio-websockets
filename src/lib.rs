@@ -65,6 +65,9 @@ compile_error!("client and server implementation require at least one SHA1 backe
 #[cfg(feature = "client")]
 pub mod client;
 pub mod error;
+#[cfg(benchmark)]
+pub mod mask;
+#[cfg(not(benchmark))]
 mod mask;
 pub mod proto;
 #[cfg(feature = "client")]
