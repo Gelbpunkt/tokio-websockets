@@ -210,7 +210,7 @@ jobs:
             --feature-powerset \
             --no-dev-deps \
             --exclude-features aws-lc-rs,rustls-tls12 \
-            --group-features client,fastrand,sha1_smol \
+            --group-features client,nightly,sha1_smol \
             --group-features server,sha1_smol
 
   miri:
