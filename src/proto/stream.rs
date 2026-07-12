@@ -488,9 +488,8 @@ where
             self.queue_frame(frame);
         } else {
             // Chunk the message into frames
-            for frame in item.into_frames(self.config.frame_size) {
-                self.queue_frame(frame);
-            }
+            item.into_frames(self.config.frame_size)
+                .for_each(|frame| self.queue_frame(frame));
         }
 
         Ok(())

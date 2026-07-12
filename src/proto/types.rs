@@ -1,5 +1,5 @@
 //! Types required for the WebSocket protocol implementation.
-use std::{fmt, mem::replace, num::NonZeroU16, ops::Deref};
+use std::{fmt, mem, num::NonZeroU16, ops::Deref};
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -503,11 +503,33 @@ impl Iterator for MessageFrames {
                 .split_to(self.frame_size.min(self.payload.len()));
 
             Frame {
-                opcode: replace(&mut self.opcode, OpCode::Continuation),
+                opcode: mem::replace(&mut self.opcode, OpCode::Continuation),
                 is_final: self.payload.is_empty(),
                 payload,
             }
         })
+    }
+
+    fn fold<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let mut acc = init;
+        loop {
+            let payload = self
+                .payload
+                .split_to(self.frame_size.min(self.payload.len()));
+            let frame = Frame {
+                opcode: mem::replace(&mut self.opcode, OpCode::Continuation),
+                is_final: self.payload.is_empty(),
+                payload,
+            };
+
+            acc = f(acc, frame);
+            if self.payload.is_empty() {
+                return acc;
+            }
+        }
     }
 }
 
