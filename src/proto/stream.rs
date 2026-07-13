@@ -11,7 +11,7 @@ use std::{
 };
 
 use bytes::{Buf, BytesMut};
-use futures_core::Stream;
+use futures_core::{FusedStream, Stream};
 use futures_sink::Sink;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::{codec::FramedRead, io::poll_write_buf};
@@ -456,11 +456,17 @@ where
         Poll::Ready(Some(Ok(Message { opcode, payload })))
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let is_closed =
-            self.state == StreamState::ClosedByPeer || self.state == StreamState::CloseAcknowledged;
-        (0, is_closed.then_some(0))
+        (0, self.is_terminated().then_some(0))
+    }
+}
+
+impl<T> FusedStream for WebSocketStream<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    fn is_terminated(&self) -> bool {
+        self.state == StreamState::ClosedByPeer || self.state == StreamState::CloseAcknowledged
     }
 }
 
