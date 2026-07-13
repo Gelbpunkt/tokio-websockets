@@ -455,6 +455,13 @@ where
 
         Poll::Ready(Some(Ok(Message { opcode, payload })))
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let is_closed =
+            self.state == StreamState::ClosedByPeer || self.state == StreamState::CloseAcknowledged;
+        (0, is_closed.then_some(0))
+    }
 }
 
 // The tokio-util implementation of a sink uses a buffer which start_send
