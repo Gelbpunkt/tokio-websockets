@@ -196,9 +196,6 @@ pub struct WebSocketStream<T> {
     /// Opcode of the full message that is being assembled.
     partial_opcode: OpCode,
 
-    /// Buffer that outgoing frame headers are formatted into.
-    header_buf: [u8; 14],
-
     /// Queue of outgoing frames to send.
     frame_queue: FrameQueue,
 
@@ -220,7 +217,6 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            header_buf: [0; 14],
             frame_queue: FrameQueue::new(),
             flushing_waker: None,
         }
@@ -241,7 +237,6 @@ where
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
             partial_opcode: OpCode::Continuation,
-            header_buf: [0; 14],
             frame_queue: FrameQueue::new(),
             flushing_waker: None,
         }
@@ -377,8 +372,9 @@ where
             self.state = StreamState::ClosedByUs;
         }
 
+        let mut header = [0; 14];
         #[cfg_attr(not(feature = "client"), allow(unused_variables))]
-        let mask = frame.encode(&mut self.header_buf);
+        let mask = frame.encode(&mut header);
 
         #[cfg(feature = "client")]
         {
@@ -392,12 +388,12 @@ where
                 let mut mask_copy = *mask;
                 crate::mask::frame(&mut mask_copy, &mut payload);
                 frame.payload = payload.freeze();
-                self.header_buf[1] |= 1 << 7;
+                header[1] |= 1 << 7;
             }
         }
 
         let item = EncodedFrame {
-            header: self.header_buf,
+            header,
             payload: frame.payload,
         };
         self.frame_queue.push(item);
