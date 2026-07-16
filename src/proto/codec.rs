@@ -12,7 +12,7 @@ use tokio_util::codec::Decoder;
 
 use super::types::{Frame, Limits, OpCode, Role};
 use crate::{
-    CloseCode, Error, Payload, mask,
+    CloseCode, Error, mask,
     proto::ProtocolError,
     utf8::{self, Validator},
 };
@@ -219,8 +219,7 @@ impl Decoder for WebSocketProtocol {
         // Advance the offset into the payload body
         src.advance(offset);
         // Take the payload
-        let mut payload = Payload::from(src.split_to(payload_length));
-        payload.set_utf8_validated(opcode == OpCode::Text && fin);
+        let payload = src.split_to(payload_length).freeze();
 
         // It is possible to receive intermediate control frames between a large other
         // frame. We therefore can't simply reset the fragmented opcode after we receive

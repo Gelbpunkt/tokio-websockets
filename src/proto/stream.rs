@@ -21,7 +21,7 @@ use super::types::Role;
 use super::{
     Config, Limits,
     codec::WebSocketProtocol,
-    types::{Frame, Message, OpCode, Payload, StreamState},
+    types::{Frame, Message, OpCode, StreamState},
 };
 use crate::{CloseCode, Error};
 
@@ -391,14 +391,14 @@ where
                 // &mut *mask won't work, the compiler will optimize the deref/copy away
                 let mut mask_copy = *mask;
                 crate::mask::frame(&mut mask_copy, &mut payload);
-                frame.payload = Payload::from(payload);
+                frame.payload = payload.freeze();
                 self.header_buf[1] |= 1 << 7;
             }
         }
 
         let item = EncodedFrame {
             header: self.header_buf,
-            payload: frame.payload.data,
+            payload: frame.payload,
         };
         self.frame_queue.push(item);
     }
@@ -434,7 +434,8 @@ where
 
             if opcode != OpCode::Continuation {
                 if fin {
-                    return Poll::Ready(Some(Ok(Message { opcode, payload })));
+                    // SAFETY: Codec validates text frames as UTF-8.
+                    return Poll::Ready(Some(Ok(unsafe { Message::new(opcode, payload) })));
                 }
                 self.partial_opcode = opcode;
                 self.partial_payload = BytesMut::from(payload);
@@ -450,10 +451,10 @@ where
         }
 
         let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
-        let mut payload = Payload::from(take(&mut self.partial_payload));
-        payload.set_utf8_validated(opcode == OpCode::Text);
+        // SAFETY: Codec validates text frames as UTF-8.
+        let message = unsafe { Message::new(opcode, take(&mut self.partial_payload).freeze()) };
 
-        Poll::Ready(Some(Ok(Message { opcode, payload })))
+        Poll::Ready(Some(Ok(message)))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
