@@ -457,7 +457,8 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, self.is_terminated().then_some(0))
+        let is_exhausted = self.is_terminated() || self.state == StreamState::ClosedByPeer;
+        (0, is_exhausted.then_some(0))
     }
 }
 
@@ -466,7 +467,7 @@ where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     fn is_terminated(&self) -> bool {
-        self.state == StreamState::ClosedByPeer || self.state == StreamState::CloseAcknowledged
+        self.state == StreamState::CloseAcknowledged
     }
 }
 
