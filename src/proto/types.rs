@@ -171,7 +171,7 @@ impl TryFrom<u16> for CloseCode {
 #[derive(Clone)]
 pub struct Payload {
     /// The raw payload data.
-    data: Bytes,
+    pub(crate) data: Bytes,
     /// Whether the payload data was validated to be valid UTF-8.
     utf8_validated: bool,
 }

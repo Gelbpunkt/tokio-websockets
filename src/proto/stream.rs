@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll, Waker, ready},
 };
 
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use futures_core::{FusedStream, Stream};
 use futures_sink::Sink;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -31,7 +31,7 @@ struct EncodedFrame {
     /// Encoded frame header and mask.
     header: [u8; 14],
     /// Potentially masked message payload, ready for writing to the I/O.
-    payload: Payload,
+    payload: Bytes,
 }
 
 impl EncodedFrame {
@@ -398,7 +398,7 @@ where
 
         let item = EncodedFrame {
             header: self.header_buf,
-            payload: frame.payload,
+            payload: frame.payload.data,
         };
         self.frame_queue.push(item);
     }
