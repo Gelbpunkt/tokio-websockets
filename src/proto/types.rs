@@ -1,5 +1,5 @@
 //! Types required for the WebSocket protocol implementation.
-use std::{fmt, mem, num::NonZeroU16, ops::Deref};
+use std::{fmt, mem, num::NonZero, ops::Deref};
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -65,7 +65,7 @@ impl From<OpCode> for u8 {
 
 /// Close status code.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CloseCode(NonZeroU16);
+pub struct CloseCode(NonZero<u16>);
 
 // rustfmt reorders these alphabetically
 #[rustfmt::skip]
@@ -118,7 +118,7 @@ impl CloseCode {
     /// Returns `None` if `code` is not a valid `CloseCode`
     const fn try_from_u16(code: u16) -> Option<Self> {
         match code {
-            1000..=1015 | 3000..=4999 => Some(Self(NonZeroU16::new(code).unwrap())),
+            1000..=1015 | 3000..=4999 => Some(Self(NonZero::new(code).unwrap())),
             0..=999 | 1016..=2999 | 5000..=u16::MAX => None,
         }
     }

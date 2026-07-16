@@ -6,7 +6,7 @@ use std::{
     convert::TryFrom,
     future::Future,
     io,
-    num::NonZeroUsize,
+    num::NonZero,
     pin::Pin,
     sync::{Arc, Mutex},
     task::{Context, Poll},
@@ -82,7 +82,7 @@ struct Workload {
     io_behaviors: Vec<IoBehavior>,
     operations: Vec<Operation>,
     /// Zero would panic.
-    frame_size: NonZeroUsize,
+    frame_size: NonZero<usize>,
     /// Limit to a small int to avoid OOM.
     max_payload_len: u16,
 }
