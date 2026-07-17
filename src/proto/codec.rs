@@ -7,6 +7,8 @@
 //!
 //! [`WebSocketStream`]: super::WebSocketStream
 
+use std::mem;
+
 use bytes::{Buf, BytesMut};
 use tokio_util::codec::Decoder;
 
@@ -50,6 +52,11 @@ impl WebSocketProtocol {
             payload_processed: 0,
             validator: Validator::new(),
         }
+    }
+
+    /// Takes the fragmented message opcode.
+    pub(super) fn take_message_opcode(&mut self) -> OpCode {
+        mem::replace(&mut self.fragmented_message_opcode, OpCode::Continuation)
     }
 }
 
@@ -221,12 +228,8 @@ impl Decoder for WebSocketProtocol {
         // Take the payload
         let payload = src.split_to(payload_length).freeze();
 
-        // It is possible to receive intermediate control frames between a large other
-        // frame. We therefore can't simply reset the fragmented opcode after we receive
-        // a "final" frame.
-        if (fin && opcode == OpCode::Continuation) || (!fin && opcode != OpCode::Continuation) {
-            // Full chunked message received (and opcode is Continuation)
-            // or first frame of a multi-frame message received
+        if !fin && opcode != OpCode::Continuation {
+            // First frame of a multi-frame message
             self.fragmented_message_opcode = opcode;
         }
         // In all other cases, we have either a continuation or control frame, neither

@@ -5,7 +5,7 @@
 use std::{
     collections::VecDeque,
     io::{self, IoSlice},
-    mem::{replace, take},
+    mem::take,
     pin::Pin,
     task::{Context, Poll, Waker, ready},
 };
@@ -193,8 +193,6 @@ pub struct WebSocketStream<T> {
 
     /// Payload of the full message that is being assembled.
     partial_payload: BytesMut,
-    /// Opcode of the full message that is being assembled.
-    partial_opcode: OpCode,
 
     /// Queue of outgoing frames to send.
     frame_queue: FrameQueue,
@@ -216,7 +214,6 @@ where
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
-            partial_opcode: OpCode::Continuation,
             frame_queue: FrameQueue::new(),
             flushing_waker: None,
         }
@@ -236,7 +233,6 @@ where
             config,
             state: StreamState::Active,
             partial_payload: BytesMut::new(),
-            partial_opcode: OpCode::Continuation,
             frame_queue: FrameQueue::new(),
             flushing_waker: None,
         }
@@ -433,7 +429,6 @@ where
                     // SAFETY: Codec validates text frames as UTF-8.
                     return Poll::Ready(Some(Ok(unsafe { Message::new(opcode, payload) })));
                 }
-                self.partial_opcode = opcode;
                 self.partial_payload = BytesMut::from(payload);
             } else if len > max_len {
                 return Poll::Ready(Some(Err(Error::PayloadTooLong { len, max_len })));
@@ -446,7 +441,7 @@ where
             }
         }
 
-        let opcode = replace(&mut self.partial_opcode, OpCode::Continuation);
+        let opcode = self.inner.decoder_mut().take_message_opcode();
         // SAFETY: Codec validates text frames as UTF-8.
         let message = unsafe { Message::new(opcode, take(&mut self.partial_payload).freeze()) };
 
