@@ -474,11 +474,11 @@ where
 {
     type Error = Error;
 
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // tokio-util calls poll_flush when more than 8096 bytes are pending, otherwise
         // it returns Ready. We will just replicate that behavior
         if self.frame_queue.remaining() >= self.config.flush_threshold {
-            self.as_mut().poll_flush(cx)
+            self.poll_flush(cx)
         } else {
             Poll::Ready(Ok(()))
         }
