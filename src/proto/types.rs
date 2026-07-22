@@ -615,11 +615,14 @@ impl Default for Config {
 }
 
 /// Role assumed by the [`WebSocketStream`] in a connection.
+#[cfg(any(feature = "client", feature = "server"))]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Role {
     /// The client end.
+    #[cfg(feature = "client")]
     Client,
     /// The server end.
+    #[cfg(feature = "server")]
     Server,
 }
 

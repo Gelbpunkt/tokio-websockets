@@ -12,7 +12,9 @@ use std::mem;
 use bytes::{Buf, BytesMut};
 use tokio_util::codec::Decoder;
 
-use super::types::{Frame, Limits, OpCode, Role};
+#[cfg(any(feature = "client", feature = "server"))]
+use super::types::Role;
+use super::types::{Frame, Limits, OpCode};
 use crate::{
     CloseCode, Error, mask,
     proto::ProtocolError,
@@ -30,6 +32,7 @@ const MAX_FRAME_HEADER_SIZE: usize = 14;
 #[derive(Debug)]
 pub(super) struct WebSocketProtocol {
     /// The [`Role`] this implementation should assume for the stream.
+    #[cfg(any(feature = "client", feature = "server"))]
     pub(super) role: Role,
     /// The [`Limits`] imposed on this stream.
     pub(super) limits: Limits,
@@ -111,9 +114,12 @@ impl Decoder for WebSocketProtocol {
         // Bit 0
         let masked = first_two_bytes[1] >> 7 != 0;
 
+        #[cfg(feature = "client")]
         if masked && self.role == Role::Client {
             return Err(Error::Protocol(ProtocolError::UnexpectedMaskedFrame));
-        } else if !masked && self.role == Role::Server {
+        }
+        #[cfg(feature = "server")]
+        if !masked && self.role == Role::Server {
             return Err(Error::Protocol(ProtocolError::UnexpectedUnmaskedFrame));
         }
 
