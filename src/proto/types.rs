@@ -190,6 +190,14 @@ impl fmt::Debug for Payload {
     }
 }
 
+impl PartialEq for Payload {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
+impl Eq for Payload {}
+
 impl From<Bytes> for Payload {
     fn from(value: Bytes) -> Self {
         Self {
