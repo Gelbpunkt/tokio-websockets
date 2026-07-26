@@ -13,7 +13,7 @@ fn mask_benchmark(c: &mut Criterion) {
     SystemRng.fill_bytes(&mut data);
     // Generate a random masking key
     let mut key = [0; 4];
-    SystemRng.fill_bytes(&mut data);
+    SystemRng.fill_bytes(&mut key);
 
     // We benchmark 2^n bytes of input for n in 0..=30 (2 ** 30 bytes are 1GiB)
     for exp in 0..=30 {
