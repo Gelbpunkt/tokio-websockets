@@ -651,7 +651,6 @@ pub(super) struct Frame {
 
 impl Frame {
     /// Default close frame.
-    #[allow(clippy::declare_interior_mutable_const)]
     pub const DEFAULT_CLOSE: Self = Self {
         opcode: OpCode::Close,
         is_final: true,

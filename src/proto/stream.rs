@@ -178,7 +178,6 @@ impl Buf for FrameQueue {
 ///
 /// [`ClientBuilder`]: crate::ClientBuilder
 /// [`ServerBuilder`]: crate::ServerBuilder
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct WebSocketStream<T> {
     /// The underlying stream using the [`WebSocketProtocol`] to read and write
@@ -362,14 +361,14 @@ where
     /// Masks and queues a frame for sending when [`poll_flush`] gets called.
     fn queue_frame(
         &mut self,
-        #[cfg_attr(not(feature = "client"), allow(unused_mut))] mut frame: Frame,
+        #[cfg_attr(not(feature = "client"), expect(unused_mut))] mut frame: Frame,
     ) {
         if frame.opcode == OpCode::Close && self.state != StreamState::ClosedByPeer {
             self.state = StreamState::ClosedByUs;
         }
 
         let mut header = [0; 14];
-        #[cfg_attr(not(feature = "client"), allow(unused_variables))]
+        #[cfg_attr(not(feature = "client"), expect(unused_variables))]
         let mask = frame.encode(&mut header);
 
         #[cfg(feature = "client")]

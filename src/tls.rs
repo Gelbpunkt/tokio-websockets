@@ -75,7 +75,7 @@ impl Debug for Connector {
 }
 
 /// A stream that might be protected with TLS.
-#[allow(clippy::large_enum_variant)] // Only one or two of these will be used
+#[expect(clippy::large_enum_variant)] // Only one or two of these will be used
 #[derive(Debug)]
 pub enum MaybeTlsStream<S> {
     /// Unencrypted socket stream.
@@ -256,7 +256,7 @@ impl Connector {
 
                 #[cfg(feature = "rustls-native-roots")]
                 {
-                    #[cfg_attr(feature = "rustls-webpki-roots", allow(unused))]
+                    #[cfg_attr(feature = "rustls-webpki-roots", expect(unused))]
                     let rustls_native_certs::CertificateResult { certs, errors, .. } =
                         rustls_native_certs::load_native_certs();
 
@@ -298,7 +298,11 @@ impl Connector {
             feature = "rustls-platform-verifier",
             feature = "rustls-bring-your-own-connector"
         )),
-        allow(unused_variables, clippy::unused_async)
+        expect(
+            unused_variables,
+            clippy::unused_async,
+            clippy::unused_async_trait_impl
+        )
     )]
     pub async fn wrap<S: AsyncRead + AsyncWrite + Unpin>(
         &self,

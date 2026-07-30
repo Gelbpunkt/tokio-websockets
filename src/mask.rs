@@ -23,7 +23,6 @@
 /// sufficiently large inputs, it masks in chunks of 64 bytes per
 /// instruction, applying the fallback method on all remaining data.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[allow(clippy::incompatible_msrv)] // nightly feature gated, stable since 1.89.0
 #[target_feature(enable = "avx512f")]
 unsafe fn frame_avx512(key: &mut [u8; 4], input: &mut [u8]) {
     #[cfg(target_arch = "x86")]
@@ -312,7 +311,7 @@ unsafe fn frame_lsx_vector(key: &mut [u8; 4], input: &mut [u8]) {
 }
 
 /// Rotates the mask in-place by a certain amount of bytes.
-#[allow(clippy::cast_possible_truncation)] // offset % 4 is within u32 bounds
+#[expect(clippy::cast_possible_truncation)] // offset % 4 is within u32 bounds
 fn rotate_mask(key: &mut [u8; 4], offset: usize) {
     *key = u32::from_be_bytes(*key)
         .rotate_left((offset % key.len()) as u32 * u8::BITS)

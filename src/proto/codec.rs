@@ -78,7 +78,7 @@ impl Decoder for WebSocketProtocol {
     type Error = Error;
     type Item = Frame;
 
-    #[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
+    #[expect(clippy::cast_possible_truncation, clippy::too_many_lines)]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Opcode and payload length must be present
         let first_two_bytes = get_buf_if_space!(src, 0..2);
