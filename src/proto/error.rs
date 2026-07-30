@@ -2,7 +2,6 @@
 use std::fmt;
 
 /// Error encountered on protocol violations by the other end of the connection.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ProtocolError {
