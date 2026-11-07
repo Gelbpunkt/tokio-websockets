@@ -296,7 +296,7 @@ unsafe fn frame_lsx_vector(key: &mut [u8; 4], input: &mut [u8]) {
 
         if !aligned_data.is_empty() {
             let key_vector = [i32::from_ne_bytes(*key); 4];
-            let mask = lsx_vld(key_vector.as_ptr().cast(), 0);
+            let mask = lsx_vld::<0>(key_vector.as_ptr().cast());
 
             for block in aligned_data {
                 *block = lsx_vxor_v(*block, mask);

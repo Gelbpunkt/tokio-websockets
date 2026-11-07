@@ -32,11 +32,6 @@
     all(feature = "nightly", target_arch = "s390x"),
     feature(stdarch_s390x)
 )]
-// Required for LASX until stable
-#![cfg_attr(
-    all(feature = "nightly", target_arch = "loongarch64"),
-    feature(stdarch_loongarch)
-)]
 #![cfg_attr(
     all(
         feature = "nightly",
