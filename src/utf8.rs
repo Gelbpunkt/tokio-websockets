@@ -47,8 +47,8 @@ impl Validator {
             // 0b11110xxx (four-byte code point)
             0b1111_0000..=0b1111_0111 => 4,
             // Invalid first byte.
-            // SAFETY: The first byte must be valid UTF-8, otherwise from_str would return
-            // a FromUtf8Error with error_len() that is Some(_)
+            // SAFETY: The first byte must be valid UTF-8, otherwise from_str
+            // would return a FromUtf8Error with error_len() that is Some(_)
             _ => unsafe { unreachable_unchecked() },
         }
     }
@@ -85,7 +85,8 @@ impl Validator {
             }
             .copy_from_slice(&input[..bytes_to_copy]);
 
-            // If we know that the codepoint is complete, we can use the basic variant
+            // If we know that the codepoint is complete, we can use the basic
+            // variant
             if available_bytes >= missing_bytes {
                 if simdutf8::basic::from_utf8(unsafe {
                     self.partial_codepoint
@@ -136,7 +137,8 @@ impl Validator {
                     Err(ProtocolError::InvalidUtf8)
                 }
                 Err(utf8_error) => {
-                    // Incomplete input, copy the partial codepoints to the validator
+                    // Incomplete input, copy the partial codepoints to the
+                    // validator
                     self.partial_codepoint_len = remaining_bytes.len() - utf8_error.valid_up_to();
                     unsafe {
                         self.partial_codepoint

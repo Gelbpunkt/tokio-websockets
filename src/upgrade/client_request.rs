@@ -166,8 +166,9 @@ impl Decoder for Codec<'_> {
             let values = self.response_headers.get_all(name).iter();
 
             if name == SET_COOKIE {
-                // Set-Cookie is treated differently because if multiple values are present,
-                // multiple header entries should be used rather than one
+                // Set-Cookie is treated differently because if multiple values
+                // are present, multiple header entries should
+                // be used rather than one
                 for value in values {
                     resp.extend_from_slice(name.as_str().as_bytes());
                     resp.extend_from_slice(b": ");
@@ -175,7 +176,8 @@ impl Decoder for Codec<'_> {
                     resp.extend_from_slice(b"\r\n");
                 }
             } else {
-                // All other header values of the same key should be concatenated with a comma
+                // All other header values of the same key should be
+                // concatenated with a comma
                 resp.extend_from_slice(name.as_str().as_bytes());
                 resp.extend_from_slice(b": ");
 

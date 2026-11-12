@@ -268,8 +268,8 @@ impl<'a, R: Resolver> Builder<'a, R> {
         Error,
     > {
         let uri = self.uri.as_ref().ok_or(Error::NoUriConfigured)?;
-        // Uri::host contains square brackets around IPv6 addresses, which is required
-        // by the RFC: https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2
+        // Uri::host contains square brackets around IPv6 addresses, which is
+        // required by the RFC: https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2
         // These, however, do not resolve.
         let host = uri
             .host()

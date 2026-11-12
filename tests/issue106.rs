@@ -35,9 +35,9 @@ impl AsyncRead for MockStream {
 }
 
 impl AsyncWrite for MockStream {
-    // We can track the amount of flushes called on the WebSocketStream by counting
-    // the writes to the mock stream, since flushing the WebSocketStream writes
-    // pending data to the mock stream.
+    // We can track the amount of flushes called on the WebSocketStream by
+    // counting the writes to the mock stream, since flushing the
+    // WebSocketStream writes pending data to the mock stream.
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, _: &[u8]) -> Poll<Result<usize>> {
         cx.waker().wake_by_ref();
         Poll::Pending

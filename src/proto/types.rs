@@ -136,7 +136,8 @@ impl CloseCode {
         match self.0.get() {
             1004 | 1005 | 1006 | 1015 => true,
             1000..=4999 => false,
-            // `TryFrom` is the only way to acquire self and it errors for these values
+            // `TryFrom` is the only way to acquire self and it errors for these
+            // values
             0..=999 | 5000..=u16::MAX => {
                 debug_assert!(false, "unexpected CloseCode");
                 false
@@ -230,9 +231,9 @@ impl From<Payload> for BytesMut {
 
 impl From<Vec<u8>> for Payload {
     fn from(value: Vec<u8>) -> Self {
-        // BytesMut::from_iter goes through a specialization in std if the iterator is a
-        // Vec, effectively allowing us to use BytesMut::from_vec which isn't
-        // exposed in bytes. See https://github.com/tokio-rs/bytes/issues/723 for details.
+        // BytesMut::from_iter goes through a specialization in std if the
+        // iterator is a Vec, effectively allowing us to use
+        // BytesMut::from_vec which isn't exposed in bytes. See https://github.com/tokio-rs/bytes/issues/723 for details.
         Self {
             data: BytesMut::from_iter(value).freeze(),
             utf8_validated: false,
@@ -439,8 +440,8 @@ impl Message {
             let code = if self.payload.is_empty() {
                 CloseCode::NO_STATUS_RECEIVED
             } else {
-                // SAFETY: Opcode is Close with a non-empty payload so it's at least 2 bytes
-                // long
+                // SAFETY: Opcode is Close with a non-empty payload so it's at
+                // least 2 bytes long
                 unsafe {
                     CloseCode::try_from(u16::from_be_bytes(
                         self.payload

@@ -93,8 +93,8 @@ fn main() -> io::Result<()> {
     // client chunks the frames
     let mut buf = vec![0; message_size];
 
-    // We expect the server to assume that this is a websocket connection (i.e. skip
-    // the handshake)
+    // We expect the server to assume that this is a websocket connection (i.e.
+    // skip the handshake)
     loop {
         // Now just write the message in chops
         for chop in encoded_message.chunks(chop_size) {

@@ -17,15 +17,16 @@ async fn test_pr102_regression() {
     // This will close the connection
     drop(server);
 
-    // Create a client and make sure the close frame from the server was sent and
-    // the connection closed
+    // Create a client and make sure the close frame from the server was sent
+    // and the connection closed
     let mut client = ClientBuilder::new().take_over(tx);
 
     // Receive the close frame, this will queue the close ack frame
     assert!(client.next().await.unwrap().unwrap().is_close());
-    // The close ack frame is queued, the connection is closed, before PR 102 this
-    // would trigger an infinite loop in close()
-    // For the regression test, fail the test if this doesn't close within a second
+    // The close ack frame is queued, the connection is closed, before PR 102
+    // this would trigger an infinite loop in close()
+    // For the regression test, fail the test if this doesn't close within a
+    // second
     assert!(
         timeout(Duration::from_secs(1), client.close())
             .await

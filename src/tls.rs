@@ -260,7 +260,8 @@ impl Connector {
                     let rustls_native_certs::CertificateResult { certs, errors, .. } =
                         rustls_native_certs::load_native_certs();
 
-                    // Not finding any native roots is not fatal if webpki roots are enabled
+                    // Not finding any native roots is not fatal if webpki roots
+                    // are enabled
                     #[cfg(not(feature = "rustls-webpki-roots"))]
                     if certs.is_empty() {
                         return Err(Error::NoNativeRootCertificatesFound(errors));

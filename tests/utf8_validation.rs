@@ -45,8 +45,8 @@ async fn test_utf8_fail_fast_incomplete_continuation() {
     let mut frame1_payload: Vec<u8> = std::iter::repeat_with(|| fastrand::alphanumeric() as u8)
         .take(4096)
         .collect();
-    // We omit the last byte of the emoji, since it is *already* invalid at the 0.
-    // This should catch even more edge cases
+    // We omit the last byte of the emoji, since it is *already* invalid at the
+    // 0. This should catch even more edge cases
     let frame3_payload = [159, 0];
 
     let frame1 = encode_frame(1, &frame1_payload, 4096, false);

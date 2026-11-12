@@ -82,8 +82,9 @@ async fn test_cancellation_safety() {
     let mut cx = Context::from_waker(noop_waker_ref());
 
     loop {
-        // Cancellable futures should be possible to re-create at any time and resume as
-        // if they were created once and then polled a few times
+        // Cancellable futures should be possible to re-create at any time and
+        // resume as if they were created once and then polled a few
+        // times
         if let Poll::Ready(val) = server.next().poll_unpin(&mut cx) {
             let msg = val.expect("eof").expect("err");
             assert_eq!(&*msg.into_payload(), TO_SEND);

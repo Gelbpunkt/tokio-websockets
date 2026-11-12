@@ -280,9 +280,9 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame, Error>>> {
-        // In the case of Active or ClosedByUs, we want to receive more messages from
-        // the remote. In the case of ClosedByPeer, we have to flush to make sure our
-        // close acknowledge goes through.
+        // In the case of Active or ClosedByUs, we want to receive more messages
+        // from the remote. In the case of ClosedByPeer, we have to
+        // flush to make sure our close acknowledge goes through.
         if self.state == StreamState::CloseAcknowledged {
             return Poll::Ready(None);
         } else if self.state == StreamState::ClosedByPeer {
@@ -292,10 +292,11 @@ where
         }
 
         // If there are pending items, try to flush the sink.
-        // Futures only store a single waker. If we use poll_flush(cx) here, the stored
-        // waker (i.e. usually that of the write task) is replaced with our waker (i.e.
-        // that of the read task) and our write task may never get woken up again. We
-        // circumvent this by not calling poll_flush at all if poll_flush is polled by
+        // Futures only store a single waker. If we use poll_flush(cx) here, the
+        // stored waker (i.e. usually that of the write task) is
+        // replaced with our waker (i.e. that of the read task) and our
+        // write task may never get woken up again. We circumvent this
+        // by not calling poll_flush at all if poll_flush is polled by
         // another task at the moment.
         if self.frame_queue.has_remaining() {
             let waker = self.flushing_waker.clone();
@@ -376,10 +377,12 @@ where
             if self.inner.decoder().role == Role::Client {
                 let mut payload = BytesMut::from(frame.payload);
                 crate::rand::get_mask(mask);
-                // mask::frame will mutate the mask in-place, but we want to send the original
-                // mask. This is essentially a u32, so copying it is cheap and easier than
+                // mask::frame will mutate the mask in-place, but we want to
+                // send the original mask. This is essentially a
+                // u32, so copying it is cheap and easier than
                 // special-casing this in the masking implementation.
-                // &mut *mask won't work, the compiler will optimize the deref/copy away
+                // &mut *mask won't work, the compiler will optimize the
+                // deref/copy away
                 let mut mask_copy = *mask;
                 crate::mask::frame(&mut mask_copy, &mut payload);
                 frame.payload = payload.freeze();
@@ -474,8 +477,9 @@ where
     type Error = Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // tokio-util calls poll_flush when more than 8096 bytes are pending, otherwise
-        // it returns Ready. We will just replicate that behavior
+        // tokio-util calls poll_flush when more than 8096 bytes are pending,
+        // otherwise it returns Ready. We will just replicate that
+        // behavior
         if self.frame_queue.remaining() >= self.config.flush_threshold {
             self.poll_flush(cx)
         } else {
@@ -501,8 +505,8 @@ where
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Borrow checker hacks... It needs this to understand that we can separately
-        // borrow the fields of the struct mutably
+        // Borrow checker hacks... It needs this to understand that we can
+        // separately borrow the fields of the struct mutably
         let this = self.get_mut();
         let frame_queue = &mut this.frame_queue;
         let io = this.inner.get_mut();
